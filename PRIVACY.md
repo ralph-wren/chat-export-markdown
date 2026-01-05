@@ -30,9 +30,6 @@ The extension requests the following permissions for specific purposes required 
 *   **`activeTab`**:
     *   **Reason**: To access the content of the current chat page (e.g., chatgpt.com or gemini.google.com) *only when* the user clicks the extension icon or the "Summarize" button.
     *   **Usage**: Used to identify the active tab and inject the content extraction script.
-*   **`scripting`**:
-    *   **Reason**: To programmatically execute the content extraction script on the active chat page.
-    *   **Usage**: Used to parse the DOM of the chat interface and retrieve the conversation text for summarization.
 *   **`storage`**:
     *   **Reason**: To save user preferences and local data.
     *   **Usage**: Used to store your API Settings (Key, Model, Base URL) and the local history of generated summaries.

@@ -20,14 +20,17 @@
 
 ### 1. 主界面与历史记录
 查看最近的导出记录并开始新的总结任务。
-![主界面](store-assets/screenshot-1.png)
+![主界面](store-assets/screenshot-4.png)
 
 ### 2. AI 总结结果
 带有语法高亮的 Markdown 预览。
-![总结结果](store-assets/screenshot-2.png)
+![主界面](store-assets/screenshot-1.png)
 
-### 3. 优化对话与设置
+### 3. 优化对话
 提出后续问题并配置您的 API 提供商。
+![设置](store-assets/screenshot-2.png)
+
+### 4. API配置
 ![设置](store-assets/screenshot-3.png)
 
 ## 🛠️ 安装指南
