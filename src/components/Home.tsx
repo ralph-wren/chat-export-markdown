@@ -22,14 +22,20 @@ const MermaidChart = ({ code }: { code: string }) => {
     const renderChart = async () => {
       try {
         const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
+        // Attempt to parse/render. If syntax is incomplete (during stream), it might throw.
         const { svg } = await mermaid.render(id, code);
         setSvg(svg);
       } catch (error) {
-        console.error('Mermaid render error:', error);
-        setSvg(`<pre class="text-red-500 text-xs">${code}</pre>`);
+        // While streaming or if syntax is invalid, show the code block gracefully.
+        // Don't show scary red errors, just the raw code with a loading hint if it looks like it's being built.
+        // We can't easily know if 'loading' is true here without prop drilling, 
+        // so we just default to a neutral fallback.
+        setSvg(`<div class="p-2 bg-gray-50 border rounded text-xs font-mono text-gray-500 overflow-x-auto whitespace-pre-wrap">${code}</div>`);
       }
     };
-    renderChart();
+    if (code) {
+        renderChart();
+    }
   }, [code]);
 
   return <div dangerouslySetInnerHTML={{ __html: svg }} />;
@@ -65,7 +71,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   const [progress, setProgress] = useState(0);
   const [logMessage, setLogMessage] = useState('');
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<React.ReactNode | null>(null);
 
   useEffect(() => {
     // Check for ongoing background task when popup opens
@@ -213,7 +219,31 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
 
     } catch (error: any) {
       console.error(error);
-      setErrorMessage(error.message);
+      let errorMsg = error.message;
+      
+      // Handle "Could not establish connection" error specifically
+      if (errorMsg.includes('Could not establish connection') || errorMsg.includes('Receiving end does not exist')) {
+          setErrorMessage(
+            <div className="flex flex-col gap-2">
+               <span>Connection failed. The page might need a refresh.</span>
+               <button 
+                 onClick={async () => {
+                   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                   if (tab?.id) {
+                     chrome.tabs.reload(tab.id);
+                     window.close(); // Close popup to force user to reopen after refresh
+                   }
+                 }}
+                 className="text-xs bg-red-100 hover:bg-red-200 text-red-800 py-1 px-2 rounded font-medium transition w-fit"
+               >
+                 Refresh Page
+               </button>
+            </div> as any
+          );
+      } else {
+          setErrorMessage(errorMsg);
+      }
+      
       setStatus('Error');
       setLoading(false);
     }
