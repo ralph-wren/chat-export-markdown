@@ -130,10 +130,8 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   };
 
   useEffect(() => {
-    if (view === 'history') {
-      loadHistory();
-    }
-  }, [view]);
+    loadHistory();
+  }, []);
 
   const loadHistory = async () => {
     const items = await getHistory();
@@ -261,11 +259,6 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
           Memoraid
         </h1>
         <div className="flex gap-2">
-           {view === 'home' && (
-            <button onClick={() => setView('history')} className="p-2 hover:bg-gray-100 rounded-full" title="History">
-              <History className="w-5 h-5 text-gray-600" />
-            </button>
-           )}
           <button onClick={onOpenSettings} className="p-2 hover:bg-gray-100 rounded-full" title="Settings">
             <SettingsIcon className="w-5 h-5 text-gray-600" />
           </button>
@@ -274,89 +267,105 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
 
       <div className="flex-1 flex flex-col items-center justify-center space-y-4 w-full">
         {view === 'home' && (
-          <div className="text-center space-y-4 w-full flex flex-col items-center">
-            <p className="text-gray-600 text-sm px-4">
-              Open a ChatGPT or Gemini chat page and click the button below.
-            </p>
-            
-            {!loading ? (
-              <button
-                onClick={handleSummarize}
-                className="bg-black text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-gray-800 transition mx-auto"
-              >
-                <FileText className="w-5 h-5" />
-                Summarize & Export
-              </button>
-            ) : (
-              <div className="w-64 mx-auto space-y-3">
-                 <div className="bg-gray-100 rounded-lg p-3 border flex flex-col gap-2">
-                   <div className="flex justify-between items-center text-xs text-gray-500 font-medium">
-                     <span className="flex items-center gap-2">
-                       <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
-                       Processing...
-                     </span>
-                     <span>{progress}%</span>
+          <div className="w-full flex-1 flex flex-col min-h-0">
+            <div className="text-center space-y-4 w-full flex flex-col items-center mb-8 shrink-0">
+              <p className="text-gray-600 text-sm px-4">
+                Open a ChatGPT or Gemini chat page and click the button below.
+              </p>
+              
+              {!loading ? (
+                <button
+                  onClick={handleSummarize}
+                  className="bg-black text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-gray-800 transition mx-auto"
+                >
+                  <FileText className="w-5 h-5" />
+                  Summarize & Export
+                </button>
+              ) : (
+                <div className="w-64 mx-auto space-y-3">
+                   <div className="bg-gray-100 rounded-lg p-3 border flex flex-col gap-2">
+                     <div className="flex justify-between items-center text-xs text-gray-500 font-medium">
+                       <span className="flex items-center gap-2">
+                         <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
+                         Processing...
+                       </span>
+                       <span>{progress}%</span>
+                     </div>
+                     
+                     <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className="bg-blue-600 h-1.5 rounded-full transition-all duration-300 ease-in-out" 
+                          style={{ width: `${progress}%` }}
+                        ></div>
+                     </div>
+                     
+                     <button 
+                       onClick={handleCancel}
+                       className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 py-1 rounded transition flex items-center justify-center gap-1 w-full mt-1"
+                     >
+                       <X className="w-3 h-3" /> Cancel
+                     </button>
                    </div>
-                   
-                   <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                      <div 
-                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-300 ease-in-out" 
-                        style={{ width: `${progress}%` }}
-                      ></div>
-                   </div>
-                   
-                   <button 
-                     onClick={handleCancel}
-                     className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 py-1 rounded transition flex items-center justify-center gap-1 w-full mt-1"
-                   >
-                     <X className="w-3 h-3" /> Cancel
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 flex flex-col min-h-0 w-full border-t pt-4">
+               <div className="flex justify-between items-center mb-3 px-1 shrink-0">
+                 <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                   <History className="w-4 h-4" />
+                   Recent Documents
+                 </h2>
+                 {historyItems.length > 0 && (
+                   <button onClick={handleClearHistory} className="text-[10px] text-gray-400 hover:text-red-500 uppercase tracking-wider font-bold">
+                     Clear All
                    </button>
-                 </div>
-              </div>
-            )}
+                 )}
+               </div>
+               
+               <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
+                 {historyItems.length === 0 ? (
+                   <div className="h-32 flex flex-col items-center justify-center text-gray-400">
+                     <History className="w-8 h-8 mb-2 opacity-20" />
+                     <p className="text-xs italic">No history yet.</p>
+                   </div>
+                 ) : (
+                   historyItems.map(item => (
+                     <div 
+                       key={item.id}
+                       onClick={() => {
+                         setResult(item.content);
+                         setView('result');
+                       }}
+                       className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer group flex justify-between items-start transition bg-white"
+                     >
+                       <div className="flex-1 min-w-0">
+                         <h3 className="font-medium text-sm truncate" title={item.title}>{item.title}</h3>
+                         <p className="text-[10px] text-gray-400 mt-0.5">
+                           {new Date(item.date).toLocaleDateString()} {new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                         </p>
+                       </div>
+                       <button 
+                         onClick={(e) => handleDeleteItem(e, item.id)}
+                         className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"
+                       >
+                         <Trash2 className="w-3.5 h-3.5" />
+                       </button>
+                     </div>
+                   ))
+                 )}
+               </div>
+            </div>
           </div>
         )}
 
         {view === 'history' && (
            <div className="w-full h-full flex flex-col">
+             {/* This view is deprecated but kept for safety if state gets stuck */}
              <div className="flex justify-between items-center mb-4">
                <button onClick={() => setView('home')} className="flex items-center gap-1 text-sm text-gray-600 hover:text-black">
                  <ArrowLeft className="w-4 h-4" /> Back
                </button>
-               <h2 className="font-semibold">History</h2>
-               <button onClick={handleClearHistory} className="text-xs text-red-500 hover:text-red-700">
-                 Clear All
-               </button>
-             </div>
-             
-             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-               {historyItems.length === 0 ? (
-                 <p className="text-center text-gray-400 text-sm mt-10">No history yet.</p>
-               ) : (
-                 historyItems.map(item => (
-                   <div 
-                     key={item.id}
-                     onClick={() => {
-                       setResult(item.content);
-                       setView('result');
-                     }}
-                     className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer group flex justify-between items-start transition"
-                   >
-                     <div className="flex-1 min-w-0">
-                       <h3 className="font-medium text-sm truncate" title={item.title}>{item.title}</h3>
-                       <p className="text-xs text-gray-400">
-                         {new Date(item.date).toLocaleDateString()} {new Date(item.date).toLocaleTimeString()}
-                       </p>
-                     </div>
-                     <button 
-                       onClick={(e) => handleDeleteItem(e, item.id)}
-                       className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"
-                     >
-                       <Trash2 className="w-4 h-4" />
-                     </button>
-                   </div>
-                 ))
-               )}
              </div>
            </div>
         )}

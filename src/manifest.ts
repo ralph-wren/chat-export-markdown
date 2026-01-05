@@ -19,8 +19,7 @@ export default defineManifest({
     '128': 'public/icon-128.png',
   },
   permissions: ['storage', 'activeTab', 'scripting', 'notifications'],
-  host_permissions: ['https://*/*', 'http://*/*'],
-  content_scripts: [
+})  content_scripts: [
     {
       matches: ['https://chatgpt.com/*', 'https://gemini.google.com/*'],
       js: ['src/content/index.ts'],
