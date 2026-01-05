@@ -1,5 +1,6 @@
 export interface AppSettings {
-  apiKey: string;
+  apiKey: string; // Current active key (legacy support/fallback)
+  apiKeys: Record<string, string>; // Map of provider -> apiKey
   baseUrl: string;
   model: string;
   systemPrompt: string;
@@ -8,6 +9,7 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   apiKey: '',
+  apiKeys: {}, // Initialize empty map
   baseUrl: 'https://api.apiyi.com/v1',
   model: 'gpt-4o',
   provider: 'apiyi',

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Download, FileText, Settings as SettingsIcon, Loader2, Copy, Eye, Code, Send, History, Trash2, ArrowLeft, X } from 'lucide-react';
-import { getSettings, getHistory, deleteHistoryItem, HistoryItem, clearHistory } from '../utils/storage';
+import { getHistory, deleteHistoryItem, HistoryItem, clearHistory } from '../utils/storage';
 import { ExtractionResult } from '../utils/types';
-import OpenAI from 'openai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkFrontmatter from 'remark-frontmatter';
 import rehypeSlug from 'rehype-slug';
+import rehypeRaw from 'rehype-raw';
 import mermaid from 'mermaid';
 
 mermaid.initialize({
@@ -62,6 +62,9 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   const [isRefining, setIsRefining] = useState(false);
 
   const [progress, setProgress] = useState(0);
+  const [logMessage, setLogMessage] = useState('');
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     // Check for ongoing background task when popup opens
@@ -94,6 +97,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       setLoading(false);
       setProgress(0);
       setStatus('Ready');
+      setErrorMessage(null);
     } catch (error) {
       console.error('Cancel error:', error);
     }
@@ -112,20 +116,43 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     
     if (task.error) {
       setLoading(false);
-      setStatus(`Error: ${task.error}`);
+      setStatus(`Error`);
+      setErrorMessage(task.error);
+      setLogMessage(task.message || task.error);
       setProgress(0);
+      setIsRefining(false); // Stop refinement loading
       return;
     }
 
-    setLoading(task.status !== 'Done!');
+    // Determine if it's a main summarization task or refinement
+    const isRefinementTask = task.status.startsWith('Refin') || task.status === 'Refined!';
+    
+    if (isRefinementTask) {
+      setIsRefining(task.status !== 'Refined!');
+      // Restore conversation history if available
+      if (task.conversationHistory) {
+        setConversationHistory(task.conversationHistory);
+      }
+    } else {
+      setLoading(task.status !== 'Done!');
+    }
+
     setStatus(task.status);
+    setErrorMessage(null);
     setProgress(task.progress);
+    setLogMessage(task.message || task.status);
     
     if (task.result) {
       setResult(task.result);
-      setView('result');
-      // Clear background task after showing result (optional, or keep it until dismissed)
-      // chrome.runtime.sendMessage({ type: 'CLEAR_STATUS' });
+      // Only switch view if we are not already in result view (to avoid jumping if user is refining)
+      if (view !== 'result') {
+        setView('result');
+      }
+    }
+    
+    // Always sync conversation history if present in task, to ensure we have the full context
+    if (task.conversationHistory) {
+      setConversationHistory(task.conversationHistory);
     }
   };
 
@@ -142,7 +169,9 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     setLoading(true);
     setProgress(5);
     setStatus('Extracting chat content...');
+    setLogMessage('Extracting chat content from page...');
     setResult(null);
+    setErrorMessage(null);
     setConversationHistory([]); 
 
     try {
@@ -159,6 +188,8 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
         throw new Error(response.payload);
       }
 
+      setLogMessage('Content extracted! Sending to background task...');
+
       const extraction: ExtractionResult = response.payload;
       console.log('Extracted:', extraction);
 
@@ -170,7 +201,8 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
 
     } catch (error: any) {
       console.error(error);
-      setStatus(`Error: ${error.message}`);
+      setErrorMessage(error.message);
+      setStatus('Error');
       setLoading(false);
     }
   };
@@ -180,39 +212,29 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     
     setIsRefining(true);
     setStatus('Refining...');
+    setErrorMessage(null);
+    setProgress(5); // Initial progress
     
     try {
-      const settings = await getSettings();
-      const openai = new OpenAI({
-        apiKey: settings.apiKey,
-        baseURL: settings.baseUrl,
-        dangerouslyAllowBrowser: true 
-      });
-
       const newHistory: ChatMessage[] = [
         ...conversationHistory,
         { role: 'user', content: refinementInput }
       ];
 
-      const completion = await openai.chat.completions.create({
-        model: settings.model,
-        messages: newHistory as any,
-      });
-
-      const refinedContent = completion.choices[0]?.message?.content || result || '';
-      
-      setResult(refinedContent);
-      setConversationHistory([
-        ...newHistory,
-        { role: 'assistant', content: refinedContent }
-      ]);
+      // Optimistically update history locally
+      setConversationHistory(newHistory);
       setRefinementInput('');
-      setStatus('Refined!');
+
+      // Delegate to Background Script
+      await chrome.runtime.sendMessage({ 
+        type: 'START_REFINEMENT', 
+        payload: newHistory 
+      });
 
     } catch (error: any) {
       console.error(error);
-      setStatus(`Refine Error: ${error.message}`);
-    } finally {
+      setErrorMessage(error.message);
+      setStatus('Refine Error');
       setIsRefining(false);
     }
   };
@@ -269,6 +291,16 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
         {view === 'home' && (
           <div className="w-full flex-1 flex flex-col min-h-0">
             <div className="text-center space-y-4 w-full flex flex-col items-center mb-8 shrink-0">
+              
+              {errorMessage && (
+                <div className="w-full px-4 mb-2">
+                  <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm flex items-start gap-2 text-left">
+                    <X className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span className="break-words">{errorMessage}</span>
+                  </div>
+                </div>
+              )}
+
               <p className="text-gray-600 text-sm px-4">
                 Open a ChatGPT or Gemini chat page and click the button below.
               </p>
@@ -299,6 +331,11 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                         ></div>
                      </div>
                      
+                     {/* Detailed Log Message */}
+                     <p className="text-[10px] text-gray-400 text-center truncate px-1 h-4">
+                       {logMessage}
+                     </p>
+
                      <button 
                        onClick={handleCancel}
                        className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 py-1 rounded transition flex items-center justify-center gap-1 w-full mt-1"
@@ -396,7 +433,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                 <div className="prose prose-sm prose-slate max-w-none">
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm, remarkFrontmatter]}
-                    rehypePlugins={[rehypeSlug]}
+                    rehypePlugins={[rehypeSlug, rehypeRaw]}
                     components={{
                       code({node, inline, className, children, ...props}: any) {
                         const match = /language-(\w+)/.exec(className || '');
@@ -459,6 +496,23 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
             </div>
             
             <div className="pt-2 border-t mt-2 shrink-0">
+              {isRefining && (
+                 <div className="mb-2 px-1">
+                     <div className="flex justify-between items-center text-[10px] text-gray-500 font-medium mb-1">
+                       <span className="flex items-center gap-1 truncate max-w-[200px]">
+                         <Loader2 className="w-3 h-3 animate-spin text-purple-600" />
+                         {logMessage || 'Refining...'}
+                       </span>
+                       <span>{progress}%</span>
+                     </div>
+                     <div className="w-full bg-gray-100 rounded-full h-1 overflow-hidden">
+                        <div 
+                          className="bg-purple-600 h-1 rounded-full transition-all duration-300 ease-in-out" 
+                          style={{ width: `${progress}%` }}
+                        ></div>
+                     </div>
+                 </div>
+              )}
               <div className="flex gap-2">
                 <input
                   type="text"

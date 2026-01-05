@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { getSettings, addHistoryItem } from '../utils/storage';
-import { ExtractionResult, ActiveTask } from '../utils/types';
+import { ExtractionResult, ActiveTask, ChatMessage } from '../utils/types';
 
 console.log('Background service worker started');
 
@@ -24,6 +24,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     startSummarization(message.payload);
     sendResponse({ success: true });
     return true; // async response
+  }
+  
+  if (message.type === 'START_REFINEMENT') {
+    startRefinement(message.payload);
+    sendResponse({ success: true });
+    return true;
   }
   
   if (message.type === 'CANCEL_SUMMARIZATION') {
@@ -58,22 +64,153 @@ function updateTaskState(newState: ActiveTask) {
   broadcastUpdate();
 }
 
-async function startSummarization(extraction: ExtractionResult) {
+let timerInterval: NodeJS.Timeout | null = null;
+let startTime: number = 0;
+
+function startTimer(baseMessage: string) {
+  if (timerInterval) clearInterval(timerInterval);
+  startTime = Date.now();
+  
+  timerInterval = setInterval(() => {
+    if (!currentTask) {
+      if (timerInterval) clearInterval(timerInterval);
+      return;
+    }
+    
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const message = `${baseMessage} (${elapsed}s)`;
+    
+    // Update task state without broadcasting every second to avoid UI flicker overkill, 
+    // but here we want to show it, so we update storage and broadcast.
+    // To optimize, maybe only broadcast if popup is open? 
+    // For now, we update the task state.
+    currentTask = { ...currentTask, message };
+    chrome.storage.local.set({ currentTask });
+    broadcastUpdate();
+  }, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
+
+async function startRefinement(messages: ChatMessage[]) {
   try {
     abortController = new AbortController();
-    updateTaskState({ status: 'Initializing...', progress: 10 });
+    updateTaskState({ 
+      status: 'Refining...', 
+      message: 'Initializing refinement...', 
+      progress: 5,
+      conversationHistory: messages 
+    });
 
     const settings = await getSettings();
-    if (!settings.apiKey) {
-      throw new Error('API Key is missing. Please check settings.');
+    let effectiveApiKey = settings.apiKeys?.[settings.provider] || settings.apiKey;
+    
+    if (!effectiveApiKey) {
+      throw new Error(`API Key for ${settings.provider} is missing. Please check settings.`);
     }
 
     const openai = new OpenAI({
-      apiKey: settings.apiKey,
+      apiKey: effectiveApiKey,
       baseURL: settings.baseUrl,
     });
 
-    updateTaskState({ status: 'Generating summary with AI...', progress: 30 });
+    updateTaskState({ 
+      status: 'Refining...', 
+      message: 'Sending instructions to AI...', 
+      progress: 30,
+      conversationHistory: messages
+    });
+
+    const completionPromise = openai.chat.completions.create({
+      model: settings.model,
+      messages: messages as any,
+    }, { signal: abortController.signal });
+
+    const baseMessage = 'Waiting for AI response...';
+    updateTaskState({ 
+      status: 'Refining...', 
+      message: baseMessage, 
+      progress: 50,
+      conversationHistory: messages
+    });
+    startTimer(baseMessage);
+
+    const completion: any = await completionPromise;
+    stopTimer();
+
+    updateTaskState({ 
+      status: 'Refining...', 
+      message: 'Processing response...', 
+      progress: 90,
+      conversationHistory: messages
+    });
+
+    const refinedContent = completion.choices[0]?.message?.content || '';
+    
+    // Update history with assistant response
+    const updatedHistory: ChatMessage[] = [
+      ...messages,
+      { role: 'assistant', content: refinedContent }
+    ];
+
+    updateTaskState({ 
+      status: 'Refined!', 
+      message: 'Refinement complete!',
+      progress: 100, 
+      result: refinedContent,
+      conversationHistory: updatedHistory
+    });
+
+  } catch (error: any) {
+    stopTimer();
+    if (error.name === 'AbortError') {
+      console.log('Refinement cancelled');
+      return;
+    }
+    console.error('Refinement error:', error);
+    updateTaskState({ 
+      status: 'Error', 
+      message: error.message || 'Refinement failed',
+      progress: 0, 
+      error: error.message,
+      conversationHistory: messages // Keep history so user can retry
+    });
+  } finally {
+    abortController = null;
+    stopTimer();
+  }
+}
+
+async function startSummarization(extraction: ExtractionResult) {
+  try {
+    abortController = new AbortController();
+    updateTaskState({ status: 'Processing...', message: 'Initializing...', progress: 5 });
+
+    const settings = await getSettings();
+    
+    // Determine the effective API Key:
+    // 1. Try to get provider-specific key from the new apiKeys map
+    // 2. Fallback to the legacy single 'apiKey' if not found
+    let effectiveApiKey = settings.apiKeys?.[settings.provider] || settings.apiKey;
+    
+    // Special handling for 'custom' provider: might rely on the legacy field if not explicitly mapped,
+    // but the UI now syncs custom key to apiKeys['custom'] too.
+    
+    if (!effectiveApiKey) {
+      throw new Error(`API Key for ${settings.provider} is missing. Please check settings.`);
+    }
+
+    const openai = new OpenAI({
+      apiKey: effectiveApiKey,
+      baseURL: settings.baseUrl,
+    });
+
+    updateTaskState({ status: 'Processing...', message: 'Sending request to AI...', progress: 30 });
 
     const initialMessages = [
       { role: 'system', content: settings.systemPrompt },
@@ -100,11 +237,22 @@ async function startSummarization(extraction: ExtractionResult) {
       messages: initialMessages as any,
     }, { signal: abortController.signal });
 
+    const baseMessage = 'Waiting for AI response...';
+    updateTaskState({ status: 'Processing...', message: baseMessage, progress: 50 });
+    startTimer(baseMessage);
+
     // Race between completion and timeout
     const completion: any = await Promise.race([completionPromise, timeoutPromise]);
+    stopTimer();
 
-    const summary = completion.choices[0]?.message?.content || 'No summary generated.';
+    updateTaskState({ status: 'Processing...', message: 'Processing response...', progress: 90 });
+
+    let summary = completion.choices[0]?.message?.content || 'No summary generated.';
     
+    // Strip wrapping markdown code blocks if present
+    // Matches ```markdown at start and ``` at end, allowing for optional newlines
+    summary = summary.replace(/^```markdown\s*/i, '').replace(/\s*```$/, '');
+
     // Save to History
     const newItem = {
       id: Date.now().toString(),
@@ -117,16 +265,28 @@ async function startSummarization(extraction: ExtractionResult) {
 
     updateTaskState({ 
       status: 'Done!', 
+      message: 'Summary generated successfully!',
       progress: 100, 
-      result: summary 
+      result: summary,
+      conversationHistory: [
+        ...initialMessages as ChatMessage[],
+        { role: 'assistant', content: summary }
+      ]
     });
 
     // Send Notification
+    const iconUrl = chrome.runtime.getURL('public/icon-128.png');
     chrome.notifications.create({
       type: 'basic',
-      iconUrl: 'public/icon-128.png',
+      iconUrl: iconUrl,
       title: 'Chat Export Complete',
       message: `Summary generated for: ${extraction.title || 'Untitled Chat'}`
+    }, (notificationId) => {
+      if (chrome.runtime.lastError) {
+        console.error('Notification failed:', chrome.runtime.lastError);
+      } else {
+        console.log('Notification sent:', notificationId);
+      }
     });
 
   } catch (error: any) {
@@ -138,14 +298,16 @@ async function startSummarization(extraction: ExtractionResult) {
     console.error('Summarization error:', error);
     updateTaskState({ 
       status: 'Error', 
+      message: error.message || 'An error occurred',
       progress: 0, 
       error: error.message 
     });
 
     // Send Error Notification
+    const iconUrl = chrome.runtime.getURL('public/icon-128.png');
     chrome.notifications.create({
       type: 'basic',
-      iconUrl: 'public/icon-128.png',
+      iconUrl: iconUrl,
       title: 'Chat Export Failed',
       message: error.message || 'Unknown error occurred'
     });

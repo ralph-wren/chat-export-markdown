@@ -17,6 +17,8 @@ export type ExtensionMessage =
 export interface ActiveTask {
   status: string;
   progress: number;
+  message?: string; // Detailed log message
   result?: string;
   error?: string;
+  conversationHistory?: ChatMessage[]; // Persist chat history for refinement
 }

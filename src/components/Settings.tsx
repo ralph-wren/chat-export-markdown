@@ -55,14 +55,51 @@ const PROVIDERS: Record<string, ProviderConfig> = {
   }
 };
 
+const getProviderLink = (provider: string): string | null => {
+  switch (provider) {
+    case 'apiyi':
+      return 'https://api.apiyi.com/register/?aff_code=pBOp';
+    case 'yi':
+      return 'https://platform.lingyiwanwu.com/';
+    case 'deepseek':
+      return 'https://platform.deepseek.com/api_keys';
+    case 'dashscope':
+      return 'https://dashscope.console.aliyun.com/apiKey';
+    case 'zhipu':
+      return 'https://open.bigmodel.cn/usercenter/apikeys';
+    case 'moonshot':
+      return 'https://platform.moonshot.cn/console/api-keys';
+    case 'doubao':
+      return 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey';
+    case 'openai':
+      return 'https://platform.openai.com/api-keys';
+    default:
+      return null;
+  }
+};import { Eye, EyeOff } from 'lucide-react';
+
+// ... (existing code)
+
 const Settings: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [status, setStatus] = useState<string>('');
   const [selectedProvider, setSelectedProvider] = useState<string>('apiyi');
-
+  const [showApiKey, setShowApiKey] = useState(false);
   useEffect(() => {
     getSettings().then((saved) => {
-      setSettings(saved);
+      // Ensure apiKeys object exists (migration for old settings)
+      const initializedSettings = {
+        ...saved,
+        apiKeys: saved.apiKeys || {}
+      };
+      
+      // Migrate old single key if needed
+      if (saved.apiKey && !initializedSettings.apiKeys[saved.provider || 'apiyi']) {
+        initializedSettings.apiKeys[saved.provider || 'apiyi'] = saved.apiKey;
+      }
+
+      setSettings(initializedSettings);
+      
       if (saved.provider && PROVIDERS[saved.provider]) {
         setSelectedProvider(saved.provider);
       } else {
@@ -84,24 +121,37 @@ const Settings: React.FC = () => {
     setSelectedProvider(providerKey);
     
     const config = PROVIDERS[providerKey];
-    if (providerKey !== 'custom') {
-      setSettings(prev => ({
-        ...prev,
-        provider: providerKey,
-        baseUrl: config.baseUrl,
-        model: config.models[0] || ''
-      }));
-    } else {
-       setSettings(prev => ({
-        ...prev,
-        provider: providerKey
-      }));
-    }
+    setSettings(prev => {
+      const newSettings = { ...prev, provider: providerKey };
+      
+      // Update Base URL and Model if not custom
+      if (providerKey !== 'custom') {
+        newSettings.baseUrl = config.baseUrl;
+        newSettings.model = config.models[0] || '';
+      }
+      
+      // Switch to the stored API Key for this provider
+      newSettings.apiKey = prev.apiKeys?.[providerKey] || '';
+      
+      return newSettings;
+    });
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setSettings(prev => ({ ...prev, [name]: value }));
+    
+    if (name === 'apiKey') {
+      setSettings(prev => ({
+        ...prev,
+        apiKey: value,
+        apiKeys: {
+          ...prev.apiKeys,
+          [selectedProvider]: value
+        }
+      }));
+    } else {
+      setSettings(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSave = async () => {
@@ -132,15 +182,36 @@ const Settings: React.FC = () => {
       </div>
       
       <div className="space-y-2">
-        <label className="block text-sm font-medium">API Key</label>
-        <input
-          type="password"
-          name="apiKey"
-          value={settings.apiKey}
-          onChange={handleChange}
-          className="w-full p-2 border rounded"
-          placeholder={`Enter your ${PROVIDERS[selectedProvider]?.name} API Key`}
-        />
+        <div className="flex justify-between items-center">
+          <label className="block text-sm font-medium">API Key</label>
+          {getProviderLink(selectedProvider) && (
+            <a 
+              href={getProviderLink(selectedProvider)!} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+            >
+              Get Key ↗
+            </a>
+          )}
+        </div>
+        <div className="relative">
+          <input
+            type={showApiKey ? "text" : "password"}
+            name="apiKey"
+            value={settings.apiKey}
+            onChange={handleChange}
+            className="w-full p-2 border rounded pr-10"
+            placeholder={`Enter your ${PROVIDERS[selectedProvider]?.name} API Key`}
+          />
+          <button
+            type="button"
+            onClick={() => setShowApiKey(!showApiKey)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"
+          >
+            {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -201,14 +272,20 @@ const Settings: React.FC = () => {
         />
       </div>
 
-      <button
-        onClick={handleSave}
-        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
-      >
-        Save Settings
-      </button>
+      <div className="sticky bottom-0 bg-white pt-4 border-t mt-4 pb-2">
+        <button
+          onClick={handleSave}
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition font-medium"
+        >
+          {status === 'Saved!' ? 'Saved Successfully!' : 'Save Settings'}
+        </button>
+      </div>
       
-      {status && <p className="text-center text-green-600 text-sm">{status}</p>}
+      {status && (
+        <div className="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded shadow-lg animate-in fade-in slide-in-from-top-2 z-50">
+          {status}
+        </div>
+      )}
     </div>
   );
 };
