@@ -1,6 +1,6 @@
 # Memoraid
 
-一个强大的 Chrome 扩展程序，使用 AI（ChatGPT 和 Gemini）来**总结**、**导出**和**优化**对话内容。
+一个强大的 Chrome 扩展程序，使用 AI（ChatGPT 和 Gemini）来**总结**、**导出**和**优化**对话内容以及**任意网页**。
 
 <div align="center">
   <img src="store-assets/icon-128.png" width="128" alt="Memoraid Logo" />
@@ -8,7 +8,8 @@
 
 ## ✨ 核心功能
 
-- **🚀 一键总结**：自动提取 ChatGPT 和 Gemini 当前标签页的对话内容。
+- **🚀 一键总结**：自动提取 ChatGPT、Gemini、DeepSeek 当前标签页的对话内容，或**任意网页（博客、新闻等）的正文内容**。
+- **🌐 全网支持**：内置 Mozilla Readability 引擎，智能识别网页核心内容，去除广告干扰，支持阅读模式总结。
 - **🤖 AI 驱动**：使用先进的 LLM（通过 01.AI/Yi、OpenAI、DeepSeek 等）生成简洁、结构化的摘要。
 - **💬 对话优化**：针对摘要或原始内容向 AI 提出后续问题（例如，“精简一点”、“翻译成西班牙语”）。
 - **📜 历史记录管理**：自动将摘要保存到本地。随时访问过去的导出记录。
@@ -73,7 +74,9 @@
 
 ## 🚀 使用教程
 
-1. **打开对话**：在 [ChatGPT](https://chatgpt.com) 或 [Gemini](https://gemini.google.com) 上导航到一个对话页面。
+1. **打开页面**：
+   - 导航到 [ChatGPT](https://chatgpt.com)、[Gemini](https://gemini.google.com) 或 [DeepSeek](https://chat.deepseek.com) 的对话页面。
+   - 或者打开任意**博客、新闻文章**或技术文档页面。
 2. **启动 Memoraid**：点击扩展图标。
 3. **开始总结**：点击 **"Summarize & Export"** 按钮。
    - 扩展程序将提取对话内容并发送给 AI。

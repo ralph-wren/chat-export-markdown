@@ -56,6 +56,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   categories: [category1]
   ---
   \`\`\`
+- **CRITICAL RULE**: **Front Matter 结束后的第一行，必须是文档的 # 一级标题（与 Front Matter 中的 title 一致）。**
 
 ### 2️⃣ 标题与层级规则
 - 标题 **清晰、准确、可检索**。
@@ -151,7 +152,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
 - [ ] 重点已加粗
 - [ ] 表格 / 流程图使用合理
 - [ ] 没有废话标题
-- [ ] 内容面向真实业务`
+  - [ ] 内容面向真实业务
+
+## 十一、禁止事项（CRITICAL）
+- **禁止重复用户的输入内容**。
+- **禁止在开头输出“好的，这是为您生成的文档...”之类的客套话**。
+- **禁止输出 JSON 格式的元数据，只输出 Markdown**。
+`
 };
 
 export const getSettings = async (): Promise<AppSettings> => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, FileText, Settings as SettingsIcon, Loader2, Copy, Eye, Code, Send, History, Trash2, ArrowLeft, X, RefreshCw } from 'lucide-react';
+import { Download, FileText, Settings as SettingsIcon, Loader2, Copy, Eye, Code, Send, History, Trash2, ArrowLeft, X, RefreshCw, Square } from 'lucide-react';
 import { getHistory, deleteHistoryItem, HistoryItem, clearHistory } from '../utils/storage';
 import { ExtractionResult } from '../utils/types';
 import ReactMarkdown from 'react-markdown';
@@ -21,15 +21,17 @@ const MermaidChart = ({ code }: { code: string }) => {
   useEffect(() => {
     const renderChart = async () => {
       try {
+        // Simple heuristic to check if code looks somewhat complete before rendering
+        // Mermaid often throws hard errors on partial syntax
+        if (!code || code.trim().length < 10) {
+           throw new Error('Code too short');
+        }
+
         const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
-        // Attempt to parse/render. If syntax is incomplete (during stream), it might throw.
         const { svg } = await mermaid.render(id, code);
         setSvg(svg);
       } catch (error) {
         // While streaming or if syntax is invalid, show the code block gracefully.
-        // Don't show scary red errors, just the raw code with a loading hint if it looks like it's being built.
-        // We can't easily know if 'loading' is true here without prop drilling, 
-        // so we just default to a neutral fallback.
         setSvg(`<div class="p-2 bg-gray-50 border rounded text-xs font-mono text-gray-500 overflow-x-auto whitespace-pre-wrap">${code}</div>`);
       }
     };
@@ -59,6 +61,18 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   const [result, setResult] = useState<string | null>(null);
   const [currentTitle, setCurrentTitle] = useState<string>(''); // Track current document title
   const [isPreview, setIsPreview] = useState(true);
+  
+  const [userClosedResult, setUserClosedResult] = useState(false);
+  const userClosedResultRef = React.useRef(userClosedResult);
+  const viewRef = React.useRef(view);
+
+  useEffect(() => {
+    userClosedResultRef.current = userClosedResult;
+  }, [userClosedResult]);
+
+  useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
   
   // History State
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
@@ -154,15 +168,17 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     setLogMessage(task.message || task.status);
     
     if (task.result) {
-      setResult(task.result);
-      if (task.title) {
-        setCurrentTitle(task.title);
+        setResult(task.result);
+        if (task.title) {
+          setCurrentTitle(task.title);
+        }
+        // Only switch view if we are not already in result view (to avoid jumping if user is refining)
+        // AND if the user hasn't explicitly closed the result view for this session
+        // Use refs to check current state to avoid stale closure in event listener
+        if (viewRef.current !== 'result' && allowAutoSwitch && !userClosedResultRef.current) {
+          setView('result');
+        }
       }
-      // Only switch view if we are not already in result view (to avoid jumping if user is refining)
-      if (view !== 'result' && allowAutoSwitch) {
-        setView('result');
-      }
-    }
     
     // Always sync conversation history if present in task, to ensure we have the full context
     if (task.conversationHistory) {
@@ -187,6 +203,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     setResult(null);
     setErrorMessage(null);
     setConversationHistory([]); 
+    setUserClosedResult(false); // Reset this flag for new task 
 
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -381,11 +398,23 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                        {logMessage}
                      </p>
 
+                     {result && (
+                       <button 
+                         onClick={() => {
+                           setView('result');
+                           setUserClosedResult(false);
+                         }}
+                         className="text-xs bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 py-1.5 rounded transition flex items-center justify-center gap-1.5 w-full mt-1 font-medium"
+                       >
+                         <Eye className="w-3 h-3" /> View Live Result
+                       </button>
+                     )}
+
                      <button 
                        onClick={handleCancel}
-                       className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 py-1 rounded transition flex items-center justify-center gap-1 w-full mt-1"
+                       className="text-xs border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 py-1.5 rounded transition flex items-center justify-center gap-1.5 w-full mt-1 font-medium"
                      >
-                       <X className="w-3 h-3" /> Cancel
+                       <Square className="w-3 h-3 fill-current" /> Stop Generating
                      </button>
                    </div>
                 </div>
@@ -455,23 +484,25 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
 
         {view === 'result' && result && (
           <div className="w-full space-y-4 h-full flex flex-col">
-            <div className="flex justify-between items-center px-1">
+            <div className="flex justify-between items-center px-1 mb-2">
               <span className="text-xs font-semibold text-gray-500">Result</span>
               <div className="flex gap-2">
                  <button
                   onClick={() => setIsPreview(!isPreview)}
-                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                  className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded transition shadow-sm font-medium"
                 >
-                  {isPreview ? <Code className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  {isPreview ? <Code className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   {isPreview ? 'Show Code' : 'Preview'}
                 </button>
                 <button
                  onClick={() => {
                    setView('home');
+                   setUserClosedResult(true); // Mark as explicitly closed
                    loadHistory(); // Reload history when returning to home
                  }}
-                 className="text-xs text-gray-500 hover:text-black"
+                 className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 hover:bg-red-50 hover:text-red-600 text-gray-700 px-3 py-1.5 rounded transition shadow-sm font-medium"
               >
+                <X className="w-3.5 h-3.5" />
                 Close
               </button>
               </div>
@@ -598,9 +629,9 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                   <button
                     onClick={handleCancel}
                     className="bg-red-500 text-white p-2 rounded hover:bg-red-600 transition flex items-center justify-center min-w-[36px]"
-                    title="Cancel Refinement"
+                    title="Stop Generating"
                   >
-                    <X className="w-4 h-4" />
+                    <Square className="w-3 h-3 fill-current" />
                   </button>
                 ) : (
                   <button

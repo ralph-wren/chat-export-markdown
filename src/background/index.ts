@@ -275,11 +275,16 @@ async function startSummarization(extraction: ExtractionResult) {
 
     updateTaskState({ status: 'Processing...', message: 'Sending request to AI...', progress: 30 });
 
+    // Format messages for better model understanding (avoid JSON confusion)
+    const formattedContent = Array.isArray(extraction.messages) 
+      ? extraction.messages.map((m: any) => `### ${m.role ? m.role.toUpperCase() : 'CONTENT'}:\n${m.content}`).join('\n\n')
+      : String(extraction.messages);
+
     const initialMessages = [
       { role: 'system', content: settings.systemPrompt },
       { 
         role: 'user', 
-        content: `Please summarize the following conversation from ${extraction.url}.\n\nTitle: ${extraction.title}\n\nContent:\n${JSON.stringify(extraction.messages)}` 
+        content: `Please summarize the following content from ${extraction.url}.\n\nTitle: ${extraction.title}\n\nContent:\n${formattedContent}` 
       }
     ];
 
@@ -444,6 +449,7 @@ async function startSummarization(extraction: ExtractionResult) {
       message: error.message || 'Unknown error occurred'
     });
   } finally {
+    stopTimer();
     abortController = null;
   }
 }

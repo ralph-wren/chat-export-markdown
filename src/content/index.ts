@@ -1,4 +1,5 @@
 import { ExtractionResult, ChatMessage } from '../utils/types';
+import { Readability } from '@mozilla/readability';
 
 console.log('Chat Export Content Script Loaded');
 
@@ -25,9 +26,41 @@ async function extractContent(): Promise<ExtractionResult> {
   } else if (url.includes('chat.deepseek.com')) {
     return extractDeepSeek();
   } else {
-    throw new Error('Unsupported website. Please use on ChatGPT, Gemini, or DeepSeek.');
+    return extractGenericPage();
   }
 }
+
+function extractGenericPage(): ExtractionResult {
+  try {
+    // Clone document to avoid modifying the actual page
+    const documentClone = document.cloneNode(true) as Document;
+    const reader = new Readability(documentClone);
+    const article = reader.parse();
+
+    const title = article?.title || document.title || 'Web Page Content';
+    const content = article?.textContent || document.body.innerText;
+
+    return {
+      title,
+      messages: [{
+        role: 'user',
+        content: `Page Content:\n\n${content.trim()}`
+      }],
+      url: window.location.href
+    };
+  } catch (error) {
+    console.warn('Readability extraction failed, falling back to body text', error);
+    return {
+      title: document.title || 'Web Page Content',
+      messages: [{
+        role: 'user',
+        content: document.body.innerText
+      }],
+      url: window.location.href
+    };
+  }
+}
+
 
 function extractDeepSeek(): ExtractionResult {
   const title = document.title || 'DeepSeek Conversation';
