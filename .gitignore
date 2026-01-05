@@ -140,3 +140,5 @@ vite.config.ts.timestamp-*
 /.history/
 /.idea/
 /dist.zip
+/release/
+!/release/memoraid-release.zip

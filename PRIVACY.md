@@ -39,9 +39,6 @@ The extension requests the following permissions for specific purposes required 
 *   **`notifications`**:
     *   **Reason**: To provide system-level feedback for long-running background tasks.
     *   **Usage**: Used to notify you when a background summarization task is successfully completed or if an error occurs, ensuring you don't miss the result even if the popup is closed.
-*   **`host_permissions` (http://*/*, https://*/*)**:
-    *   **Reason**: To allow the extension to communicate with *any* AI API provider the user configures.
-    *   **Usage**: Users can configure custom API endpoints (e.g., a local LLM running on localhost, or an enterprise API proxy). This permission is strictly used to send the chat content to the user-defined API URL for summarization.
 
 ## 5. Changes to This Policy
 
