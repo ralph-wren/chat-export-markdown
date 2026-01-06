@@ -8,15 +8,15 @@ export default defineManifest({
   action: {
     default_popup: 'index.html',
     default_icon: {
-      '16': 'public/icon-16.png',
-      '48': 'public/icon-48.png',
-      '128': 'public/icon-128.png',
+      '16': 'icon-16.png',
+      '48': 'icon-48.png',
+      '128': 'icon-128.png',
     },
   },
   icons: {
-    '16': 'public/icon-16.png',
-    '48': 'public/icon-48.png',
-    '128': 'public/icon-128.png',
+    '16': 'icon-16.png',
+    '48': 'icon-48.png',
+    '128': 'icon-128.png',
   },
   permissions: ['storage', 'activeTab', 'notifications'],
   content_scripts: [
