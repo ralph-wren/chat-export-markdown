@@ -110,10 +110,10 @@ export default {
        if (!redirectUri) return new Response('Missing redirect_uri', { status: 400 });
 
        if (provider === 'google') {
-           const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(url.origin + '/auth/callback/google')}&response_type=code&scope=email profile&state=${encodeURIComponent(redirectUri)}`;
+           const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${env.GOOGLE_CLIENT_ID?.trim()}&redirect_uri=${encodeURIComponent(url.origin + '/auth/callback/google')}&response_type=code&scope=email%20profile&prompt=select_account&state=${encodeURIComponent(redirectUri)}`;
            return Response.redirect(authUrl, 302);
        } else if (provider === 'github') {
-           const authUrl = `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(url.origin + '/auth/callback/github')}&scope=user:email&state=${encodeURIComponent(redirectUri)}`;
+           const authUrl = `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_CLIENT_ID?.trim()}&redirect_uri=${encodeURIComponent(url.origin + '/auth/callback/github')}&scope=user:email&state=${encodeURIComponent(redirectUri)}`;
            return Response.redirect(authUrl, 302);
        }
        return new Response('Invalid provider', { status: 400 });
@@ -138,8 +138,8 @@ export default {
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: new URLSearchParams({
                         code,
-                        client_id: env.GOOGLE_CLIENT_ID,
-                        client_secret: env.GOOGLE_CLIENT_SECRET,
+                        client_id: env.GOOGLE_CLIENT_ID?.trim(),
+                        client_secret: env.GOOGLE_CLIENT_SECRET?.trim(),
                         redirect_uri: url.origin + '/auth/callback/google',
                         grant_type: 'authorization_code'
                     })

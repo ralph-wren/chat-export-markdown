@@ -1,8 +1,9 @@
 import OpenAI from 'openai';
 import { marked } from 'marked';
-import { getSettings, addHistoryItem } from '../utils/storage';
+import { getSettings, saveSettings, DEFAULT_SETTINGS, addHistoryItem } from '../utils/storage';
 import { ExtractionResult, ActiveTask, ChatMessage } from '../utils/types';
 import { ARTICLE_PROMPT_TEMPLATE } from '../utils/prompts';
+import { generateRandomString } from '../utils/crypto';
 
 console.log('Background service worker started');
 
@@ -22,6 +23,13 @@ chrome.runtime.onInstalled.addListener(() => {
 
 // Listen for messages from Popup
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === 'START_LOGIN') {
+    handleLogin(message.payload.provider)
+      .then(() => sendResponse({ success: true }))
+      .catch((e: any) => sendResponse({ success: false, error: e.message || String(e) }));
+    return true; 
+  }
+
   if (message.type === 'START_SUMMARIZATION') {
     startSummarization(message.payload);
     sendResponse({ success: true });
@@ -746,4 +754,49 @@ async function startArticleGeneration(extraction: ExtractionResult) {
     stopTimer();
     abortController = null;
   }
+}
+
+async function handleLogin(provider: 'google' | 'github') {
+  const settings = await getSettings();
+  const backendUrl = settings.sync?.backendUrl || DEFAULT_SETTINGS.sync!.backendUrl;
+  const redirectUri = chrome.identity.getRedirectURL('provider_cb');
+  const authUrl = `${backendUrl}/auth/login/${provider}?redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+  return new Promise<void>((resolve, reject) => {
+    chrome.identity.launchWebAuthFlow({
+      url: authUrl,
+      interactive: true
+    }, async (redirectUrl) => {
+      if (chrome.runtime.lastError || !redirectUrl) {
+        reject(new Error(chrome.runtime.lastError?.message || 'Login failed'));
+        return;
+      }
+
+      try {
+        const url = new URL(redirectUrl);
+        const token = url.searchParams.get('token');
+        const email = url.searchParams.get('email');
+
+        if (token && email) {
+          const currentSettings = await getSettings();
+          const newSettings = {
+            ...currentSettings,
+            sync: {
+              ...currentSettings.sync!,
+              enabled: true,
+              token: token,
+              email: email,
+              encryptionKey: currentSettings.sync?.encryptionKey || generateRandomString()
+            }
+          };
+          await saveSettings(newSettings);
+          resolve();
+        } else {
+          reject(new Error('No token received'));
+        }
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
 }

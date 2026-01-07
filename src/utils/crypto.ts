@@ -11,7 +11,7 @@ export const generateRandomString = (length = 16) => {
 
 const getKeyMaterial = async (password: string) => {
   const enc = new TextEncoder();
-  return window.crypto.subtle.importKey(
+  return crypto.subtle.importKey(
     "raw",
     enc.encode(password),
     { name: "PBKDF2" },
@@ -21,7 +21,7 @@ const getKeyMaterial = async (password: string) => {
 };
 
 const getDerivationKey = async (keyMaterial: CryptoKey, salt: Uint8Array) => {
-  return window.crypto.subtle.deriveKey(
+  return crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
       salt: salt as BufferSource,
@@ -36,14 +36,14 @@ const getDerivationKey = async (keyMaterial: CryptoKey, salt: Uint8Array) => {
 };
 
 export const encryptData = async (data: string, password: string): Promise<{ encrypted: string; salt: string; iv: string }> => {
-  const salt = window.crypto.getRandomValues(new Uint8Array(16));
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
   
   const keyMaterial = await getKeyMaterial(password);
   const key = await getDerivationKey(keyMaterial, salt);
   
   const encoded = new TextEncoder().encode(data);
-  const encrypted = await window.crypto.subtle.encrypt(
+  const encrypted = await crypto.subtle.encrypt(
     {
       name: "AES-GCM",
       iv: iv
@@ -67,7 +67,7 @@ export const decryptData = async (encryptedData: string, password: string, saltS
   const keyMaterial = await getKeyMaterial(password);
   const key = await getDerivationKey(keyMaterial, salt);
 
-  const decrypted = await window.crypto.subtle.decrypt(
+  const decrypted = await crypto.subtle.decrypt(
     {
       name: "AES-GCM",
       iv: iv

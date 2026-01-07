@@ -106,41 +106,55 @@ const Settings: React.FC = () => {
   const [verifyStatus, setVerifyStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [apiVerifyStatus, setApiVerifyStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'restoring' | 'success' | 'error'>('idle');
+  const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [showEncKey, setShowEncKey] = useState(false);
   
   const t = getTranslation(settings.language || 'zh-CN');
 
   useEffect(() => {
-    getSettings().then((saved) => {
-      // Ensure apiKeys object exists (migration for old settings)
-      const initializedSettings = {
-        ...saved,
-        apiKeys: saved.apiKeys || {},
-        github: saved.github || DEFAULT_SETTINGS.github,
-        sync: saved.sync || DEFAULT_SETTINGS.sync
-      };
-      
-      // Migrate old single key if needed
-      if (saved.apiKey && !initializedSettings.apiKeys[saved.provider || 'apiyi']) {
-        initializedSettings.apiKeys[saved.provider || 'apiyi'] = saved.apiKey;
-      }
+    const loadSettings = () => {
+        getSettings().then((saved) => {
+          // Ensure apiKeys object exists (migration for old settings)
+          const initializedSettings = {
+            ...saved,
+            apiKeys: saved.apiKeys || {},
+            github: saved.github || DEFAULT_SETTINGS.github,
+            sync: saved.sync || DEFAULT_SETTINGS.sync
+          };
+          
+          // Migrate old single key if needed
+          if (saved.apiKey && !initializedSettings.apiKeys[saved.provider || 'apiyi']) {
+            initializedSettings.apiKeys[saved.provider || 'apiyi'] = saved.apiKey;
+          }
 
-      setSettings(initializedSettings);
-      
-      if (saved.provider && PROVIDERS[saved.provider]) {
-        setSelectedProvider(saved.provider);
-      } else {
-        // Fallback logic
-        const foundProvider = Object.entries(PROVIDERS).find(([key, config]) => 
-          key !== 'custom' && config.baseUrl === saved.baseUrl
-        );
-        if (foundProvider) {
-          setSelectedProvider(foundProvider[0]);
-        } else {
-          setSelectedProvider('custom');
-        }
-      }
-    });
+          setSettings(initializedSettings);
+          
+          if (saved.provider && PROVIDERS[saved.provider]) {
+            setSelectedProvider(saved.provider);
+          } else {
+            // Fallback logic
+            const foundProvider = Object.entries(PROVIDERS).find(([key, config]) => 
+              key !== 'custom' && config.baseUrl === saved.baseUrl
+            );
+            if (foundProvider) {
+              setSelectedProvider(foundProvider[0]);
+            } else {
+              setSelectedProvider('custom');
+            }
+          }
+        });
+    };
+
+    loadSettings();
+
+    const handleStorageChange = () => {
+        loadSettings();
+    };
+
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    return () => {
+        chrome.storage.onChanged.removeListener(handleStorageChange);
+    };
   }, []);
 
   const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -229,84 +243,71 @@ const Settings: React.FC = () => {
 
   const handleLogin = async (provider: 'google' | 'github') => {
     setSyncStatus('syncing');
+    setSyncMessage(null);
     try {
-        const backendUrl = settings.sync?.backendUrl || DEFAULT_SETTINGS.sync!.backendUrl;
-        // Construct backend auth URL with redirect_uri pointing back to extension
-        const redirectUri = chrome.identity.getRedirectURL('provider_cb');
-        const authUrl = `${backendUrl}/auth/login/${provider}?redirect_uri=${encodeURIComponent(redirectUri)}`;
-
-        // Launch Web Auth Flow
-        chrome.identity.launchWebAuthFlow({
-            url: authUrl,
-            interactive: true
-        }, (redirectUrl) => {
-            if (chrome.runtime.lastError || !redirectUrl) {
-                console.error(chrome.runtime.lastError);
-                setSyncStatus('error');
-                alert('Login failed: ' + chrome.runtime.lastError?.message);
-                return;
-            }
-
-            // Extract token from URL params
-            const url = new URL(redirectUrl);
-            const token = url.searchParams.get('token');
-            const email = url.searchParams.get('email');
-
-            if (token && email) {
-                setSettings(prev => ({
-                    ...prev,
-                    sync: {
-                        ...prev.sync!,
-                        enabled: true,
-                        token: token,
-                        email: email,
-                        encryptionKey: prev.sync?.encryptionKey || generateRandomString()
-                    }
-                }));
-                setSyncStatus('success');
-                setTimeout(() => setSyncStatus('idle'), 2000);
-            } else {
-                setSyncStatus('error');
-                alert('Login failed: No token received');
-            }
+        const response = await chrome.runtime.sendMessage({ 
+            type: 'START_LOGIN', 
+            payload: { provider } 
         });
+
+        if (response && response.success) {
+            setSyncStatus('success');
+            setSyncMessage({ type: 'success', text: 'Login successful!' });
+            // Settings will be updated via storage listener
+        } else {
+            throw new Error(response?.error || 'Login failed');
+        }
     } catch (e: any) {
         console.error(e);
         setSyncStatus('error');
-        alert('Login Error: ' + e.message);
+        setSyncMessage({ type: 'error', text: 'Login Error: ' + (e.message || String(e)) });
+    } finally {
+        setTimeout(() => {
+            setSyncStatus('idle');
+            setSyncMessage(null);
+        }, 5000);
     }
   };
 
   const handleSyncNow = async () => {
       setSyncStatus('syncing');
+      setSyncMessage(null);
       try {
           const updated = await syncSettings(settings);
           setSettings(updated);
           await saveSettings(updated);
           setSyncStatus('success');
+          setSyncMessage({ type: 'success', text: 'Settings synced to cloud!' });
       } catch (e) {
           console.error(e);
           setSyncStatus('error');
-          alert('Sync failed: ' + (e as Error).message);
+          setSyncMessage({ type: 'error', text: 'Sync failed: ' + (e as Error).message });
       } finally {
-          setTimeout(() => setSyncStatus('idle'), 2000);
+          setTimeout(() => {
+              setSyncStatus('idle');
+              setSyncMessage(null);
+          }, 3000);
       }
   };
 
   const handleRestore = async () => {
       setSyncStatus('restoring');
+      setSyncMessage(null);
       try {
           const restored = await restoreSettings(settings);
           setSettings(restored);
           await saveSettings(restored);
           setSyncStatus('success');
-          alert('Settings restored from cloud!');
+          setSyncMessage({ type: 'success', text: 'Settings restored from cloud!' });
       } catch (e) {
           console.error(e);
           setSyncStatus('error');
-          alert('Restore failed: ' + (e as Error).message);
+          setSyncMessage({ type: 'error', text: 'Restore failed: ' + (e as Error).message });
       } finally {
-           setTimeout(() => setSyncStatus('idle'), 2000);
+           setTimeout(() => {
+               setSyncStatus('idle');
+               setSyncMessage(null);
+           }, 3000);
       }
   };
 
@@ -455,6 +456,13 @@ const Settings: React.FC = () => {
                         GitHub Login
                     </button>
                 </div>
+                {syncMessage && (
+                    <div className={`text-xs p-2 rounded text-center ${
+                        syncMessage.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+                    }`}>
+                        {syncMessage.text}
+                    </div>
+                )}
             </div>
         ) : (
             <div className="space-y-3 bg-gray-50 p-3 rounded-lg border">
@@ -527,6 +535,14 @@ const Settings: React.FC = () => {
                      </button>
                  </div>
                  
+                 {syncMessage && (
+                     <div className={`text-xs p-2 rounded text-center ${
+                         syncMessage.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+                     }`}>
+                         {syncMessage.text}
+                     </div>
+                 )}
+
                  {settings.sync.lastSynced && (
                      <p className="text-[10px] text-center text-gray-400">
                          Last Synced: {new Date(settings.sync.lastSynced).toLocaleString()}
