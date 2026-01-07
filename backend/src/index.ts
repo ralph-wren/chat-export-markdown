@@ -32,6 +32,76 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
+    // 0. Privacy Policy (Public)
+    if (url.pathname === '/privacy' && request.method === 'GET') {
+        const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Privacy Policy - Memoraid</title>
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; color: #333; }
+                h1 { border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 30px; }
+                h2 { margin-top: 30px; color: #2c3e50; }
+                ul { padding-left: 20px; }
+                li { margin-bottom: 10px; }
+                .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 0.9em; }
+            </style>
+        </head>
+        <body>
+            <h1>Privacy Policy for Memoraid</h1>
+            <p><strong>Effective Date:</strong> January 7, 2026</p>
+
+            <p>Memoraid ("we", "us", or "our") is committed to protecting your privacy. This Privacy Policy explains how our Chrome Extension collects, uses, and safeguards your information.</p>
+
+            <h2>1. Information We Collect</h2>
+            <p>We collect the minimum amount of data necessary to provide our services:</p>
+            <ul>
+                <li><strong>Authentication Data:</strong> When you log in using Google or GitHub, we receive your email address and a unique user identifier to manage your account.</li>
+                <li><strong>Sync Data:</strong> We store your application settings and preferences to synchronize them across your devices.</li>
+            </ul>
+
+            <h2>2. How We Use Your Information</h2>
+            <ul>
+                <li>To provide, maintain, and improve the Memoraid extension.</li>
+                <li>To synchronize your settings securely across multiple instances of the extension.</li>
+                <li>To authenticate your identity and prevent unauthorized access.</li>
+            </ul>
+
+            <h2>3. Data Security & Encryption</h2>
+            <p>Your privacy is our priority. We employ <strong>Client-Side Encryption</strong> (AES-GCM) for your sync data:</p>
+            <ul>
+                <li>Your settings are encrypted <strong>on your device</strong> before they are sent to our servers.</li>
+                <li>We do not have access to your encryption password or your decrypted data.</li>
+                <li>All data is transmitted over secure SSL/TLS (HTTPS) connections.</li>
+            </ul>
+
+            <h2>4. Third-Party Services</h2>
+            <p>We use trusted third-party services for authentication:</p>
+            <ul>
+                <li><strong>Google OAuth:</strong> For user authentication.</li>
+                <li><strong>GitHub OAuth:</strong> For user authentication.</li>
+            </ul>
+            <p>We do not sell, trade, or otherwise transfer your personally identifiable information to outside parties.</p>
+
+            <h2>5. Data Retention & Deletion</h2>
+            <p>We retain your encrypted data as long as you use our service. You may request the deletion of your account and all associated data by contacting us.</p>
+
+            <h2>6. Changes to This Policy</h2>
+            <p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page.</p>
+
+            <div class="footer">
+                <p>Contact Us: If you have any questions about this Privacy Policy, please contact us via the Chrome Web Store support page.</p>
+            </div>
+        </body>
+        </html>
+        `;
+        return new Response(html, {
+            headers: { 'Content-Type': 'text/html; charset=UTF-8' }
+        });
+    }
+
     // 1. Auth Init - Redirect to Provider
     if (url.pathname.startsWith('/auth/login/') && request.method === 'GET') {
        const provider = url.pathname.split('/').pop();
