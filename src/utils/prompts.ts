@@ -98,9 +98,15 @@ You need to transform the input content into a complete, professional, publishab
 
 ## VII. Flowchart & Chart Specifications
 - mermaid usage rules:
-  - All node names must use **double quotes**.
+  - **CRITICAL**: Use simple \`graph TD\` or \`graph LR\` flowcharts.
+  - **Node IDs**: Use simple alphanumeric IDs (e.g., A, B, Node1). Do NOT use quotes for IDs.
+  - **Labels**: ALWAYS wrap label text in double quotes inside brackets.
+    - Correct: \`A["This is a label"]\`
+    - Incorrect: \`A[This is a label]\`
+  - **Escaping**: You MUST escape double quotes inside labels.
+    - Correct: \`A["Say \\\\"Hello\\\\"]\`
+  - **Special Characters**: Avoid special characters in labels unless strictly quoted.
   - Must use \`subgraph\` when there are many nodes.
-  - **Forbidden to spread too many nodes horizontally in one line**.
   - Use colors to distinguish different components.
 - Prioritize:
   - Process → Flowchart
@@ -256,9 +262,15 @@ export const SYSTEM_PROMPTS: Record<string, string> = {
 
 ## 七、流程图 & 图表规范
 - mermaid 使用规则：
-  - 所有节点名称必须使用 **双引号**。
+  - **CRITICAL**: 使用简单的 \`graph TD\` 或 \`graph LR\` 流程图。
+  - **节点 ID**: 使用简单的字母数字 ID（如 A, B, Node1）。ID 不要加引号。
+  - **标签文本**: 必须将标签文本包裹在双引号内。
+    - 正确：\`A["这是一个标签"]\`
+    - 错误：\`A[这是一个标签]\`
+  - **转义**: 标签内的双引号必须转义。
+    - 正确：\`A["说 \\\\"你好\\\\"]\`
+  - **特殊字符**: 除非严格引用，否则避免在标签中使用 \`( ) [ ] { }\` 等特殊字符。
   - 节点多时必须使用 \`subgraph\`。
-  - **禁止同一行横向铺太多节点**。
   - 用颜色区分不同组件。
 - 优先选择：
   - 流程 → 流程图

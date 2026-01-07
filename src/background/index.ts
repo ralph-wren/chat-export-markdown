@@ -80,7 +80,62 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+
+  if (message.type === 'ANALYZE_SCREENSHOT') {
+    handleAnalyzeScreenshot(message.payload)
+      .then(result => sendResponse({ success: true, result }))
+      .catch(e => sendResponse({ success: false, error: e.message || String(e) }));
+    return true;
+  }
 });
+
+async function handleAnalyzeScreenshot({ prompt }: { prompt: string }) {
+  try {
+    const settings = await getSettings();
+    let effectiveApiKey = settings.apiKeys?.[settings.provider] || settings.apiKey;
+    
+    if (!effectiveApiKey) {
+      throw new Error(`API Key for ${settings.provider} is missing.`);
+    }
+
+    // 1. Capture Screenshot
+    // Note: captureVisibleTab works in background script for the active tab of the current window
+    // @ts-ignore - Chrome API types can be tricky with optional arguments
+    const dataUrl = await chrome.tabs.captureVisibleTab(undefined, { format: 'jpeg', quality: 60 });
+
+    const openai = new OpenAI({
+      apiKey: effectiveApiKey,
+      baseURL: settings.baseUrl,
+    });
+
+    // 2. Call AI with Vision
+    const response = await openai.chat.completions.create({
+      model: settings.model,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { 
+              type: "image_url", 
+              image_url: { 
+                url: dataUrl,
+                detail: "low" // Use low detail for speed and cost, usually enough for UI buttons
+              } 
+            }
+          ]
+        } as any // Cast to any to avoid type issues if installed SDK is slightly old
+      ],
+      max_tokens: 300
+    });
+
+    return response.choices[0].message.content;
+  } catch (error) {
+    console.error('Screenshot analysis failed:', error);
+    throw error;
+  }
+}
+
 
 function updateTaskState(newState: Partial<ActiveTask>) {
   currentTask = { ...currentTask, ...newState } as ActiveTask;

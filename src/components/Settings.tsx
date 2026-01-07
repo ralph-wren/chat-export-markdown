@@ -28,11 +28,6 @@ const PROVIDERS: Record<string, ProviderConfig> = {
     baseUrl: 'https://api.apiyi.com/v1',
     models: ['gpt-4o', 'gpt-4-turbo', 'claude-3-5-sonnet', 'claude-3-opus', 'gemini-1.5-pro', 'yi-large', 'deepseek-chat']
   },
-  'yi': {
-    name: '01.AI (Yi)',
-    baseUrl: 'https://api.lingyiwanwu.com/v1',
-    models: ['yi-34b-chat-0205', 'yi-34b-chat-200k', 'yi-spark']
-  },
   'deepseek': {
     name: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com',

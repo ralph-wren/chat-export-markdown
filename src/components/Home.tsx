@@ -28,11 +28,15 @@ const MermaidChart = ({ code }: { code: string }) => {
            throw new Error('Code too short');
         }
 
+        // Validate syntax before rendering to avoid the "Bomb" error icon
+        await mermaid.parse(code);
+
         const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
         const { svg } = await mermaid.render(id, code);
         setSvg(svg);
       } catch (error) {
         // While streaming or if syntax is invalid, show the code block gracefully.
+        console.warn('Mermaid rendering failed:', error);
         setSvg(`<div class="p-2 bg-gray-50 border rounded text-xs font-mono text-gray-500 overflow-x-auto whitespace-pre-wrap">${code}</div>`);
       }
     };
