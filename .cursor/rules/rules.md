@@ -12,3 +12,6 @@ Insert overview text here. The agent will only see this should they choose to ap
 5. 通过执行playwright脚本来验证浏览器操作流程是否准确，是否正确实现想要的功能
 6. 更改完代码一定要执行npm run build确认不报错
 7. 我是初学者，代码尽量加注释，尤其每次改动要加注释说明下
+8. 代码仓库地址 https://github.com/ralph-wren/memoraid
+9. 所有内容部署到cloudflare page
+10. 本地已经安装和cloudflare的d1，r1数据库的交互命令

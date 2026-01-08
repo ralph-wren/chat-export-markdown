@@ -538,7 +538,16 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
           <img src="/logo.svg" className="w-8 h-8" alt="Logo" />
           Memoraid
         </h1>
-        <div className="flex gap-2">
+        <div className="flex gap-1">
+          <a 
+            href="https://github.com/ralph-wren/memoraid" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="p-2 hover:bg-gray-100 rounded-full transition"
+            title="View on GitHub"
+          >
+            <Github className="w-5 h-5 text-gray-600" />
+          </a>
           <button onClick={loadHistory} className="p-2 hover:bg-gray-100 rounded-full" title="Refresh History">
             <RefreshCw className="w-5 h-5 text-gray-600" />
           </button>
