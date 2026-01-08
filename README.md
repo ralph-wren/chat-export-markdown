@@ -45,28 +45,34 @@
 ## 🖼️ 截图展示
 
 ### 1. 主界面与历史记录
-![主界面](store-assets/screenshot-4.png)
+![主界面](store-assets/screenshot-8.png)
 
 ### 2. AI 总结结果
 ![AI总结](store-assets/screenshot-1.png)
 
 ### 3. 文章风格设置
-![风格设置](store-assets/screenshot-2.png)
+![风格设置](store-assets/screenshot-6.png)
 
-### 4. API 配置
-![API配置](store-assets/screenshot-3.png)
+### 4. 自动发布到头条
+![风格设置](store-assets/screenshot-10.png)
 
+### 5. API 配置
+![API配置](store-assets/screenshot-7.png)
+
+### 6. 账号登录同步
+
+![API配置](store-assets/screenshot-5.png)
 ## 🛠️ 安装指南
 
 ### 从 Chrome 应用商店安装（推荐）
-1. 访问 [Chrome 应用商店 - Memoraid](#)（链接待添加）
+1. 访问 [Chrome 应用商店 - Memoraid](https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg?hl=zh-CN&utm_source=ext_sidebar)
 2. 点击"添加至 Chrome"
 
 ### 从源码安装（开发者模式）
 
 1. **克隆仓库**：
    ```bash
-   git clone https://github.com/nichuanfang/memoraid.git
+   git clone https://github.com/ralph-wren/memoraid.git
    cd memoraid
    ```
 
@@ -154,5 +160,5 @@ MIT License - 详见 [LICENSE](./LICENSE) 文件
 
 ## 📧 联系方式
 
-- GitHub Issues: [提交问题](https://github.com/nichuanfang/memoraid/issues)
-- Email: nichuanfang@gmail.com
+- GitHub Issues: [提交问题](https://github.com/ralph-wren/memoraid/issues)
+- Email: iuyuger@gmail.com
