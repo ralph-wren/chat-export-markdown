@@ -62,8 +62,8 @@ const SELECTORS = {
     '[role="dialog"]'
   ],
   
-  // 免费正版图片标签 - Playwright: getByText('免费正版图片')
-  freeLibraryTab: [
+  // 热点图库标签 - 使用热点图库（内容更丰富，免费正版图片内容太少）
+  hotLibraryTab: [
     // 通过文本匹配（在代码中特殊处理）
   ],
   
@@ -711,40 +711,40 @@ const openImageDialogFromCover = async (): Promise<boolean> => {
 };
 
 /**
- * 切换到免费正版图片标签
- * Playwright: await page.getByText('免费正版图片').click();
+ * 切换到热点图库标签（内容更丰富）
+ * 注意：不使用"免费正版图片"，因为内容太少
  */
-const switchToFreeLibrary = async (): Promise<boolean> => {
+const switchToHotLibrary = async (): Promise<boolean> => {
   await new Promise(r => setTimeout(r, 500));
-  logger.log('查找免费正版图片标签...', 'info');
+  logger.log('查找热点图库标签...', 'info');
   
   // 方法1: 直接通过文本内容查找（模拟 Playwright 的 getByText）
   const allElements = document.querySelectorAll('*');
-  let freeTab: HTMLElement | null = null;
+  let hotTab: HTMLElement | null = null;
   
   for (const el of allElements) {
     const text = (el as HTMLElement).innerText?.trim();
-    // 精确匹配 "免费正版图片"
-    if (text === '免费正版图片') {
+    // 精确匹配 "热点图库"
+    if (text === '热点图库') {
       // 确保是可点击的元素（不是父容器）
       const children = el.children;
       let hasTextChild = false;
       for (const child of children) {
-        if ((child as HTMLElement).innerText?.trim() === '免费正版图片') {
+        if ((child as HTMLElement).innerText?.trim() === '热点图库') {
           hasTextChild = true;
           break;
         }
       }
       if (!hasTextChild && isElementVisible(el as HTMLElement)) {
-        freeTab = el as HTMLElement;
-        logger.log('找到免费正版图片标签 (精确匹配)', 'success');
+        hotTab = el as HTMLElement;
+        logger.log('找到热点图库标签 (精确匹配)', 'success');
         break;
       }
     }
   }
   
   // 方法2: 查找标签页容器中的元素
-  if (!freeTab) {
+  if (!hotTab) {
     const dialog = findElement(SELECTORS.imageDialog);
     const searchContainer = dialog || document;
     const tabs = searchContainer.querySelectorAll(
@@ -753,31 +753,31 @@ const switchToFreeLibrary = async (): Promise<boolean> => {
     
     for (const tab of tabs) {
       const text = (tab.textContent || '').trim();
-      if (text.includes('免费正版图片')) {
-        freeTab = tab as HTMLElement;
-        logger.log(`找到免费正版图片标签: "${text}"`, 'success');
+      if (text.includes('热点图库')) {
+        hotTab = tab as HTMLElement;
+        logger.log(`找到热点图库标签: "${text}"`, 'success');
         break;
       }
     }
   }
   
-  if (!freeTab) {
-    logger.log('未找到免费正版图片标签', 'warn');
+  if (!hotTab) {
+    logger.log('未找到热点图库标签', 'warn');
     return false;
   }
   
   // 检查是否已经选中
-  const isActive = freeTab.classList.contains('byte-tabs-header-title-active') ||
-                   freeTab.classList.contains('active') ||
-                   freeTab.getAttribute('aria-selected') === 'true';
+  const isActive = hotTab.classList.contains('byte-tabs-header-title-active') ||
+                   hotTab.classList.contains('active') ||
+                   hotTab.getAttribute('aria-selected') === 'true';
   
   if (isActive) {
-    logger.log('免费正版图片标签已选中', 'info');
+    logger.log('热点图库标签已选中', 'info');
     return true;
   }
   
-  logger.log('切换到免费正版图片', 'action');
-  simulateClick(freeTab);
+  logger.log('切换到热点图库', 'action');
+  simulateClick(hotTab);
   await new Promise(r => setTimeout(r, 1000));
   return true;
 };
@@ -1023,9 +1023,9 @@ const closeDialog = async (): Promise<void> => {
  * 基于 Playwright 录制的操作顺序
  */
 const searchAndSelectImage = async (keyword: string, imageIndex = 0): Promise<boolean> => {
-  // 1. 切换到免费正版图片
-  if (!await switchToFreeLibrary()) {
-    logger.log('切换免费图库失败，尝试继续...', 'warn');
+  // 1. 切换到热点图库（内容更丰富）
+  if (!await switchToHotLibrary()) {
+    logger.log('切换热点图库失败，尝试继续...', 'warn');
   }
   if (isFlowCancelled) return false;
   
@@ -1085,9 +1085,9 @@ const searchAndSelectImageWithSuggestion = async (
   suggestion?: string, 
   imageIndex = 0
 ): Promise<boolean> => {
-  // 1. 切换到免费正版图片
-  if (!await switchToFreeLibrary()) {
-    logger.log('切换免费图库失败，尝试继续...', 'warn');
+  // 1. 切换到热点图库（内容更丰富）
+  if (!await switchToHotLibrary()) {
+    logger.log('切换热点图库失败，尝试继续...', 'warn');
   }
   if (isFlowCancelled) return false;
   
@@ -1639,11 +1639,11 @@ console.log(`
     - 搜索"富士山"，点击建议"富士山樱花"，选择第3张图片
 
 图片占位符格式（在文章中使用）：
-  [图片: 关键词]
+  [图片: 关键词]  - 关键词要简短，2-4个字最佳
   【图片: 关键词】
   [配图: 关键词]
 
 操作流程（基于 Playwright 录制）：
-  1. 封面图片: .add-icon → 免费正版图片 → 搜索 → 选择 → 确定
-  2. 文章配图: .syl-toolbar-tool.image → 免费正版图片 → 搜索 → 选择 → 确定
+  1. 封面图片: .add-icon → 热点图库 → 搜索 → 选择 → 确定
+  2. 文章配图: .syl-toolbar-tool.image → 热点图库 → 搜索 → 选择 → 确定
 `);

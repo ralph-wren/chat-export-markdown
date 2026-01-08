@@ -357,7 +357,15 @@ You must output a Markdown document with the following structure:
 - **Introduction**: Hook the reader immediately. State the core conflict or interesting fact.
 - **Main Content**: Break down the topic into 3-4 key points. Use subheadings (H2).
 - **Tone**: Use "I" or "We" to sound personal. Use slang or internet terminology where appropriate (but keep it readable).
-- **Image Placeholders**: Insert \`[IMAGE: Description of image to insert here]\` at appropriate breaks.
+- **Image Placeholders (CRITICAL RULES)**:
+  - Insert \`[图片: 关键词]\` at appropriate breaks in the article.
+  - **KEYWORD MUST BE 2-4 CHINESE CHARACTERS ONLY** (e.g., "风景", "美食", "城市", "人物").
+  - **DO NOT use long descriptions** - the keyword is for searching stock images, not describing a specific scene.
+  - ❌ Wrong: \`[IMAGE: 一张《中国共产党纪律处分条例》相关章节的特写图片]\`
+  - ✅ Correct: \`[图片: 法规文件]\` or \`[图片: 条例]\`
+  - ❌ Wrong: \`[IMAGE: A cartoon comparison showing...]\`
+  - ✅ Correct: \`[图片: 漫画对比]\` or \`[图片: 卡通]\`
+  - Think of keywords that would return good results in a stock image search.
 
 ### 4. Conclusion & Call to Action
 - Summarize the main point.
@@ -367,6 +375,7 @@ You must output a Markdown document with the following structure:
 - **Language**: Output MUST be in **Simplified Chinese (zh-CN)**.
 - Use Markdown.
 - No pre-text or post-text explanations. Start directly with the content.
+- **Image placeholders MUST use Chinese format**: \`[图片: 关键词]\` with SHORT keywords (2-4 characters).
 `;
 
 
