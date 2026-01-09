@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AppSettings, DEFAULT_SETTINGS, getSettings, saveSettings, syncSettings, restoreSettings, ArticleStyleSettings } from '../utils/storage';
 import { SYSTEM_PROMPTS } from '../utils/prompts';
 import { getTranslation } from '../utils/i18n';
-import { Eye, EyeOff, Github, Loader2, CheckCircle, XCircle, Newspaper, RefreshCw, Cloud, Lock, Key, Bug, Palette, Send } from 'lucide-react';
+import { Eye, EyeOff, Github, Loader2, CheckCircle, XCircle, Newspaper, RefreshCw, Cloud, Lock, Key, Bug, Palette, Send, BookOpen } from 'lucide-react';
 import { validateGitHubConnection } from '../utils/github';
 import { generateRandomString } from '../utils/crypto';
 
@@ -173,7 +173,9 @@ const Settings: React.FC = () => {
   const [showApiKey, setShowApiKey] = useState(false);
   const [showGithubToken, setShowGithubToken] = useState(false);
   const [showToutiaoCookie, setShowToutiaoCookie] = useState(false);
+  const [showZhihuCookie, setShowZhihuCookie] = useState(false);
   const [fetchingToutiao, setFetchingToutiao] = useState(false);
+  const [fetchingZhihu, setFetchingZhihu] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verifyingApi, setVerifyingApi] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -298,6 +300,17 @@ const Settings: React.FC = () => {
       ...prev,
       toutiao: {
         ...prev.toutiao || { cookie: '' },
+        [name]: value
+      }
+    }));
+  };
+
+  const handleZhihuChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setSettings(prev => ({
+      ...prev,
+      zhihu: {
+        ...prev.zhihu || { cookie: '' },
         [name]: value
       }
     }));
@@ -464,6 +477,40 @@ const Settings: React.FC = () => {
        alert('Failed to fetch cookies. Please try manually.');
     } finally {
       setFetchingToutiao(false);
+    }
+  };
+
+  const handleAutoFetchZhihuCookie = async () => {
+    if (typeof chrome === 'undefined' || !chrome.cookies) {
+      alert('This feature requires the Chrome Extension environment.');
+      return;
+    }
+
+    setFetchingZhihu(true);
+    try {
+      const cookies = await chrome.cookies.getAll({ domain: 'zhihu.com' });
+      const relevantCookies = cookies.filter(c => c.domain.includes('zhihu.com'));
+      
+      if (relevantCookies.length > 0) {
+        const cookieStr = relevantCookies.map(c => `${c.name}=${c.value}`).join('; ');
+        setSettings(prev => ({
+            ...prev,
+            zhihu: {
+                ...prev.zhihu,
+                cookie: cookieStr
+            }
+        }));
+      } else {
+        const confirmLogin = confirm('未找到知乎登录 Cookie。是否打开知乎登录页面？');
+        if (confirmLogin) {
+            chrome.tabs.create({ url: 'https://www.zhihu.com/signin' });
+        }
+      }
+    } catch (error) {
+       console.error("Failed to fetch Zhihu cookies:", error);
+       alert('获取 Cookie 失败，请手动复制。');
+    } finally {
+      setFetchingZhihu(false);
     }
   };
 
@@ -727,6 +774,78 @@ const Settings: React.FC = () => {
                         })}
                     />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Zhihu Configuration - 知乎配置 */}
+      <div className="border-t pt-4">
+        <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
+          <BookOpen className="w-4 h-4" />
+          知乎专栏配置
+        </h3>
+        <div className="space-y-3">
+          <div className="space-y-1">
+             <div className="flex justify-between items-center">
+               <label className="block text-xs font-medium text-gray-600">Cookie (发布文章需要)</label>
+               <button
+                 type="button"
+                 onClick={handleAutoFetchZhihuCookie}
+                 disabled={fetchingZhihu}
+                 className="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-xs"
+               >
+                 {fetchingZhihu ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                 自动获取
+               </button>
+             </div>
+             <div className="relative">
+                <input
+                  type={showZhihuCookie ? "text" : "password"}
+                  name="cookie"
+                  value={settings.zhihu?.cookie || ''}
+                  onChange={handleZhihuChange}
+                  className="w-full p-2 border rounded pr-10 text-sm"
+                  placeholder="粘贴知乎 Cookie..."
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowZhihuCookie(!showZhihuCookie)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"
+                >
+                  {showZhihuCookie ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                </button>
+             </div>
+             <p className="text-[10px] text-gray-400">
+               登录 zhihu.com，打开开发者工具，从任意请求头中复制 cookie。
+             </p>
+          </div>
+          
+          {/* 知乎自动发布开关 */}
+          <div className="bg-white rounded-lg border border-gray-100 p-3 mt-3">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Send className={`w-4 h-4 ${settings.zhihu?.autoPublish ? 'text-blue-500' : 'text-gray-400'}`} />
+                    <div>
+                        <span className="font-medium text-gray-800 text-sm">自动发布</span>
+                        <p className="text-[10px] text-gray-500">生成文章后自动发布到知乎专栏</p>
+                    </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                        type="checkbox" 
+                        className="sr-only peer"
+                        checked={settings.zhihu?.autoPublish || false}
+                        onChange={(e) => setSettings({ 
+                          ...settings, 
+                          zhihu: {
+                            ...settings.zhihu || { cookie: '' },
+                            autoPublish: e.target.checked
+                          }
+                        })}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
                 </label>
             </div>
           </div>

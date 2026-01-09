@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, FileText, Settings as SettingsIcon, Loader2, Copy, Eye, Code, Send, History, Trash2, ArrowLeft, X, RefreshCw, Square, Github, Folder, UploadCloud, Check, PenTool, Newspaper } from 'lucide-react';
+import { Download, FileText, Settings as SettingsIcon, Loader2, Copy, Eye, Code, Send, History, Trash2, ArrowLeft, X, RefreshCw, Square, Github, Folder, UploadCloud, Check, PenTool, Newspaper, BookOpen } from 'lucide-react';
 import { getHistory, deleteHistoryItem, HistoryItem, clearHistory, getSettings } from '../utils/storage';
 import { getDirectories, pushToGitHub } from '../utils/github';
 import { ExtractionResult } from '../utils/types';
@@ -159,6 +159,38 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       console.error(e);
       setStatus('Publish Failed');
       alert(`Publish Failed: ${e.message}`);
+    }
+  };
+
+  const handlePublishToZhihu = async () => {
+    const settings = await getSettings();
+    if (!settings.zhihu?.cookie) {
+      if (confirm('知乎 Cookie 未配置，是否前往设置？')) {
+        onOpenSettings();
+      }
+      return;
+    }
+    
+    setStatus('Publishing to Zhihu...');
+    try {
+      // Send to background
+      const response = await chrome.runtime.sendMessage({
+        type: 'PUBLISH_TO_ZHIHU',
+        payload: {
+          title: currentTitle || 'Untitled',
+          content: result
+        }
+      });
+      
+      if (response && response.success) {
+        setStatus('Published successfully!');
+      } else {
+        throw new Error(response?.error || 'Unknown error');
+      }
+    } catch (e: any) {
+      console.error(e);
+      setStatus('Publish Failed');
+      alert(`发布失败: ${e.message}`);
     }
   };
 
@@ -803,7 +835,15 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                 title="Publish to Toutiao"
               >
                 <Newspaper className="w-4 h-4" />
-                <span className="text-xs">Publish to Toutiao</span>
+                <span className="text-xs">头条</span>
+              </button>
+               <button
+                onClick={handlePublishToZhihu}
+                className="flex-1 bg-blue-500 text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-blue-600 transition"
+                title="Publish to Zhihu"
+              >
+                <BookOpen className="w-4 h-4" />
+                <span className="text-xs">知乎</span>
               </button>
             </div>
             

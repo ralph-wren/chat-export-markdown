@@ -31,6 +31,10 @@ export interface AppSettings {
     cookie: string;
     autoPublish?: boolean; // 生成文章后是否自动发布
   };
+  zhihu?: {
+    cookie: string;
+    autoPublish?: boolean; // 生成文章后是否自动发布到知乎
+  };
   sync?: {
     enabled: boolean;
     backendUrl: string; // e.g. https://my-worker.workers.dev
@@ -57,6 +61,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
     branch: 'main'
   },
   toutiao: {
+    cookie: '',
+    autoPublish: false
+  },
+  zhihu: {
     cookie: '',
     autoPublish: false
   },

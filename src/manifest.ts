@@ -2,7 +2,7 @@ import { defineManifest } from '@crxjs/vite-plugin'
 
 export default defineManifest({
   name: 'Memoraid',
-  description: 'Memoraid 是一款强大的 AI 内容处理工具，帮助您高效地总结网页内容、生成自媒体文章，并一键发布到头条号。',
+  description: 'Memoraid 是一款强大的 AI 内容处理工具，帮助您高效地总结网页内容、生成自媒体文章，并一键发布到头条号和知乎专栏。',
   version: '1.1.1',
   manifest_version: 3,
   action: {
@@ -28,6 +28,10 @@ export default defineManifest({
     {
       matches: ['*://mp.toutiao.com/*'],
       js: ['src/content/toutiao.ts'],
+    },
+    {
+      matches: ['*://zhuanlan.zhihu.com/*'],
+      js: ['src/content/zhihu.ts'],
     },
   ],
   background: {

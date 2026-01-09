@@ -54,6 +54,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+
+  if (message.type === 'PUBLISH_TO_ZHIHU') {
+    handlePublishToZhihu(message.payload);
+    sendResponse({ success: true });
+    return true;
+  }
   
   if (message.type === 'CANCEL_SUMMARIZATION') {
     if (abortController) {
@@ -691,6 +697,103 @@ async function handlePublishToToutiao(payload: { title: string; content: string 
 
   } catch (error) {
     console.error('Publish failed', error);
+  }
+}
+
+async function handlePublishToZhihu(payload: { title: string; content: string }) {
+  try {
+    const settings = await getSettings();
+    const cookieStr = settings.zhihu?.cookie;
+
+    if (cookieStr) {
+      // Parse and set cookies for zhihu.com
+      const cookies = cookieStr.split(';').map(c => c.trim()).filter(c => c);
+      for (const cookie of cookies) {
+        const separatorIndex = cookie.indexOf('=');
+        if (separatorIndex === -1) continue;
+        
+        const name = cookie.substring(0, separatorIndex);
+        const value = cookie.substring(separatorIndex + 1);
+        
+        if (name && value) {
+          try {
+            await chrome.cookies.set({
+              url: 'https://zhuanlan.zhihu.com',
+              domain: '.zhihu.com',
+              name,
+              value,
+              path: '/',
+              secure: true,
+              sameSite: 'no_restriction'
+            });
+          } catch (e) {
+            console.error(`Failed to set Zhihu cookie ${name}`, e);
+          }
+        }
+      }
+    }
+
+    // Clean up content before publishing
+    let cleanedContent = payload.content;
+    
+    // Remove metadata sections similar to Toutiao
+    cleanedContent = cleanedContent.replace(/^#{1,3}\s*封面图建议[：:].*/gm, '');
+    cleanedContent = cleanedContent.replace(/^\*?\*?封面图建议\*?\*?[：:][^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
+    cleanedContent = cleanedContent.replace(/^封面图建议[：:][^\n]*\n?/gm, '');
+    cleanedContent = cleanedContent.replace(/^#{1,3}\s*其他备选标题[：:]?.*(\n(?!#)[^\n]*)*/gm, '');
+    cleanedContent = cleanedContent.replace(/^#{1,3}\s*备选标题[：:]?.*(\n(?!#)[^\n]*)*/gm, '');
+    cleanedContent = cleanedContent.replace(/^\*?\*?其他备选标题\*?\*?[：:]?[^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
+    cleanedContent = cleanedContent.replace(/^\*?\*?备选标题\*?\*?[：:]?[^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
+    
+    // Clean up multiple consecutive blank lines
+    cleanedContent = cleanedContent.replace(/\n{3,}/g, '\n\n');
+    cleanedContent = cleanedContent.trim();
+    
+    // Extract the real title from the content (H1 heading)
+    let articleTitle = payload.title;
+    const h1Match = cleanedContent.match(/^#\s+(.+)$/m);
+    if (h1Match && h1Match[1]) {
+      const extractedTitle = h1Match[1].trim();
+      const genericTitles = ['微博搜索', 'Weibo Search', '搜索', 'Search', '主页', 'Home', 'Untitled'];
+      const isGeneric = genericTitles.some(t => payload.title?.includes(t));
+      if (isGeneric || !payload.title || payload.title.length < 3) {
+        articleTitle = extractedTitle;
+      }
+      // 知乎标题限制100字
+      if (extractedTitle.length > 3 && extractedTitle.length <= 100) {
+        articleTitle = extractedTitle;
+      }
+    }
+    
+    // Remove the H1 title from content (Zhihu has separate title field)
+    cleanedContent = cleanedContent.replace(/^#\s+.+\n+/, '');
+    cleanedContent = cleanedContent.trim();
+
+    // Convert Markdown to HTML for Zhihu's rich text editor
+    const htmlContent = await marked.parse(cleanedContent);
+
+    // Save payload to storage for content script to pick up
+    await chrome.storage.local.set({
+      pending_zhihu_publish: {
+        title: articleTitle,
+        content: cleanedContent,
+        htmlContent: htmlContent,
+        timestamp: Date.now()
+      }
+    });
+
+    const tab = await chrome.tabs.create({
+      url: 'https://zhuanlan.zhihu.com/write',
+      active: true
+    });
+
+    if (!tab.id) throw new Error('Failed to create tab');
+
+    // The content script (src/content/zhihu.ts) will handle the rest
+    console.log('Opened Zhihu write page, waiting for content script to fill...');
+
+  } catch (error) {
+    console.error('Zhihu publish failed', error);
   }
 }
 
