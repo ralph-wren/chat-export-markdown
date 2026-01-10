@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AppSettings, DEFAULT_SETTINGS, getSettings, saveSettings, syncSettings, restoreSettings, ArticleStyleSettings } from '../utils/storage';
 import { SYSTEM_PROMPTS, TOUTIAO_DEFAULT_PROMPT, ZHIHU_DEFAULT_PROMPT } from '../utils/prompts';
 import { getTranslation } from '../utils/i18n';
-import { Eye, EyeOff, Github, Loader2, CheckCircle, XCircle, Newspaper, RefreshCw, Cloud, Lock, Key, Bug, Palette, Send, BookOpen, RotateCcw } from 'lucide-react';
+import { Eye, EyeOff, Github, Loader2, CheckCircle, XCircle, Newspaper, RefreshCw, Cloud, Lock, Key, Bug, Palette, Send, BookOpen, RotateCcw, FileText } from 'lucide-react';
 import { validateGitHubConnection } from '../utils/github';
 import { generateRandomString } from '../utils/crypto';
 
@@ -924,7 +924,10 @@ const Settings: React.FC = () => {
       {/* 系统提示词 */}
       <div className="border-t pt-4 space-y-2">
         <div className="flex justify-between items-center">
-            <label className="block text-sm font-medium">{t.systemPromptLabel}</label>
+            <label className="block text-xs font-medium text-gray-600 flex items-center gap-1">
+              <FileText className="w-3 h-3" />
+              {t.systemPromptLabel}
+            </label>
             <button
                 type="button"
                 onClick={() => setSettings(prev => ({ 
@@ -940,7 +943,7 @@ const Settings: React.FC = () => {
           name="systemPrompt"
           value={settings.systemPrompt}
           onChange={handleChange}
-          className="w-full p-2 border rounded h-32"
+          className="w-full p-2 border rounded h-32 text-sm font-mono"
           placeholder={t.promptPlaceholder}
         />
       </div>
