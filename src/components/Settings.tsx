@@ -269,7 +269,7 @@ const Settings: React.FC = () => {
           } catch (error) {
             console.error('Failed to fetch shared API key:', error);
           }
-        }
+          }
 
           setSettings(initializedSettings);
           

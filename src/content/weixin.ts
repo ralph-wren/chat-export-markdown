@@ -360,6 +360,12 @@ const fillTitle = async (title: string): Promise<boolean> => {
 const fillContent = async (content: string, htmlContent?: string): Promise<boolean> => {
   logger.log('查找编辑器...', 'info');
   
+  // 移除封面提示词（[封面: xxx]），封面提示词会单独用于生成封面
+  content = removeCoverPromptFromContent(content);
+  if (htmlContent) {
+    htmlContent = removeCoverPromptFromContent(htmlContent);
+  }
+  
   // 等待编辑器加载
   await new Promise(r => setTimeout(r, 1500));
   
@@ -636,8 +642,9 @@ const clickAIImage = async (): Promise<boolean> => {
  * 生成 AI 配图
  * 输入关键词后点击"重新创作"/"开始创作"按钮，等待 AI 生成图片
  * @param prompt 图片描述关键词
+ * @param setRatio 是否设置图片尺寸（正文图片也设置为 1:1 或其他尺寸）
  */
-const generateAIImage = async (prompt: string): Promise<boolean> => {
+const generateAIImage = async (prompt: string, setRatio: boolean = true): Promise<boolean> => {
   logger.log(`AI 配图关键词: ${prompt}`, 'info');
   
   // 记录点击创作按钮前的 ai-image-list 数量
@@ -669,6 +676,32 @@ const generateAIImage = async (prompt: string): Promise<boolean> => {
   }
   
   await new Promise(r => setTimeout(r, 500));
+  
+  // 设置图片尺寸（正文图片设置为 1:1，保持默认即可，或者可以选择其他尺寸）
+  if (setRatio) {
+    logger.log('检查图片尺寸设置...', 'info');
+    
+    // 查找当前尺寸按钮
+    let ratioBtn: HTMLElement | null = null;
+    const ratioBtns = document.querySelectorAll('button, div, span');
+    for (const btn of ratioBtns) {
+      const text = (btn as HTMLElement).innerText?.trim();
+      if ((text === '1:1' || text === '1:1 ↓' || text?.match(/^\d+:\d+/)) && isElementVisible(btn as HTMLElement)) {
+        const dialog = btn.closest('.weui-desktop-dialog, [class*="dialog"], [class*="modal"]');
+        if (dialog) {
+          ratioBtn = btn as HTMLElement;
+          break;
+        }
+      }
+    }
+    
+    if (ratioBtn) {
+      // 正文图片保持 1:1 即可，不需要改变
+      logger.log('正文图片使用默认尺寸 1:1', 'info');
+    }
+  }
+  
+  await new Promise(r => setTimeout(r, 300));
   
   // 点击"重新创作"或"开始创作"按钮
   logger.log('查找创作按钮...', 'info');
@@ -973,7 +1006,7 @@ const insertAIImage = async (): Promise<boolean> => {
  * 关键：必须在封面区域悬浮后点击"AI 配图"按钮，这样生成的图片才会设置为封面
  * 而不是使用正文的图片插入方式
  * @param title 文章标题
- * @param content 文章内容
+ * @param content 文章内容（包含封面提示词）
  */
 const setCoverWithAI = async (title?: string, content?: string): Promise<boolean> => {
   logger.log('🎨 使用 AI 生成封面图片...', 'info');
@@ -985,6 +1018,20 @@ const setCoverWithAI = async (title?: string, content?: string): Promise<boolean
   if (!articleTitle) {
     logger.log('未找到文章标题，无法生成封面', 'warn');
     return false;
+  }
+  
+  // 从内容中提取封面提示词（[封面: xxx] 格式）
+  const coverPromptData = extractCoverPrompt(articleContent);
+  let coverPrompt: string;
+  
+  if (coverPromptData) {
+    // 使用 AI 生成的封面提示词
+    coverPrompt = coverPromptData.prompt;
+    logger.log(`使用文章中的封面提示词: ${coverPrompt.substring(0, 50)}...`, 'info');
+  } else {
+    // 如果没有封面提示词，使用自动生成的
+    coverPrompt = generateImagePrompt(articleTitle, articleContent, undefined, true);
+    logger.log(`自动生成封面提示词: ${coverPrompt.substring(0, 50)}...`, 'info');
   }
   
   // 滚动到页面底部，确保封面区域可见
@@ -1142,8 +1189,7 @@ const setCoverWithAI = async (title?: string, content?: string): Promise<boolean
   simulateClick(aiCoverBtn);
   await new Promise(r => setTimeout(r, 2000));
   
-  // 步骤5: 生成封面提示词并输入
-  const coverPrompt = generateImagePrompt(articleTitle, articleContent, undefined, true);
+  // 步骤5: 输入封面提示词（使用前面提取或生成的 coverPrompt）
   logger.log(`封面提示词: ${coverPrompt.substring(0, 60)}...`, 'info');
   
   // 查找并输入提示词
@@ -1303,8 +1349,9 @@ const setCoverWithAI = async (title?: string, content?: string): Promise<boolean
   
   await new Promise(r => setTimeout(r, 2000));
   
-  // 关键：在封面 AI 配图弹窗中，需要点击图片来选择作为封面
-  // 这里不是用 insertAIImage，而是直接点击图片选择
+  // 关键：在封面 AI 配图弹窗中，需要点击"使用"按钮来选择作为封面
+  // 注意：封面弹窗中的按钮是"使用"，而不是正文的"插入"
+  // 如果点击"插入"会把图片插入到正文中，而不是设置为封面
   logger.log('选择封面图片...', 'action');
   
   const allLists = document.querySelectorAll('.ai-image-list');
@@ -1324,58 +1371,127 @@ const setCoverWithAI = async (title?: string, content?: string): Promise<boolean
       targetItem.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
       await new Promise(r => setTimeout(r, 800));
       
-      // 查找"使用"或"选择"按钮（封面选择可能用不同的按钮文字）
-      let selectBtn: HTMLElement | null = null;
+      // 查找"使用"按钮（封面专用，不是"插入"）
+      // 关键：封面弹窗中第一个按钮是"使用"，第二个是"插入"
+      // 必须点击"使用"才能设置为封面，点击"插入"会插入到正文
+      let useBtn: HTMLElement | null = null;
       
-      // 方法1: 查找 operation-group 中的按钮
+      // 方法1: 查找 operation-group 中的"使用"按钮（第一个按钮）
       const opGroup = targetItem.querySelector('.ai-image-operation-group');
       if (opGroup) {
-        // 封面可能是第一个按钮（使用/选择），而不是第二个（插入）
         const firstBtn = opGroup.children[0] as HTMLElement;
         const secondBtn = opGroup.children[1] as HTMLElement;
         
-        // 检查按钮文字
+        // 优先查找"使用"按钮
         if (firstBtn) {
           const text = firstBtn.innerText?.trim();
+          logger.log(`第一个按钮文字: "${text}"`, 'info');
           if (text === '使用' || text === '选择' || text === '设为封面') {
-            selectBtn = firstBtn;
+            useBtn = firstBtn;
+            logger.log('找到"使用"按钮（第一个）', 'success');
           }
         }
-        if (!selectBtn && secondBtn) {
+        
+        // 如果第一个不是"使用"，检查第二个（但要避免点击"插入"）
+        if (!useBtn && secondBtn) {
           const text = secondBtn.innerText?.trim();
-          if (text === '使用' || text === '选择' || text === '设为封面' || text === '插入') {
-            selectBtn = secondBtn;
+          logger.log(`第二个按钮文字: "${text}"`, 'info');
+          // 只有当第二个按钮是"使用"时才选择它，不要选择"插入"
+          if (text === '使用' || text === '选择' || text === '设为封面') {
+            useBtn = secondBtn;
+            logger.log('找到"使用"按钮（第二个）', 'success');
           }
         }
-        // 如果都没找到，用第一个按钮
-        if (!selectBtn && firstBtn) {
-          selectBtn = firstBtn;
+        
+        // 如果都没找到"使用"，但第一个按钮存在且不是"插入"，则使用第一个
+        if (!useBtn && firstBtn) {
+          const text = firstBtn.innerText?.trim();
+          if (text !== '插入') {
+            useBtn = firstBtn;
+            logger.log(`使用第一个按钮: "${text}"`, 'info');
+          }
         }
       }
       
-      // 方法2: 通过文字查找
-      if (!selectBtn) {
+      // 方法2: 在整个图片项中通过文字查找"使用"按钮
+      if (!useBtn) {
         const btns = targetItem.querySelectorAll('div, span, button');
         for (const btn of btns) {
           const text = (btn as HTMLElement).innerText?.trim();
-          if (text === '使用' || text === '选择' || text === '设为封面' || text === '插入') {
-            selectBtn = btn as HTMLElement;
+          // 优先查找"使用"，避免"插入"
+          if (text === '使用' || text === '选择' || text === '设为封面') {
+            useBtn = btn as HTMLElement;
+            logger.log(`通过文字找到按钮: "${text}"`, 'success');
             break;
           }
         }
       }
       
-      if (selectBtn) {
-        logger.log('点击选择封面图片', 'action');
-        simulateClick(selectBtn);
+      // 方法3: 在整个弹窗中查找"使用"按钮
+      if (!useBtn) {
+        const dialog = document.querySelector('.weui-desktop-dialog, [class*="dialog"]');
+        if (dialog) {
+          const allBtns = dialog.querySelectorAll('.ai-image-operation-group div, .ai-image-operation-group span');
+          for (const btn of allBtns) {
+            const text = (btn as HTMLElement).innerText?.trim();
+            if (text === '使用' && isElementVisible(btn as HTMLElement)) {
+              useBtn = btn as HTMLElement;
+              logger.log('在弹窗中找到"使用"按钮', 'success');
+              break;
+            }
+          }
+        }
+      }
+      
+      if (useBtn) {
+        logger.log('点击"使用"按钮设置封面', 'action');
+        simulateClick(useBtn);
         await new Promise(r => setTimeout(r, 1500));
-        logger.log('✅ AI 封面设置完成', 'success');
+        
+        // 关键：点击"使用"后还需要点击"确认"按钮才能真正设置封面
+        // 根据 Playwright 录制: await page1.getByRole('button', { name: '确认' }).click();
+        logger.log('查找确认按钮...', 'info');
+        
+        let confirmBtn = findElementByText('确认', ['button']);
+        if (!confirmBtn) {
+          // 在弹窗中查找
+          const dialog = document.querySelector('.weui-desktop-dialog, [class*="dialog"]');
+          if (dialog) {
+            const btns = dialog.querySelectorAll('button');
+            for (const btn of btns) {
+              const text = (btn as HTMLElement).innerText?.trim();
+              if (text === '确认' && isElementVisible(btn as HTMLElement)) {
+                confirmBtn = btn as HTMLElement;
+                break;
+              }
+            }
+          }
+        }
+        
+        if (confirmBtn) {
+          logger.log('点击确认按钮', 'action');
+          simulateClick(confirmBtn);
+          await new Promise(r => setTimeout(r, 1000));
+          logger.log('✅ AI 封面设置完成', 'success');
+        } else {
+          logger.log('未找到确认按钮，封面可能已设置', 'warn');
+        }
+        
         return true;
       } else {
-        // 直接点击图片试试
-        logger.log('直接点击图片选择', 'action');
+        // 如果实在找不到"使用"按钮，尝试直接点击图片
+        logger.log('未找到"使用"按钮，尝试直接点击图片', 'warn');
         simulateClick(targetItem);
         await new Promise(r => setTimeout(r, 1500));
+        
+        // 检查是否有确认按钮需要点击
+        const confirmBtn = findElementByText('确认', ['button']);
+        if (confirmBtn) {
+          logger.log('点击确认按钮', 'action');
+          simulateClick(confirmBtn);
+          await new Promise(r => setTimeout(r, 1000));
+        }
+        
         logger.log('✅ AI 封面设置完成', 'success');
         return true;
       }
@@ -1875,6 +1991,48 @@ const findImagePlaceholders = (): { text: string; keyword: string }[] => {
   }
   
   return placeholders;
+};
+
+/**
+ * 从内容中提取封面提示词
+ * 格式: [封面: xxx] 或 【封面: xxx】
+ * @param content 文章内容
+ * @returns 封面提示词，如果没有则返回 null
+ */
+const extractCoverPrompt = (content: string): { text: string; prompt: string } | null => {
+  const patterns = [
+    /\[封面[：:]\s*([^\]]+)\]/,
+    /【封面[：:]\s*([^】]+)】/,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = content.match(pattern);
+    if (match) {
+      return {
+        text: match[0],
+        prompt: match[1].trim()
+      };
+    }
+  }
+  
+  return null;
+};
+
+/**
+ * 从内容中移除封面提示词
+ * @param content 文章内容
+ * @returns 移除封面提示词后的内容
+ */
+const removeCoverPromptFromContent = (content: string): string => {
+  // 移除 [封面: xxx] 或 【封面: xxx】 格式的封面提示词
+  let cleaned = content
+    .replace(/\[封面[：:]\s*[^\]]+\]\s*/g, '')
+    .replace(/【封面[：:]\s*[^】]+】\s*/g, '');
+  
+  // 清理多余的空行
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
+  
+  return cleaned;
 };
 
 /**

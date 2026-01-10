@@ -416,6 +416,7 @@ async function startSummarization(extraction: ExtractionResult) {
       model: settings.model,
       messages: initialMessages as any,
       stream: true,
+      temperature: 0.9, // 提高温度让回复更有创造性和多样化
     }, { signal: abortController.signal });
 
     const baseMessage = 'Generating summary...';
@@ -977,6 +978,7 @@ async function startArticleGeneration(extraction: ExtractionResult) {
       model: settings.model,
       messages: initialMessages as any,
       stream: true,
+      temperature: 0.9, // 提高温度让回复更有创造性和多样化
     }, { signal: abortController.signal });
 
     const baseMessage = 'Generating article...';
@@ -1188,6 +1190,7 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
       model: settings.model,
       messages: initialMessages as any,
       stream: true,
+      temperature: 0.9, // 提高温度让回复更有创造性和多样化
     }, { signal: abortController.signal });
 
     const baseMessage = '正在生成文章...';
