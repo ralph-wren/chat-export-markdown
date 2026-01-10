@@ -467,7 +467,7 @@ const Settings: React.FC = () => {
             }
         }));
       } else {
-        const confirmLogin = confirm('No Toutiao login cookies found. Would you like to open the Toutiao login page?');
+        const confirmLogin = confirm(t.noToutiaoCookie);
         if (confirmLogin) {
             chrome.tabs.create({ url: 'https://mp.toutiao.com/' });
         }
@@ -501,14 +501,14 @@ const Settings: React.FC = () => {
             }
         }));
       } else {
-        const confirmLogin = confirm('未找到知乎登录 Cookie。是否打开知乎登录页面？');
+        const confirmLogin = confirm(t.noZhihuCookie);
         if (confirmLogin) {
             chrome.tabs.create({ url: 'https://www.zhihu.com/signin' });
         }
       }
     } catch (error) {
        console.error("Failed to fetch Zhihu cookies:", error);
-       alert('获取 Cookie 失败，请手动复制。');
+       alert('Failed to fetch cookies. Please try manually.');
     } finally {
       setFetchingZhihu(false);
     }
@@ -589,13 +589,13 @@ const Settings: React.FC = () => {
       <div className="border-t pt-4">
         <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
             <Cloud className="w-4 h-4" />
-            Sync & Backup (Encrypted)
+            {t.syncBackupTitle}
         </h3>
         
         {!settings.sync?.token ? (
             <div className="space-y-3">
                 <p className="text-xs text-gray-500">
-                    Sign in to sync your settings across devices. All critical data (API Keys) is encrypted client-side before upload.
+                    {t.syncDescription}
                 </p>
                 <div className="flex gap-2">
                     <button
@@ -603,14 +603,14 @@ const Settings: React.FC = () => {
                         className="flex-1 py-2 px-3 border rounded flex items-center justify-center gap-2 hover:bg-gray-50 text-sm font-medium transition"
                     >
                         <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.033s2.701-6.033,6.033-6.033c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/></svg>
-                        Google Login
+                        {t.googleLogin}
                     </button>
                     <button
                         onClick={() => handleLogin('github')}
                         className="flex-1 py-2 px-3 border rounded flex items-center justify-center gap-2 hover:bg-gray-50 text-sm font-medium transition"
                     >
                         <Github className="w-4 h-4" />
-                        GitHub Login
+                        {t.githubLogin}
                     </button>
                 </div>
                 {syncMessage && (
@@ -632,7 +632,7 @@ const Settings: React.FC = () => {
                         onClick={handleLogout}
                         className="text-xs text-red-600 hover:text-red-800"
                      >
-                         Logout
+                         {t.logout}
                      </button>
                  </div>
 
@@ -640,7 +640,7 @@ const Settings: React.FC = () => {
                     <div className="flex justify-between items-center">
                         <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
                             <Lock className="w-3 h-3" />
-                            Encryption Key (Passphrase)
+                            {t.encryptionKeyLabel}
                         </label>
                         <button
                             type="button"
@@ -648,7 +648,7 @@ const Settings: React.FC = () => {
                             className="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-[10px]"
                         >
                             <Key className="w-3 h-3" />
-                            Random Generate
+                            {t.randomGenerate}
                         </button>
                     </div>
                     <div className="relative">
@@ -669,7 +669,7 @@ const Settings: React.FC = () => {
                         </button>
                     </div>
                     <p className="text-[10px] text-gray-400 leading-tight">
-                        This key is used to encrypt your data before sending to cloud. You MUST remember it to restore data on another device.
+                        {t.encryptionKeyHint}
                     </p>
                  </div>
 
@@ -680,7 +680,7 @@ const Settings: React.FC = () => {
                         className="flex-1 bg-blue-600 text-white py-1.5 rounded text-xs font-medium hover:bg-blue-700 transition flex items-center justify-center gap-1.5"
                      >
                          {syncStatus === 'syncing' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Cloud className="w-3 h-3" />}
-                         Sync Up
+                         {t.syncUp}
                      </button>
                      <button
                         onClick={handleRestore}
@@ -688,7 +688,7 @@ const Settings: React.FC = () => {
                         className="flex-1 bg-white border text-gray-700 py-1.5 rounded text-xs font-medium hover:bg-gray-50 transition flex items-center justify-center gap-1.5"
                      >
                          {syncStatus === 'restoring' ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                         Restore
+                         {t.restore}
                      </button>
                  </div>
                  
@@ -702,7 +702,7 @@ const Settings: React.FC = () => {
 
                  {settings.sync.lastSynced && (
                      <p className="text-[10px] text-center text-gray-400">
-                         Last Synced: {new Date(settings.sync.lastSynced).toLocaleString()}
+                         {t.lastSynced}: {new Date(settings.sync.lastSynced).toLocaleString()}
                      </p>
                  )}
             </div>
@@ -712,12 +712,12 @@ const Settings: React.FC = () => {
       <div className="border-t pt-4">
         <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
           <Newspaper className="w-4 h-4" />
-          Toutiao Configuration
+          {t.toutiaoConfigTitle}
         </h3>
         <div className="space-y-3">
           <div className="space-y-1">
              <div className="flex justify-between items-center">
-               <label className="block text-xs font-medium text-gray-600">Cookie (Required for Publishing)</label>
+               <label className="block text-xs font-medium text-gray-600">{t.cookieLabel}</label>
                <button
                  type="button"
                  onClick={handleAutoFetchToutiaoCookie}
@@ -725,7 +725,7 @@ const Settings: React.FC = () => {
                  className="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-xs"
                >
                  {fetchingToutiao ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                 Auto Fetch
+                 {t.autoFetch}
                </button>
              </div>
              <div className="relative">
@@ -746,7 +746,7 @@ const Settings: React.FC = () => {
                 </button>
              </div>
              <p className="text-[10px] text-gray-400">
-               Login to mp.toutiao.com, open DevTools, copy 'cookie' from any network request header.
+               {t.cookieHint}
              </p>
           </div>
           
@@ -756,8 +756,8 @@ const Settings: React.FC = () => {
                 <div className="flex items-center gap-2">
                     <Send className={`w-4 h-4 ${settings.toutiao?.autoPublish ? 'text-green-500' : 'text-gray-400'}`} />
                     <div>
-                        <span className="font-medium text-gray-800 text-sm">自动发布</span>
-                        <p className="text-[10px] text-gray-500">生成文章后自动发布到头条并跳转到发布页面</p>
+                        <span className="font-medium text-gray-800 text-sm">{t.autoPublish}</span>
+                        <p className="text-[10px] text-gray-500">{t.autoPublishHintToutiao}</p>
                     </div>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -784,12 +784,12 @@ const Settings: React.FC = () => {
       <div className="border-t pt-4">
         <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
           <BookOpen className="w-4 h-4" />
-          知乎专栏配置
+          {t.zhihuConfigTitle}
         </h3>
         <div className="space-y-3">
           <div className="space-y-1">
              <div className="flex justify-between items-center">
-               <label className="block text-xs font-medium text-gray-600">Cookie (发布文章需要)</label>
+               <label className="block text-xs font-medium text-gray-600">{t.cookieLabel}</label>
                <button
                  type="button"
                  onClick={handleAutoFetchZhihuCookie}
@@ -797,7 +797,7 @@ const Settings: React.FC = () => {
                  className="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-xs"
                >
                  {fetchingZhihu ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                 自动获取
+                 {t.autoFetch}
                </button>
              </div>
              <div className="relative">
@@ -807,7 +807,7 @@ const Settings: React.FC = () => {
                   value={settings.zhihu?.cookie || ''}
                   onChange={handleZhihuChange}
                   className="w-full p-2 border rounded pr-10 text-sm"
-                  placeholder="粘贴知乎 Cookie..."
+                  placeholder={t.cookieLabel}
                 />
                 <button
                   type="button"
@@ -818,7 +818,7 @@ const Settings: React.FC = () => {
                 </button>
              </div>
              <p className="text-[10px] text-gray-400">
-               登录 zhihu.com，打开开发者工具，从任意请求头中复制 cookie。
+               {t.cookieHint}
              </p>
           </div>
           
@@ -828,8 +828,8 @@ const Settings: React.FC = () => {
                 <div className="flex items-center gap-2">
                     <Send className={`w-4 h-4 ${settings.zhihu?.autoPublish ? 'text-blue-500' : 'text-gray-400'}`} />
                     <div>
-                        <span className="font-medium text-gray-800 text-sm">自动发布</span>
-                        <p className="text-[10px] text-gray-500">生成文章后自动发布到知乎专栏</p>
+                        <span className="font-medium text-gray-800 text-sm">{t.autoPublish}</span>
+                        <p className="text-[10px] text-gray-500">{t.autoPublishHintZhihu}</p>
                     </div>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -856,62 +856,62 @@ const Settings: React.FC = () => {
       <div className="border-t pt-4">
         <h3 className="text-md font-semibold mb-3 flex items-center gap-2">
           <Palette className="w-4 h-4" />
-          文章风格设置
+          {t.articleStyleTitle}
         </h3>
         <p className="text-xs text-gray-500 mb-4">
-          调整滑动条来控制 AI 生成文章的风格倾向
+          {t.articleStyleHint}
         </p>
         <div className="space-y-4">
           {/* 客观性 */}
           <StyleSlider
-            label="立场倾向"
-            leftLabel="客观中立"
-            rightLabel="观点鲜明"
+            label={t.styleStance}
+            leftLabel={t.styleStanceLeft}
+            rightLabel={t.styleStanceRight}
             value={settings.articleStyle?.objectivity ?? 50}
             onChange={(v) => handleStyleChange('objectivity', v)}
           />
           
           {/* 情感倾向 */}
           <StyleSlider
-            label="情感色彩"
-            leftLabel="消极悲观"
-            rightLabel="积极乐观"
+            label={t.styleEmotion}
+            leftLabel={t.styleEmotionLeft}
+            rightLabel={t.styleEmotionRight}
             value={settings.articleStyle?.sentiment ?? 60}
             onChange={(v) => handleStyleChange('sentiment', v)}
           />
           
           {/* 语气 */}
           <StyleSlider
-            label="评价态度"
-            leftLabel="批评质疑"
-            rightLabel="赞美认可"
+            label={t.styleTone}
+            leftLabel={t.styleToneLeft}
+            rightLabel={t.styleToneRight}
             value={settings.articleStyle?.tone ?? 50}
             onChange={(v) => handleStyleChange('tone', v)}
           />
           
           {/* 礼貌程度 */}
           <StyleSlider
-            label="表达方式"
-            leftLabel="犀利直接"
-            rightLabel="委婉礼貌"
+            label={t.stylePoliteness}
+            leftLabel={t.stylePolitenessLeft}
+            rightLabel={t.stylePolitenessRight}
             value={settings.articleStyle?.politeness ?? 60}
             onChange={(v) => handleStyleChange('politeness', v)}
           />
           
           {/* 正式程度 */}
           <StyleSlider
-            label="语言风格"
-            leftLabel="口语随意"
-            rightLabel="正式书面"
+            label={t.styleFormality}
+            leftLabel={t.styleFormalityLeft}
+            rightLabel={t.styleFormalityRight}
             value={settings.articleStyle?.formality ?? 30}
             onChange={(v) => handleStyleChange('formality', v)}
           />
           
           {/* 幽默程度 */}
           <StyleSlider
-            label="趣味程度"
-            leftLabel="严肃认真"
-            rightLabel="幽默搞笑"
+            label={t.styleHumor}
+            leftLabel={t.styleHumorLeft}
+            rightLabel={t.styleHumorRight}
             value={settings.articleStyle?.humor ?? 40}
             onChange={(v) => handleStyleChange('humor', v)}
           />
@@ -925,7 +925,7 @@ const Settings: React.FC = () => {
             }))}
             className="text-xs text-blue-600 hover:text-blue-800 underline"
           >
-            重置为默认风格
+            {t.resetToDefaultStyle}
           </button>
         </div>
       </div>
@@ -936,8 +936,8 @@ const Settings: React.FC = () => {
             <div className="flex items-center gap-2">
                 <Bug className={`w-5 h-5 ${settings.debugMode ? 'text-orange-500' : 'text-gray-400'}`} />
                 <div>
-                    <span className="font-medium text-gray-800">Debug Mode</span>
-                    <p className="text-xs text-gray-500">Automatically upload error logs to server for analysis</p>
+                    <span className="font-medium text-gray-800">{t.debugModeTitle}</span>
+                    <p className="text-xs text-gray-500">{t.debugModeHint}</p>
                 </div>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">

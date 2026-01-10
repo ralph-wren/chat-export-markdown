@@ -3,6 +3,7 @@ import { Download, FileText, Settings as SettingsIcon, Loader2, Copy, Eye, Code,
 import { getHistory, deleteHistoryItem, HistoryItem, clearHistory, getSettings } from '../utils/storage';
 import { getDirectories, pushToGitHub } from '../utils/github';
 import { ExtractionResult } from '../utils/types';
+import { getTranslation, Translation } from '../utils/i18n';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkFrontmatter from 'remark-frontmatter';
@@ -66,6 +67,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   const [result, setResult] = useState<string | null>(null);
   const [currentTitle, setCurrentTitle] = useState<string>(''); // Track current document title
   const [isPreview, setIsPreview] = useState(true);
+  const [t, setT] = useState<Translation>(getTranslation('zh-CN')); // 翻译
   
   const [userClosedResult, setUserClosedResult] = useState(false);
   const userClosedResultRef = React.useRef(userClosedResult);
@@ -78,6 +80,15 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   useEffect(() => {
     viewRef.current = view;
   }, [view]);
+
+  // 加载语言设置
+  useEffect(() => {
+    const loadLanguage = async () => {
+      const settings = await getSettings();
+      setT(getTranslation(settings.language || 'zh-CN'));
+    };
+    loadLanguage();
+  }, []);
   
   // History State
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
@@ -133,13 +144,13 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   const handlePublishToToutiao = async () => {
     const settings = await getSettings();
     if (!settings.toutiao?.cookie) {
-      if (confirm('Toutiao Cookie is missing. Go to settings?')) {
+      if (confirm(t.cookieMissing)) {
         onOpenSettings();
       }
       return;
     }
     
-    setStatus('Publishing to Toutiao...');
+    setStatus(t.publishingToToutiao);
     try {
       // Send to background
       const response = await chrome.runtime.sendMessage({
@@ -151,14 +162,14 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       });
       
       if (response && response.success) {
-        setStatus('Published successfully!');
+        setStatus(t.publishSuccess);
       } else {
         throw new Error(response?.error || 'Unknown error');
       }
     } catch (e: any) {
       console.error(e);
-      setStatus('Publish Failed');
-      alert(`Publish Failed: ${e.message}`);
+      setStatus(t.publishFailed);
+      alert(`${t.publishFailed}: ${e.message}`);
     }
   };
 
@@ -166,13 +177,13 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   const handlePublishToZhihu = async () => {
     const settings = await getSettings();
     if (!settings.zhihu?.cookie) {
-      if (confirm('知乎 Cookie 未配置，是否前往设置？')) {
+      if (confirm(t.cookieMissing)) {
         onOpenSettings();
       }
       return;
     }
     
-    setStatus('Publishing to Zhihu...');
+    setStatus(t.publishingToZhihu);
     try {
       // Send to background
       const response = await chrome.runtime.sendMessage({
@@ -184,14 +195,14 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       });
       
       if (response && response.success) {
-        setStatus('Published successfully!');
+        setStatus(t.publishSuccess);
       } else {
         throw new Error(response?.error || 'Unknown error');
       }
     } catch (e: any) {
       console.error(e);
-      setStatus('Publish Failed');
-      alert(`发布失败: ${e.message}`);
+      setStatus(t.publishFailed);
+      alert(`${t.publishFailed}: ${e.message}`);
     }
   };
 
@@ -199,7 +210,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   const handleGenerateAndPublishToToutiao = async () => {
     const settings = await getSettings();
     if (!settings.toutiao?.cookie) {
-      if (confirm('头条 Cookie 未配置，是否前往设置？')) {
+      if (confirm(t.cookieMissing)) {
         onOpenSettings();
       }
       return;
@@ -207,8 +218,8 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
 
     setLoading(true);
     setProgress(5);
-    setStatus('Extracting content...');
-    setLogMessage('正在提取页面内容...');
+    setStatus(t.extractingContent);
+    setLogMessage(t.extractingContent);
     setResult(null);
     setErrorMessage(null);
     setConversationHistory([]);
@@ -228,7 +239,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
         throw new Error(response.payload);
       }
 
-      setLogMessage('内容提取成功！开始生成文章并发布到头条...');
+      setLogMessage(t.contentExtracted);
 
       const extraction: ExtractionResult = response.payload;
       
@@ -249,7 +260,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       if (errorMsg.includes('Could not establish connection') || errorMsg.includes('Receiving end does not exist')) {
         setErrorMessage(
           <div className="flex flex-col gap-2">
-            <span>连接失败，请刷新页面后重试。</span>
+            <span>{t.connectionFailed}</span>
             <button 
               onClick={async () => {
                 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -260,7 +271,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
               }}
               className="text-xs bg-red-100 hover:bg-red-200 text-red-800 py-1 px-2 rounded font-medium transition w-fit"
             >
-              刷新页面
+              {t.refreshPage}
             </button>
           </div> as any
         );
@@ -277,7 +288,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   const handleGenerateAndPublishToZhihu = async () => {
     const settings = await getSettings();
     if (!settings.zhihu?.cookie) {
-      if (confirm('知乎 Cookie 未配置，是否前往设置？')) {
+      if (confirm(t.cookieMissing)) {
         onOpenSettings();
       }
       return;
@@ -285,8 +296,8 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
 
     setLoading(true);
     setProgress(5);
-    setStatus('Extracting content...');
-    setLogMessage('正在提取页面内容...');
+    setStatus(t.extractingContent);
+    setLogMessage(t.extractingContent);
     setResult(null);
     setErrorMessage(null);
     setConversationHistory([]);
@@ -306,7 +317,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
         throw new Error(response.payload);
       }
 
-      setLogMessage('内容提取成功！开始生成文章并发布到知乎...');
+      setLogMessage(t.contentExtracted);
 
       const extraction: ExtractionResult = response.payload;
       
@@ -327,7 +338,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       if (errorMsg.includes('Could not establish connection') || errorMsg.includes('Receiving end does not exist')) {
         setErrorMessage(
           <div className="flex flex-col gap-2">
-            <span>连接失败，请刷新页面后重试。</span>
+            <span>{t.connectionFailed}</span>
             <button 
               onClick={async () => {
                 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -338,7 +349,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
               }}
               className="text-xs bg-red-100 hover:bg-red-200 text-red-800 py-1 px-2 rounded font-medium transition w-fit"
             >
-              刷新页面
+              {t.refreshPage}
             </button>
           </div> as any
         );
@@ -440,8 +451,8 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   const handleSummarize = async () => {
     setLoading(true);
     setProgress(5);
-    setStatus('Extracting chat content...');
-    setLogMessage('Extracting chat content from page...');
+    setStatus(t.extractingContent);
+    setLogMessage(t.extractingContent);
     setResult(null);
     setErrorMessage(null);
     setConversationHistory([]); 
@@ -461,7 +472,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
         throw new Error(response.payload);
       }
 
-      setLogMessage('Content extracted! Sending to background task...');
+      setLogMessage(t.contentExtracted);
 
       const extraction: ExtractionResult = response.payload;
       console.log('Extracted:', extraction);
@@ -484,7 +495,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       if (errorMsg.includes('Could not establish connection') || errorMsg.includes('Receiving end does not exist')) {
           setErrorMessage(
             <div className="flex flex-col gap-2">
-               <span>Connection failed. The page might need a refresh.</span>
+               <span>{t.connectionFailed}</span>
                <button 
                  onClick={async () => {
                    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -495,7 +506,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                  }}
                  className="text-xs bg-red-100 hover:bg-red-200 text-red-800 py-1 px-2 rounded font-medium transition w-fit"
                >
-                 Refresh Page
+                 {t.refreshPage}
                </button>
             </div> as any
           );
@@ -511,8 +522,8 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   const handleGenerateArticle = async () => {
     setLoading(true);
     setProgress(5);
-    setStatus('Extracting content for article...');
-    setLogMessage('Extracting content from page...');
+    setStatus(t.extractingContent);
+    setLogMessage(t.extractingContent);
     setResult(null);
     setErrorMessage(null);
     setConversationHistory([]); 
@@ -532,7 +543,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
         throw new Error(response.payload);
       }
 
-      setLogMessage('Content extracted! Starting article generation...');
+      setLogMessage(t.contentExtracted);
 
       const extraction: ExtractionResult = response.payload;
       console.log('Extracted for article:', extraction);
@@ -553,7 +564,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       if (errorMsg.includes('Could not establish connection') || errorMsg.includes('Receiving end does not exist')) {
           setErrorMessage(
             <div className="flex flex-col gap-2">
-               <span>Connection failed. The page might need a refresh.</span>
+               <span>{t.connectionFailed}</span>
                <button 
                  onClick={async () => {
                    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -564,7 +575,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                  }}
                  className="text-xs bg-red-100 hover:bg-red-200 text-red-800 py-1 px-2 rounded font-medium transition w-fit"
                >
-                 Refresh Page
+                 {t.refreshPage}
                </button>
             </div> as any
           );
@@ -612,7 +623,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   const handleOpenSaveModal = async () => {
     const settings = await getSettings();
     if (!settings.github?.token || !settings.github?.repo) {
-      if (confirm('GitHub Integration is not configured. Go to settings?')) {
+      if (confirm(t.githubNotConfigured)) {
         onOpenSettings();
       }
       return;
@@ -675,9 +686,9 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       chrome.storage.local.set({ lastGithubDir: saveConfig.directory });
 
       setPushResultUrl(pushResponse.url);
-      setStatus('Pushed to GitHub!');
+      setStatus(t.pushedToGithub);
     } catch (e: any) {
-      alert(`Push Failed: ${e.message}`);
+      alert(`${t.publishFailed}: ${e.message}`);
     } finally {
       setIsPushing(false);
     }
@@ -686,7 +697,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   const handleCopy = () => {
     if (!result) return;
     navigator.clipboard.writeText(result).then(() => {
-      setStatus('Copied to clipboard!');
+      setStatus(t.copiedToClipboard);
       setTimeout(() => setStatus('Done!'), 2000);
     });
   };
@@ -717,7 +728,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   };
 
   const handleClearHistory = async () => {
-    if (confirm('Are you sure you want to clear all history?')) {
+    if (confirm(t.confirmClearHistory)) {
       await clearHistory();
       loadHistory();
     }
@@ -764,7 +775,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
               )}
 
               <p className="text-gray-600 text-sm px-4">
-                打开 ChatGPT 或 Gemini 对话页面，点击下方按钮一键发布
+                {t.homeDescription}
               </p>
               
               {!loading ? (
@@ -774,25 +785,25 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                     <button
                       onClick={handleGenerateAndPublishToToutiao}
                       className="flex-1 bg-red-600 text-white px-4 py-3 rounded-lg flex items-center gap-2 hover:bg-red-700 transition justify-center"
-                      title="生成文章并发布到头条"
+                      title={t.publishToToutiao}
                     >
                       <Newspaper className="w-5 h-5" />
-                      <span className="text-sm font-medium">发头条</span>
+                      <span className="text-sm font-medium">{t.publishToToutiao}</span>
                     </button>
                     <button
                       onClick={handleGenerateAndPublishToZhihu}
                       className="flex-1 bg-blue-500 text-white px-4 py-3 rounded-lg flex items-center gap-2 hover:bg-blue-600 transition justify-center"
-                      title="生成文章并发布到知乎"
+                      title={t.publishToZhihu}
                     >
                       <BookOpen className="w-5 h-5" />
-                      <span className="text-sm font-medium">发知乎</span>
+                      <span className="text-sm font-medium">{t.publishToZhihu}</span>
                     </button>
                   </div>
                   
                   {/* 分隔线 */}
                   <div className="flex items-center w-64 gap-2 my-1">
                     <div className="flex-1 h-px bg-gray-200"></div>
-                    <span className="text-xs text-gray-400">或</span>
+                    <span className="text-xs text-gray-400">{t.orSeparator}</span>
                     <div className="flex-1 h-px bg-gray-200"></div>
                   </div>
                   
@@ -802,14 +813,14 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                     className="bg-purple-600 text-white px-6 py-2.5 rounded-lg flex items-center gap-2 hover:bg-purple-700 transition w-64 justify-center"
                   >
                     <PenTool className="w-4 h-4" />
-                    <span className="text-sm">仅生成文章</span>
+                    <span className="text-sm">{t.generateArticleOnly}</span>
                   </button>
                   <button
                     onClick={handleSummarize}
                     className="bg-gray-700 text-white px-6 py-2.5 rounded-lg flex items-center gap-2 hover:bg-gray-800 transition w-64 justify-center"
                   >
                     <FileText className="w-4 h-4" />
-                    <span className="text-sm">生成摘要</span>
+                    <span className="text-sm">{t.generateSummary}</span>
                   </button>
                 </div>
               ) : (
@@ -818,7 +829,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                      <div className="flex justify-between items-center text-xs text-gray-500 font-medium">
                        <span className="flex items-center gap-2">
                          <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
-                         Processing...
+                         {t.processing}
                        </span>
                        <span>{progress}%</span>
                      </div>
@@ -843,7 +854,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                          }}
                          className="text-xs bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 py-1.5 rounded transition flex items-center justify-center gap-1.5 w-full mt-1 font-medium"
                        >
-                         <Eye className="w-3 h-3" /> View Live Result
+                         <Eye className="w-3 h-3" /> {t.viewLiveResult}
                        </button>
                      )}
 
@@ -851,7 +862,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                        onClick={handleCancel}
                        className="text-xs border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 py-1.5 rounded transition flex items-center justify-center gap-1.5 w-full mt-1 font-medium"
                      >
-                       <Square className="w-3 h-3 fill-current" /> Stop Generating
+                       <Square className="w-3 h-3 fill-current" /> {t.stopGenerating}
                      </button>
                    </div>
                 </div>
@@ -862,11 +873,11 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                <div className="flex justify-between items-center mb-3 px-1 shrink-0">
                  <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-1">
                    <History className="w-4 h-4" />
-                   Recent Documents
+                   {t.recentDocuments}
                  </h2>
                  {historyItems.length > 0 && (
                    <button onClick={handleClearHistory} className="text-[10px] text-gray-400 hover:text-red-500 uppercase tracking-wider font-bold">
-                     Clear All
+                     {t.clearAll}
                    </button>
                  )}
                </div>
@@ -875,7 +886,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                  {historyItems.length === 0 ? (
                    <div className="h-32 flex flex-col items-center justify-center text-gray-400">
                      <History className="w-8 h-8 mb-2 opacity-20" />
-                     <p className="text-xs italic">No history yet.</p>
+                     <p className="text-xs italic">{t.noHistoryYet}</p>
                    </div>
                  ) : (
                    historyItems.map(item => (
@@ -922,14 +933,14 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
         {view === 'result' && result && (
           <div className="w-full space-y-4 h-full flex flex-col">
             <div className="flex justify-between items-center px-1 mb-2">
-              <span className="text-xs font-semibold text-gray-500">Result</span>
+              <span className="text-xs font-semibold text-gray-500">{t.result}</span>
               <div className="flex gap-2">
                  <button
                   onClick={() => setIsPreview(!isPreview)}
                   className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded transition shadow-sm font-medium"
                 >
                   {isPreview ? <Code className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  {isPreview ? 'Show Code' : 'Preview'}
+                  {isPreview ? t.showCode : t.preview}
                 </button>
                 <button
                  onClick={() => {
@@ -940,7 +951,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                  className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 hover:bg-red-50 hover:text-red-600 text-gray-700 px-3 py-1.5 rounded transition shadow-sm font-medium"
               >
                 <X className="w-3.5 h-3.5" />
-                Close
+                {t.close}
               </button>
               </div>
             </div>
@@ -993,26 +1004,26 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                <button
                 onClick={handleCopy}
                 className="flex-1 bg-blue-600 text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-blue-700 transition"
-                title="Copy"
+                title={t.copy}
               >
                 <Copy className="w-4 h-4" />
-                <span className="text-xs">Copy</span>
+                <span className="text-xs">{t.copy}</span>
               </button>
                <button
                 onClick={handleDownload}
                 className="flex-1 bg-green-600 text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-green-700 transition"
-                title="Download MD"
+                title={t.downloadMarkdown}
               >
                 <Download className="w-4 h-4" />
-                <span className="text-xs">MD</span>
+                <span className="text-xs">{t.downloadMarkdown}</span>
               </button>
               <button
                 onClick={handleOpenSaveModal}
                 className="flex-1 bg-gray-800 text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-gray-900 transition"
-                title="Save to GitHub"
+                title={t.save}
               >
                 <UploadCloud className="w-4 h-4" />
-                <span className="text-xs">Save</span>
+                <span className="text-xs">{t.save}</span>
               </button>
             </div>
 
@@ -1020,18 +1031,18 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                <button
                 onClick={handlePublishToToutiao}
                 className="flex-1 bg-red-600 text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-red-700 transition"
-                title="Publish to Toutiao"
+                title={t.toutiao}
               >
                 <Newspaper className="w-4 h-4" />
-                <span className="text-xs">头条</span>
+                <span className="text-xs">{t.toutiao}</span>
               </button>
                <button
                 onClick={handlePublishToZhihu}
                 className="flex-1 bg-blue-500 text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-blue-600 transition"
-                title="Publish to Zhihu"
+                title={t.zhihu}
               >
                 <BookOpen className="w-4 h-4" />
-                <span className="text-xs">知乎</span>
+                <span className="text-xs">{t.zhihu}</span>
               </button>
             </div>
             
@@ -1077,7 +1088,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                   type="text"
                   value={refinementInput}
                   onChange={(e) => setRefinementInput(e.target.value)}
-                  placeholder="Ask AI to refine (e.g. 'Make it shorter')..."
+                  placeholder={t.refinePromptPlaceholder}
                   disabled={isRefining}
                   className="flex-1 p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -1107,7 +1118,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       </div>
 
       <div className="mt-auto pt-4 border-t text-center text-xs text-gray-400 shrink-0">
-        Status: {status}
+        {t.status}: {status}
       </div>
 
       {/* Save Modal */}
@@ -1116,7 +1127,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center p-3 border-b">
               <h3 className="font-semibold flex items-center gap-2">
-                <Github className="w-4 h-4" /> Save to GitHub
+                <Github className="w-4 h-4" /> {t.saveToGithub}
               </h3>
               <button onClick={() => setIsSaveModalOpen(false)} className="text-gray-500 hover:text-black">
                 <X className="w-4 h-4" />
@@ -1129,26 +1140,26 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                   <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto">
                     <Check className="w-6 h-6" />
                   </div>
-                  <p className="text-green-600 font-medium">Successfully Pushed!</p>
+                  <p className="text-green-600 font-medium">{t.successfullyPushed}</p>
                   <a 
                     href={pushResultUrl} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-sm break-all block"
                   >
-                    View on GitHub
+                    {t.viewOnGithub}
                   </a>
                   <button 
                     onClick={() => setIsSaveModalOpen(false)}
                     className="w-full bg-gray-100 text-gray-700 py-2 rounded hover:bg-gray-200"
                   >
-                    Close
+                    {t.close}
                   </button>
                 </div>
               ) : (
                 <>
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-gray-600">File Name</label>
+                    <label className="text-xs font-medium text-gray-600">{t.fileName}</label>
                     <input 
                       type="text" 
                       value={saveConfig.fileName}
@@ -1158,10 +1169,10 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                   </div>
                   
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-gray-600">Directory</label>
+                    <label className="text-xs font-medium text-gray-600">{t.directory}</label>
                     {isLoadingDirs ? (
                       <div className="p-2 text-xs text-gray-500 flex items-center gap-2">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Loading directories...
+                        <Loader2 className="w-3 h-3 animate-spin" /> {t.loadingDirectories}
                       </div>
                     ) : (
                       <div className="relative">
@@ -1181,13 +1192,13 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                   </div>
                   
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-gray-600">Commit Message</label>
+                    <label className="text-xs font-medium text-gray-600">{t.commitMessage}</label>
                     <input 
                       type="text" 
                       value={saveConfig.message}
                       onChange={e => setSaveConfig({...saveConfig, message: e.target.value})}
                       className="w-full p-2 border rounded text-sm"
-                      placeholder="Commit message"
+                      placeholder={t.commitMessage}
                     />
                   </div>
                   
@@ -1197,7 +1208,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                     className="w-full bg-black text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-gray-800 disabled:opacity-50 transition"
                   >
                     {isPushing ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
-                    {isPushing ? 'Pushing...' : 'Push to GitHub'}
+                    {isPushing ? t.pushing : t.pushToGithub}
                   </button>
                 </>
               )}
