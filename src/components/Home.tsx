@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, FileText, Settings as SettingsIcon, Loader2, Copy, Eye, Code, Send, History, Trash2, ArrowLeft, X, RefreshCw, Square, Github, Folder, UploadCloud, Check, Newspaper, BookOpen } from 'lucide-react';
+import { Download, FileText, Settings as SettingsIcon, Loader2, Copy, Eye, Code, Send, History, Trash2, ArrowLeft, X, RefreshCw, Square, Github, Folder, UploadCloud, Check, Newspaper, BookOpen, MessageCircle } from 'lucide-react';
 import { getHistory, deleteHistoryItem, HistoryItem, clearHistory, getSettings } from '../utils/storage';
 import { getDirectories, pushToGitHub } from '../utils/github';
 import { ExtractionResult } from '../utils/types';
@@ -206,6 +206,39 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     }
   };
 
+  // 从已有结果发布到微信公众号
+  const handlePublishToWeixin = async () => {
+    const settings = await getSettings();
+    if (!settings.weixin?.cookie) {
+      if (confirm(t.cookieMissing)) {
+        onOpenSettings();
+      }
+      return;
+    }
+    
+    setStatus(t.publishingToWeixin || '正在发布到公众号...');
+    try {
+      // Send to background
+      const response = await chrome.runtime.sendMessage({
+        type: 'PUBLISH_TO_WEIXIN',
+        payload: {
+          title: currentTitle || 'Untitled',
+          content: result
+        }
+      });
+      
+      if (response && response.success) {
+        setStatus(t.publishSuccess);
+      } else {
+        throw new Error(response?.error || 'Unknown error');
+      }
+    } catch (e: any) {
+      console.error(e);
+      setStatus(t.publishFailed);
+      alert(`${t.publishFailed}: ${e.message}`);
+    }
+  };
+
   // 一键生成文章并发布到头条
   const handleGenerateAndPublishToToutiao = async () => {
     const settings = await getSettings();
@@ -328,6 +361,84 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       // 发送生成并发布到知乎的请求
       chrome.runtime.sendMessage({ 
         type: 'GENERATE_AND_PUBLISH_ZHIHU', 
+        payload: extraction 
+      });
+
+    } catch (error: any) {
+      console.error(error);
+      let errorMsg = error.message;
+      
+      if (errorMsg.includes('Could not establish connection') || errorMsg.includes('Receiving end does not exist')) {
+        setErrorMessage(
+          <div className="flex flex-col gap-2">
+            <span>{t.connectionFailed}</span>
+            <button 
+              onClick={async () => {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (tab?.id) {
+                  chrome.tabs.reload(tab.id);
+                  window.close();
+                }
+              }}
+              className="text-xs bg-red-100 hover:bg-red-200 text-red-800 py-1 px-2 rounded font-medium transition w-fit"
+            >
+              {t.refreshPage}
+            </button>
+          </div> as any
+        );
+      } else {
+        setErrorMessage(errorMsg);
+      }
+      
+      setStatus('Error');
+      setLoading(false);
+    }
+  };
+
+  // 一键生成文章并发布到微信公众号
+  const handleGenerateAndPublishToWeixin = async () => {
+    const settings = await getSettings();
+    if (!settings.weixin?.cookie) {
+      if (confirm(t.cookieMissing)) {
+        onOpenSettings();
+      }
+      return;
+    }
+
+    setLoading(true);
+    setProgress(5);
+    setStatus(t.extractingContent);
+    setLogMessage(t.extractingContent);
+    setResult(null);
+    setErrorMessage(null);
+    setConversationHistory([]);
+    setUserClosedResult(false);
+
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab.id) throw new Error('No active tab');
+
+      const response = await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_CONTENT' });
+      
+      if (!response) {
+        throw new Error('No response from content script. Refresh the page?');
+      }
+      
+      if (response.type === 'ERROR') {
+        throw new Error(response.payload);
+      }
+
+      setLogMessage(t.contentExtracted);
+
+      const extraction: ExtractionResult = response.payload;
+      
+      if (extraction.title) {
+        setCurrentTitle(extraction.title);
+      }
+
+      // 发送生成并发布到微信公众号的请求
+      chrome.runtime.sendMessage({ 
+        type: 'GENERATE_AND_PUBLISH_WEIXIN', 
         payload: extraction 
       });
 
@@ -711,31 +822,39 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
               
               {!loading ? (
                 <div className="flex flex-col gap-3 w-full items-center">
-                  {/* 三个主要功能按钮放在一起 */}
-                  <div className="flex gap-2 w-72">
+                  {/* 四个主要功能按钮放在一起 */}
+                  <div className="flex gap-2 w-80">
                     <button
                       onClick={handleSummarize}
-                      className="flex-1 bg-gray-700 text-white px-3 py-3 rounded-lg flex items-center gap-1.5 hover:bg-gray-800 transition justify-center"
+                      className="flex-1 bg-gray-700 text-white px-2 py-3 rounded-lg flex items-center gap-1 hover:bg-gray-800 transition justify-center"
                       title={t.generateTechDoc}
                     >
                       <FileText className="w-4 h-4" />
-                      <span className="text-sm font-medium">{t.generateTechDoc}</span>
+                      <span className="text-xs font-medium">{t.generateTechDoc}</span>
                     </button>
                     <button
                       onClick={handleGenerateAndPublishToToutiao}
-                      className="flex-1 bg-red-600 text-white px-3 py-3 rounded-lg flex items-center gap-1.5 hover:bg-red-700 transition justify-center"
+                      className="flex-1 bg-red-600 text-white px-2 py-3 rounded-lg flex items-center gap-1 hover:bg-red-700 transition justify-center"
                       title={t.publishToToutiao}
                     >
                       <Newspaper className="w-4 h-4" />
-                      <span className="text-sm font-medium">{t.publishToToutiao}</span>
+                      <span className="text-xs font-medium">{t.publishToToutiao}</span>
                     </button>
                     <button
                       onClick={handleGenerateAndPublishToZhihu}
-                      className="flex-1 bg-blue-500 text-white px-3 py-3 rounded-lg flex items-center gap-1.5 hover:bg-blue-600 transition justify-center"
+                      className="flex-1 bg-blue-500 text-white px-2 py-3 rounded-lg flex items-center gap-1 hover:bg-blue-600 transition justify-center"
                       title={t.publishToZhihu}
                     >
                       <BookOpen className="w-4 h-4" />
-                      <span className="text-sm font-medium">{t.publishToZhihu}</span>
+                      <span className="text-xs font-medium">{t.publishToZhihu}</span>
+                    </button>
+                    <button
+                      onClick={handleGenerateAndPublishToWeixin}
+                      className="flex-1 bg-green-500 text-white px-2 py-3 rounded-lg flex items-center gap-1 hover:bg-green-600 transition justify-center"
+                      title={t.publishToWeixin || '发公众号'}
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      <span className="text-xs font-medium">{t.publishToWeixin || '公众号'}</span>
                     </button>
                   </div>
                 </div>
@@ -959,6 +1078,14 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
               >
                 <BookOpen className="w-4 h-4" />
                 <span className="text-xs">{t.zhihu}</span>
+              </button>
+               <button
+                onClick={handlePublishToWeixin}
+                className="flex-1 bg-green-500 text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-green-600 transition"
+                title={t.weixin || '公众号'}
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span className="text-xs">{t.weixin || '公众号'}</span>
               </button>
             </div>
             

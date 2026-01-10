@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { AppSettings, DEFAULT_SETTINGS, getSettings, saveSettings, syncSettings, restoreSettings, ArticleStyleSettings } from '../utils/storage';
-import { SYSTEM_PROMPTS, TOUTIAO_DEFAULT_PROMPT, ZHIHU_DEFAULT_PROMPT } from '../utils/prompts';
+import { SYSTEM_PROMPTS, TOUTIAO_DEFAULT_PROMPT, ZHIHU_DEFAULT_PROMPT, WEIXIN_DEFAULT_PROMPT } from '../utils/prompts';
 import { getTranslation } from '../utils/i18n';
-import { Eye, EyeOff, Github, Loader2, CheckCircle, XCircle, Newspaper, RefreshCw, Cloud, Lock, Key, Bug, Palette, Send, BookOpen, RotateCcw, FileText } from 'lucide-react';
+import { Eye, EyeOff, Github, Loader2, CheckCircle, XCircle, Newspaper, RefreshCw, Cloud, Lock, Key, Bug, Palette, Send, BookOpen, RotateCcw, FileText, MessageCircle } from 'lucide-react';
 import { validateGitHubConnection } from '../utils/github';
 import { generateRandomString } from '../utils/crypto';
 
@@ -197,8 +197,10 @@ const Settings: React.FC = () => {
   const [showGithubToken, setShowGithubToken] = useState(false);
   const [showToutiaoCookie, setShowToutiaoCookie] = useState(false);
   const [showZhihuCookie, setShowZhihuCookie] = useState(false);
+  const [showWeixinCookie, setShowWeixinCookie] = useState(false);
   const [fetchingToutiao, setFetchingToutiao] = useState(false);
   const [fetchingZhihu, setFetchingZhihu] = useState(false);
+  const [fetchingWeixin, setFetchingWeixin] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verifyingApi, setVerifyingApi] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -231,18 +233,18 @@ const Settings: React.FC = () => {
   useEffect(() => {
     const loadSettings = async () => {
         const saved = await getSettings();
-        // Ensure apiKeys object exists (migration for old settings)
-        const initializedSettings = {
-          ...saved,
-          apiKeys: saved.apiKeys || {},
-          github: saved.github || DEFAULT_SETTINGS.github,
-          sync: saved.sync || DEFAULT_SETTINGS.sync
-        };
-        
-        // Migrate old single key if needed
-        if (saved.apiKey && !initializedSettings.apiKeys[saved.provider || 'apiyi']) {
-          initializedSettings.apiKeys[saved.provider || 'apiyi'] = saved.apiKey;
-        }
+          // Ensure apiKeys object exists (migration for old settings)
+          const initializedSettings = {
+            ...saved,
+            apiKeys: saved.apiKeys || {},
+            github: saved.github || DEFAULT_SETTINGS.github,
+            sync: saved.sync || DEFAULT_SETTINGS.sync
+          };
+          
+          // Migrate old single key if needed
+          if (saved.apiKey && !initializedSettings.apiKeys[saved.provider || 'apiyi']) {
+            initializedSettings.apiKeys[saved.provider || 'apiyi'] = saved.apiKey;
+          }
 
         // 如果是 nvidia provider，从后端获取共享密钥
         const providerKey = saved.provider || 'nvidia';
@@ -269,21 +271,21 @@ const Settings: React.FC = () => {
           }
         }
 
-        setSettings(initializedSettings);
-        
-        if (saved.provider && PROVIDERS[saved.provider]) {
-          setSelectedProvider(saved.provider);
-        } else {
-          // Fallback logic
-          const foundProvider = Object.entries(PROVIDERS).find(([key, config]) => 
-            key !== 'custom' && config.baseUrl === saved.baseUrl
-          );
-          if (foundProvider) {
-            setSelectedProvider(foundProvider[0]);
+          setSettings(initializedSettings);
+          
+          if (saved.provider && PROVIDERS[saved.provider]) {
+            setSelectedProvider(saved.provider);
           } else {
-            setSelectedProvider('custom');
+            // Fallback logic
+            const foundProvider = Object.entries(PROVIDERS).find(([key, config]) => 
+              key !== 'custom' && config.baseUrl === saved.baseUrl
+            );
+            if (foundProvider) {
+              setSelectedProvider(foundProvider[0]);
+            } else {
+              setSelectedProvider('custom');
+            }
           }
-        }
         
         // 标记初始化完成，之后的 settings 变化才会触发自动保存
         setTimeout(() => {
@@ -349,20 +351,20 @@ const Settings: React.FC = () => {
         apiKey: ''
       }));
     } else {
-      setSettings(prev => {
-        const newSettings = { ...prev, provider: providerKey };
-        
-        // Update Base URL and Model if not custom
-        if (providerKey !== 'custom') {
-          newSettings.baseUrl = config.baseUrl;
-          newSettings.model = config.models[0] || '';
-        }
-        
-        // Switch to the stored API Key for this provider
-        newSettings.apiKey = prev.apiKeys?.[providerKey] || '';
-        
-        return newSettings;
-      });
+    setSettings(prev => {
+      const newSettings = { ...prev, provider: providerKey };
+      
+      // Update Base URL and Model if not custom
+      if (providerKey !== 'custom') {
+        newSettings.baseUrl = config.baseUrl;
+        newSettings.model = config.models[0] || '';
+      }
+      
+      // Switch to the stored API Key for this provider
+      newSettings.apiKey = prev.apiKeys?.[providerKey] || '';
+      
+      return newSettings;
+    });
     }
   };
 
@@ -424,6 +426,18 @@ const Settings: React.FC = () => {
       ...prev,
       zhihu: {
         ...prev.zhihu || { cookie: '' },
+        [name]: value
+      }
+    }));
+  };
+
+  // 处理微信公众号配置变化
+  const handleWeixinChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setSettings(prev => ({
+      ...prev,
+      weixin: {
+        ...prev.weixin || { cookie: '' },
         [name]: value
       }
     }));
@@ -627,6 +641,41 @@ const Settings: React.FC = () => {
     }
   };
 
+  // 自动获取微信公众号 Cookie
+  const handleAutoFetchWeixinCookie = async () => {
+    if (typeof chrome === 'undefined' || !chrome.cookies) {
+      alert('This feature requires the Chrome Extension environment.');
+      return;
+    }
+
+    setFetchingWeixin(true);
+    try {
+      const cookies = await chrome.cookies.getAll({ domain: 'qq.com' });
+      const relevantCookies = cookies.filter(c => c.domain.includes('qq.com'));
+      
+      if (relevantCookies.length > 0) {
+        const cookieStr = relevantCookies.map(c => `${c.name}=${c.value}`).join('; ');
+        setSettings(prev => ({
+            ...prev,
+            weixin: {
+                ...prev.weixin,
+                cookie: cookieStr
+            }
+        }));
+      } else {
+        const confirmLogin = confirm(t.noWeixinCookie);
+        if (confirmLogin) {
+            chrome.tabs.create({ url: 'https://mp.weixin.qq.com/' });
+        }
+      }
+    } catch (error) {
+       console.error("Failed to fetch Weixin cookies:", error);
+       alert('Failed to fetch cookies. Please try manually.');
+    } finally {
+      setFetchingWeixin(false);
+    }
+  };
+
   const handleVerifyApi = async () => {
     if (!settings.apiKey) {
         alert(t.apiKeyPlaceholder);
@@ -716,61 +765,61 @@ const Settings: React.FC = () => {
 
       {/* AI 模型配置 */}
       <div className="border-t pt-4 space-y-4">
-        <div className="space-y-2">
-          <label className="block text-sm font-medium">{t.providerLabel}</label>
-          <select
-            value={selectedProvider}
-            onChange={handleProviderChange}
-            className="w-full p-2 border rounded"
-          >
-            {Object.entries(PROVIDERS).map(([key, config]) => (
-              <option key={key} value={key}>
-                {config.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <label className="block text-sm font-medium">{t.apiKeyLabel}</label>
-            <div className="flex items-center gap-3">
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">{t.providerLabel}</label>
+        <select
+          value={selectedProvider}
+          onChange={handleProviderChange}
+          className="w-full p-2 border rounded"
+        >
+          {Object.entries(PROVIDERS).map(([key, config]) => (
+            <option key={key} value={key}>
+              {config.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="block text-sm font-medium">{t.apiKeyLabel}</label>
+          <div className="flex items-center gap-3">
               {!PROVIDERS[selectedProvider]?.isShared && (
-                <button
-                  onClick={handleVerifyApi}
-                  disabled={verifyingApi}
-                  className={`flex items-center gap-1 text-xs transition ${
-                    apiVerifyStatus === 'success' 
-                      ? 'text-green-600' 
-                      : apiVerifyStatus === 'error'
-                      ? 'text-red-600'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  {verifyingApi ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : apiVerifyStatus === 'success' ? (
-                    <CheckCircle className="w-3 h-3" />
-                  ) : apiVerifyStatus === 'error' ? (
-                    <XCircle className="w-3 h-3" />
-                  ) : (
-                    <CheckCircle className="w-3 h-3" />
-                  )}
-                  {verifyingApi ? t.verifying : t.verifyButton}
-                </button>
+            <button
+              onClick={handleVerifyApi}
+              disabled={verifyingApi}
+              className={`flex items-center gap-1 text-xs transition ${
+                apiVerifyStatus === 'success' 
+                  ? 'text-green-600' 
+                  : apiVerifyStatus === 'error'
+                  ? 'text-red-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {verifyingApi ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : apiVerifyStatus === 'success' ? (
+                <CheckCircle className="w-3 h-3" />
+              ) : apiVerifyStatus === 'error' ? (
+                <XCircle className="w-3 h-3" />
+              ) : (
+                <CheckCircle className="w-3 h-3" />
+              )}
+              {verifyingApi ? t.verifying : t.verifyButton}
+            </button>
               )}
               {getProviderLink(selectedProvider) && !PROVIDERS[selectedProvider]?.isShared && (
-                <a 
-                  href={getProviderLink(selectedProvider)!} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                >
-                  {t.getKey} ↗
-                </a>
-              )}
-            </div>
+              <a 
+                href={getProviderLink(selectedProvider)!} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+              >
+                {t.getKey} ↗
+              </a>
+            )}
           </div>
+        </div>
           
           {/* 共享密钥提示（如 NVIDIA） */}
           {PROVIDERS[selectedProvider]?.isShared ? (
@@ -788,71 +837,71 @@ const Settings: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="relative">
-              <input
-                type={showApiKey ? "text" : "password"}
-                name="apiKey"
-                value={settings.apiKey}
-                onChange={handleChange}
-                className="w-full p-2 border rounded pr-10"
-                placeholder={t.apiKeyPlaceholder}
-              />
-              <button
-                type="button"
-                onClick={() => setShowApiKey(!showApiKey)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"
-              >
-                {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <label className="block text-sm font-medium">{t.baseUrlLabel}</label>
+        <div className="relative">
           <input
-            type="text"
-            name="baseUrl"
-            value={settings.baseUrl}
+            type={showApiKey ? "text" : "password"}
+            name="apiKey"
+            value={settings.apiKey}
             onChange={handleChange}
-            className="w-full p-2 border rounded"
-            placeholder="https://api.example.com/v1"
+            className="w-full p-2 border rounded pr-10"
+            placeholder={t.apiKeyPlaceholder}
           />
+          <button
+            type="button"
+            onClick={() => setShowApiKey(!showApiKey)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"
+          >
+            {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
         </div>
-
-        <div className="space-y-2">
-          <label className="block text-sm font-medium">{t.modelLabel}</label>
-          <div className="flex flex-col gap-2">
-            {selectedProvider !== 'custom' && currentModels.length > 0 && (
-              <select 
-                name="model" 
-                value={settings.model} 
-                onChange={handleChange}
-                className="p-2 border rounded w-full"
-              >
-                {currentModels.map(m => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-                <option value="custom">{t.manualInput}</option>
-              </select>
-            )}
-            
-            {(selectedProvider === 'custom' || !currentModels.includes(settings.model)) && (
-              <input
-                type="text"
-                name="model"
-                value={settings.model}
-                onChange={handleChange}
-                className="w-full p-2 border rounded"
-                placeholder="e.g. yi-34b-chat-0205"
-              />
-            )}
-          </div>
-          {selectedProvider === 'doubao' && (
-             <p className="text-xs text-orange-600">
-               {t.doubaoHint}
-             </p>
           )}
+      </div>
+
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">{t.baseUrlLabel}</label>
+        <input
+          type="text"
+          name="baseUrl"
+          value={settings.baseUrl}
+          onChange={handleChange}
+          className="w-full p-2 border rounded"
+          placeholder="https://api.example.com/v1"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">{t.modelLabel}</label>
+        <div className="flex flex-col gap-2">
+          {selectedProvider !== 'custom' && currentModels.length > 0 && (
+            <select 
+              name="model" 
+              value={settings.model} 
+              onChange={handleChange}
+              className="p-2 border rounded w-full"
+            >
+              {currentModels.map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+              <option value="custom">{t.manualInput}</option>
+            </select>
+          )}
+          
+          {(selectedProvider === 'custom' || !currentModels.includes(settings.model)) && (
+            <input
+              type="text"
+              name="model"
+              value={settings.model}
+              onChange={handleChange}
+              className="w-full p-2 border rounded"
+              placeholder="e.g. yi-34b-chat-0205"
+            />
+          )}
+        </div>
+        {selectedProvider === 'doubao' && (
+           <p className="text-xs text-orange-600">
+             {t.doubaoHint}
+           </p>
+        )}
         </div>
       </div>
 
@@ -1154,6 +1203,125 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
+      {/* ========== 微信公众号配置 ========== */}
+      <div className="border-t pt-4">
+        <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
+          <MessageCircle className="w-4 h-4 text-green-500" />
+          {t.weixinConfigTitle}
+        </h3>
+        <div className="space-y-3">
+          <div className="space-y-1">
+             <div className="flex justify-between items-center">
+               <label className="block text-xs font-medium text-gray-600">{t.cookieLabel}</label>
+               <button
+                 type="button"
+                 onClick={handleAutoFetchWeixinCookie}
+                 disabled={fetchingWeixin}
+                 className="text-green-600 hover:text-green-800 flex items-center gap-1 text-xs"
+               >
+                 {fetchingWeixin ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                 {t.autoFetch}
+               </button>
+             </div>
+             <div className="relative">
+                <input
+                  type={showWeixinCookie ? "text" : "password"}
+                  name="cookie"
+                  value={settings.weixin?.cookie || ''}
+                  onChange={handleWeixinChange}
+                  className="w-full p-2 border rounded pr-10 text-sm"
+                  placeholder={t.cookieLabel}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowWeixinCookie(!showWeixinCookie)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"
+                >
+                  {showWeixinCookie ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                </button>
+             </div>
+             <p className="text-[10px] text-gray-400">
+               {t.cookieHint}
+             </p>
+          </div>
+          
+          {/* 作者名称（原创声明用） */}
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-gray-600">{t.authorNameLabel}</label>
+            <input
+              type="text"
+              name="authorName"
+              value={settings.weixin?.authorName || ''}
+              onChange={handleWeixinChange}
+              className="w-full p-2 border rounded text-sm"
+              placeholder={t.authorNameLabel}
+            />
+            <p className="text-[10px] text-gray-400">
+              {t.authorNameHint}
+            </p>
+          </div>
+          
+          {/* 微信自定义提示词 */}
+          <div className="space-y-1">
+            <div className="flex justify-between items-center">
+              <label className="block text-xs font-medium text-gray-600">{t.customPromptLabel}</label>
+              <button
+                type="button"
+                onClick={() => setSettings(prev => ({
+                  ...prev,
+                  weixin: {
+                    ...prev.weixin || { cookie: '' },
+                    customPrompt: WEIXIN_DEFAULT_PROMPT
+                  }
+                }))}
+                className="text-green-600 hover:text-green-800 flex items-center gap-1 text-xs"
+              >
+                <RotateCcw className="w-3 h-3" />
+                {t.resetToDefault}
+              </button>
+            </div>
+            <textarea
+              name="customPrompt"
+              value={settings.weixin?.customPrompt || WEIXIN_DEFAULT_PROMPT}
+              onChange={handleWeixinChange}
+              className="w-full p-2 border rounded h-32 text-sm font-mono"
+              placeholder={t.customPromptPlaceholder}
+            />
+            <p className="text-[10px] text-gray-400">
+              {t.customPromptHint}
+            </p>
+          </div>
+          
+          {/* 自动生成 AI 配图开关 */}
+          <div className="bg-white rounded-lg border border-gray-100 p-3">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Palette className={`w-4 h-4 ${settings.weixin?.autoGenerateAI !== false ? 'text-green-500' : 'text-gray-400'}`} />
+                    <div>
+                        <span className="font-medium text-gray-800 text-sm">{t.autoGenerateAI}</span>
+                        <p className="text-[10px] text-gray-500">{t.autoGenerateAIHint}</p>
+                    </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                        type="checkbox" 
+                        className="sr-only peer"
+                        checked={settings.weixin?.autoGenerateAI !== false}
+                        onChange={(e) => setSettings({ 
+                          ...settings, 
+                          weixin: {
+                            ...settings.weixin || { cookie: '' },
+                            autoGenerateAI: e.target.checked
+                          }
+                        })}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ========== GitHub 集成 ========== */}
       <div className="border-t pt-4">
         <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
@@ -1282,7 +1450,7 @@ const Settings: React.FC = () => {
             </div>
         ) : (
             <div className="space-y-3 bg-gray-50 p-3 rounded-lg border">
-                 <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center">
                      <div className="flex items-center gap-2">
                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                          <span className="text-sm font-medium text-gray-700">{settings.sync.email}</span>
@@ -1301,15 +1469,15 @@ const Settings: React.FC = () => {
                             <Lock className="w-3 h-3" />
                             {t.encryptionKeyLabel}
                         </label>
-                        <button
-                            type="button"
+            <button
+                type="button"
                             onClick={handleGenerateKey}
                             className="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-[10px]"
                         >
                             <Key className="w-3 h-3" />
                             {t.randomGenerate}
-                        </button>
-                    </div>
+            </button>
+        </div>
                     <div className="relative">
                         <input
                             type={showEncKey ? "text" : "password"}
@@ -1330,10 +1498,10 @@ const Settings: React.FC = () => {
                     <p className="text-[10px] text-gray-400 leading-tight">
                         {t.encryptionKeyHint}
                     </p>
-                 </div>
+      </div>
 
                  <div className="flex gap-2 pt-1">
-                     <button
+        <button
                         onClick={handleSyncNow}
                         disabled={syncStatus !== 'idle'}
                         className="flex-1 bg-blue-600 text-white py-1.5 rounded text-xs font-medium hover:bg-blue-700 transition flex items-center justify-center gap-1.5"
@@ -1348,7 +1516,7 @@ const Settings: React.FC = () => {
                      >
                          {syncStatus === 'restoring' ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                          {t.restore}
-                     </button>
+        </button>
                  </div>
                  
                  {syncMessage && (

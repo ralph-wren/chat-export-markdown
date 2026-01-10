@@ -37,6 +37,12 @@ export interface AppSettings {
     autoPublish?: boolean; // 生成文章后是否自动发布到知乎
     customPrompt?: string; // 自定义提示词
   };
+  weixin?: {
+    cookie: string;
+    authorName?: string; // 原创声明作者名
+    autoGenerateAI?: boolean; // 是否自动生成 AI 配图
+    customPrompt?: string; // 自定义提示词
+  };
   sync?: {
     enabled: boolean;
     backendUrl: string; // e.g. https://my-worker.workers.dev
@@ -71,6 +77,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
     cookie: '',
     autoPublish: false,
     customPrompt: ZHIHU_DEFAULT_PROMPT
+  },
+  weixin: {
+    cookie: '',
+    authorName: '',
+    autoGenerateAI: true,
+    customPrompt: ''
   },
   systemPrompt: SYSTEM_PROMPTS['zh-CN'],
   sync: {

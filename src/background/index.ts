@@ -74,6 +74,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+
+  // 一键生成文章并发布到微信公众号
+  if (message.type === 'GENERATE_AND_PUBLISH_WEIXIN') {
+    startArticleGenerationAndPublish(message.payload, 'weixin');
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (message.type === 'PUBLISH_TO_WEIXIN') {
+    handlePublishToWeixin(message.payload);
+    sendResponse({ success: true });
+    return true;
+  }
   
   if (message.type === 'CANCEL_SUMMARIZATION') {
     if (abortController) {
@@ -811,6 +824,105 @@ async function handlePublishToZhihu(payload: { title: string; content: string })
   }
 }
 
+async function handlePublishToWeixin(payload: { title: string; content: string }) {
+  try {
+    const settings = await getSettings();
+    const cookieStr = settings.weixin?.cookie;
+
+    if (cookieStr) {
+      // Parse and set cookies for mp.weixin.qq.com
+      const cookies = cookieStr.split(';').map(c => c.trim()).filter(c => c);
+      for (const cookie of cookies) {
+        const separatorIndex = cookie.indexOf('=');
+        if (separatorIndex === -1) continue;
+        
+        const name = cookie.substring(0, separatorIndex);
+        const value = cookie.substring(separatorIndex + 1);
+        
+        if (name && value) {
+          try {
+            await chrome.cookies.set({
+              url: 'https://mp.weixin.qq.com',
+              domain: '.qq.com',
+              name,
+              value,
+              path: '/',
+              secure: true,
+              sameSite: 'no_restriction'
+            });
+          } catch (e) {
+            console.error(`Failed to set Weixin cookie ${name}`, e);
+          }
+        }
+      }
+    }
+
+    // Clean up content before publishing
+    let cleanedContent = payload.content;
+    
+    // Remove metadata sections
+    cleanedContent = cleanedContent.replace(/^#{1,3}\s*封面图建议[：:].*/gm, '');
+    cleanedContent = cleanedContent.replace(/^\*?\*?封面图建议\*?\*?[：:][^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
+    cleanedContent = cleanedContent.replace(/^封面图建议[：:][^\n]*\n?/gm, '');
+    cleanedContent = cleanedContent.replace(/^#{1,3}\s*其他备选标题[：:]?.*(\n(?!#)[^\n]*)*/gm, '');
+    cleanedContent = cleanedContent.replace(/^#{1,3}\s*备选标题[：:]?.*(\n(?!#)[^\n]*)*/gm, '');
+    cleanedContent = cleanedContent.replace(/^\*?\*?其他备选标题\*?\*?[：:]?[^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
+    cleanedContent = cleanedContent.replace(/^\*?\*?备选标题\*?\*?[：:]?[^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
+    
+    // Clean up multiple consecutive blank lines
+    cleanedContent = cleanedContent.replace(/\n{3,}/g, '\n\n');
+    cleanedContent = cleanedContent.trim();
+    
+    // Extract the real title from the content (H1 heading)
+    let articleTitle = payload.title;
+    const h1Match = cleanedContent.match(/^#\s+(.+)$/m);
+    if (h1Match && h1Match[1]) {
+      const extractedTitle = h1Match[1].trim();
+      const genericTitles = ['微博搜索', 'Weibo Search', '搜索', 'Search', '主页', 'Home', 'Untitled'];
+      const isGeneric = genericTitles.some(t => payload.title?.includes(t));
+      if (isGeneric || !payload.title || payload.title.length < 3) {
+        articleTitle = extractedTitle;
+      }
+      // 微信公众号标题限制64字
+      if (extractedTitle.length > 3 && extractedTitle.length <= 64) {
+        articleTitle = extractedTitle;
+      }
+    }
+    
+    // Remove the H1 title from content (Weixin has separate title field)
+    cleanedContent = cleanedContent.replace(/^#\s+.+\n+/, '');
+    cleanedContent = cleanedContent.trim();
+
+    // Convert Markdown to HTML for Weixin's rich text editor
+    const htmlContent = await marked.parse(cleanedContent);
+
+    // Save payload to storage for content script to pick up
+    await chrome.storage.local.set({
+      pending_weixin_publish: {
+        title: articleTitle,
+        content: cleanedContent,
+        htmlContent: htmlContent,
+        timestamp: Date.now()
+      }
+    });
+
+    // 打开微信公众号首页
+    // 内容脚本会检测登录状态并自动导航到图文编辑页面
+    const tab = await chrome.tabs.create({
+      url: 'https://mp.weixin.qq.com/',
+      active: true
+    });
+
+    if (!tab.id) throw new Error('Failed to create tab');
+
+    // The content script (src/content/weixin.ts) will handle the rest
+    console.log('Opened Weixin publish page, waiting for content script to fill...');
+
+  } catch (error) {
+    console.error('Weixin publish failed', error);
+  }
+}
+
 async function startArticleGeneration(extraction: ExtractionResult) {
   try {
     abortController = new AbortController();
@@ -1021,11 +1133,11 @@ async function startArticleGeneration(extraction: ExtractionResult) {
 }
 
 // 一键生成文章并发布到指定平台
-async function startArticleGenerationAndPublish(extraction: ExtractionResult, platform: 'toutiao' | 'zhihu') {
+async function startArticleGenerationAndPublish(extraction: ExtractionResult, platform: 'toutiao' | 'zhihu' | 'weixin') {
   try {
     abortController = new AbortController();
     
-    const platformName = platform === 'toutiao' ? '头条' : '知乎';
+    const platformName = platform === 'toutiao' ? '头条' : platform === 'zhihu' ? '知乎' : '公众号';
     
     // 初始化任务状态
     currentTask = { 
@@ -1194,8 +1306,13 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
         title: finalTitle,
         content: summary
       });
-    } else {
+    } else if (platform === 'zhihu') {
       await handlePublishToZhihu({
+        title: finalTitle,
+        content: summary
+      });
+    } else if (platform === 'weixin') {
+      await handlePublishToWeixin({
         title: finalTitle,
         content: summary
       });

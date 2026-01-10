@@ -31,6 +31,7 @@ export interface Translation {
   homeDescription: string;
   publishToToutiao: string;
   publishToZhihu: string;
+  publishToWeixin: string;
   orSeparator: string;
   generateArticleOnly: string;
   generateSummary: string;
@@ -50,6 +51,7 @@ export interface Translation {
   save: string;
   toutiao: string;
   zhihu: string;
+  weixin: string;
   refinePromptPlaceholder: string;
   status: string;
   
@@ -58,6 +60,7 @@ export interface Translation {
   contentExtracted: string;
   publishingToToutiao: string;
   publishingToZhihu: string;
+  publishingToWeixin: string;
   publishSuccess: string;
   publishFailed: string;
   connectionFailed: string;
@@ -108,6 +111,14 @@ export interface Translation {
   zhihuConfigTitle: string;
   autoPublishHintZhihu: string;
   noZhihuCookie: string;
+  
+  // Weixin config
+  weixinConfigTitle: string;
+  authorNameLabel: string;
+  authorNameHint: string;
+  autoGenerateAI: string;
+  autoGenerateAIHint: string;
+  noWeixinCookie: string;
   
   // Article style
   articleStyleTitle: string;
@@ -185,6 +196,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     homeDescription: 'Open a ChatGPT or Gemini chat page and click the button below to publish',
     publishToToutiao: 'Toutiao',
     publishToZhihu: 'Zhihu',
+    publishToWeixin: 'WeChat',
     orSeparator: 'or',
     generateArticleOnly: 'Generate Article Only',
     generateSummary: 'Generate Summary',
@@ -204,6 +216,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     save: 'Save',
     toutiao: 'Toutiao',
     zhihu: 'Zhihu',
+    weixin: 'WeChat',
     refinePromptPlaceholder: "Ask AI to refine (e.g. 'Make it shorter')...",
     status: 'Status',
     
@@ -212,6 +225,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     contentExtracted: 'Content extracted! Starting generation...',
     publishingToToutiao: 'Publishing to Toutiao...',
     publishingToZhihu: 'Publishing to Zhihu...',
+    publishingToWeixin: 'Publishing to WeChat...',
     publishSuccess: 'Published successfully!',
     publishFailed: 'Publish Failed',
     connectionFailed: 'Connection failed. The page might need a refresh.',
@@ -262,6 +276,14 @@ export const TRANSLATIONS: Record<string, Translation> = {
     zhihuConfigTitle: 'Zhihu Column Configuration',
     autoPublishHintZhihu: 'Automatically publish to Zhihu column after article generation',
     noZhihuCookie: 'No Zhihu login cookies found. Would you like to open the Zhihu login page?',
+    
+    // Weixin config
+    weixinConfigTitle: 'WeChat Official Account Configuration',
+    authorNameLabel: 'Author Name (for Original Declaration)',
+    authorNameHint: 'Fill in your author name for original content declaration',
+    autoGenerateAI: 'Auto Generate AI Images',
+    autoGenerateAIHint: 'Automatically generate AI images when publishing (takes 30-60 seconds)',
+    noWeixinCookie: 'No WeChat login cookies found. Would you like to open the WeChat Official Account login page?',
     
     // Article style
     articleStyleTitle: 'Article Style Settings',
@@ -337,6 +359,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     homeDescription: '打开 ChatGPT 或 Gemini 对话页面，点击下方按钮一键发布',
     publishToToutiao: '发头条',
     publishToZhihu: '发知乎',
+    publishToWeixin: '公众号',
     orSeparator: '或',
     generateArticleOnly: '仅生成文章',
     generateSummary: '生成摘要',
@@ -356,6 +379,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     save: '保存',
     toutiao: '头条',
     zhihu: '知乎',
+    weixin: '公众号',
     refinePromptPlaceholder: '让 AI 优化文章（如"写短一点"）...',
     status: '状态',
     
@@ -364,6 +388,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     contentExtracted: '内容提取成功！开始生成...',
     publishingToToutiao: '正在发布到头条...',
     publishingToZhihu: '正在发布到知乎...',
+    publishingToWeixin: '正在发布到公众号...',
     publishSuccess: '发布成功！',
     publishFailed: '发布失败',
     connectionFailed: '连接失败，请刷新页面后重试。',
@@ -414,6 +439,14 @@ export const TRANSLATIONS: Record<string, Translation> = {
     zhihuConfigTitle: '知乎专栏配置',
     autoPublishHintZhihu: '生成文章后自动发布到知乎专栏',
     noZhihuCookie: '未找到知乎登录 Cookie。是否打开知乎登录页面？',
+    
+    // Weixin config
+    weixinConfigTitle: '微信公众号配置',
+    authorNameLabel: '作者名称（原创声明用）',
+    authorNameHint: '填写原创声明时显示的作者名',
+    autoGenerateAI: '自动生成 AI 配图',
+    autoGenerateAIHint: '发布时自动生成 AI 配图（需要 30-60 秒）',
+    noWeixinCookie: '未找到微信公众号登录 Cookie。是否打开公众号登录页面？',
     
     // Article style
     articleStyleTitle: '文章风格设置',
@@ -487,8 +520,9 @@ export const TRANSLATIONS: Record<string, Translation> = {
     
     // Home page
     homeDescription: 'ChatGPTまたはGeminiのチャットページを開き、下のボタンをクリックして公開',
-    publishToToutiao: '頭条',
+    publishToToutiao: '头条',
     publishToZhihu: '知乎',
+    publishToWeixin: 'WeChat',
     orSeparator: 'または',
     generateArticleOnly: '記事のみ生成',
     generateSummary: '要約を生成',
@@ -508,6 +542,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     save: '保存',
     toutiao: '頭条',
     zhihu: '知乎',
+    weixin: 'WeChat',
     refinePromptPlaceholder: 'AIに改善を依頼（例：「短くして」）...',
     status: 'ステータス',
     
@@ -516,6 +551,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     contentExtracted: 'コンテンツ抽出完了！生成を開始...',
     publishingToToutiao: '頭条に公開中...',
     publishingToZhihu: '知乎に公開中...',
+    publishingToWeixin: 'WeChatに公開中...',
     publishSuccess: '公開成功！',
     publishFailed: '公開失敗',
     connectionFailed: '接続に失敗しました。ページを更新してください。',
@@ -566,6 +602,14 @@ export const TRANSLATIONS: Record<string, Translation> = {
     zhihuConfigTitle: '知乎コラム設定',
     autoPublishHintZhihu: '記事生成後、自動的に知乎コラムに公開します',
     noZhihuCookie: '知乎のログインCookieが見つかりません。知乎のログインページを開きますか？',
+    
+    // Weixin config
+    weixinConfigTitle: 'WeChat公式アカウント設定',
+    authorNameLabel: '著者名（オリジナル宣言用）',
+    authorNameHint: 'オリジナルコンテンツ宣言に表示される著者名を入力してください',
+    autoGenerateAI: 'AI画像を自動生成',
+    autoGenerateAIHint: '公開時にAI画像を自動生成します（30-60秒かかります）',
+    noWeixinCookie: 'WeChatのログインCookieが見つかりません。WeChat公式アカウントのログインページを開きますか？',
     
     // Article style
     articleStyleTitle: '記事スタイル設定',
@@ -641,6 +685,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     homeDescription: 'ChatGPT 또는 Gemini 채팅 페이지를 열고 아래 버튼을 클릭하여 게시',
     publishToToutiao: '头条',
     publishToZhihu: '知乎',
+    publishToWeixin: 'WeChat',
     orSeparator: '또는',
     generateArticleOnly: '기사만 생성',
     generateSummary: '요약 생성',
@@ -660,6 +705,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     save: '저장',
     toutiao: '头条',
     zhihu: '知乎',
+    weixin: 'WeChat',
     refinePromptPlaceholder: 'AI에게 개선 요청 (예: "짧게 해줘")...',
     status: '상태',
     
@@ -668,6 +714,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     contentExtracted: '콘텐츠 추출 완료! 생성 시작...',
     publishingToToutiao: '头条에 게시 중...',
     publishingToZhihu: '知乎에 게시 중...',
+    publishingToWeixin: 'WeChat에 게시 중...',
     publishSuccess: '게시 성공!',
     publishFailed: '게시 실패',
     connectionFailed: '연결 실패. 페이지를 새로고침하세요.',
@@ -718,6 +765,14 @@ export const TRANSLATIONS: Record<string, Translation> = {
     zhihuConfigTitle: '知乎 칼럼 설정',
     autoPublishHintZhihu: '기사 생성 후 자동으로 知乎 칼럼에 게시합니다',
     noZhihuCookie: '知乎 로그인 쿠키를 찾을 수 없습니다. 知乎 로그인 페이지를 여시겠습니까?',
+    
+    // Weixin config
+    weixinConfigTitle: 'WeChat 공식 계정 설정',
+    authorNameLabel: '작성자 이름 (원본 선언용)',
+    authorNameHint: '원본 콘텐츠 선언에 표시될 작성자 이름을 입력하세요',
+    autoGenerateAI: 'AI 이미지 자동 생성',
+    autoGenerateAIHint: '게시 시 AI 이미지를 자동으로 생성합니다 (30-60초 소요)',
+    noWeixinCookie: 'WeChat 로그인 쿠키를 찾을 수 없습니다. WeChat 공식 계정 로그인 페이지를 여시겠습니까?',
     
     // Article style
     articleStyleTitle: '기사 스타일 설정',
@@ -793,6 +848,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     homeDescription: 'Öffnen Sie eine ChatGPT- oder Gemini-Chatseite und klicken Sie auf die Schaltfläche unten',
     publishToToutiao: 'Toutiao',
     publishToZhihu: 'Zhihu',
+    publishToWeixin: 'WeChat',
     orSeparator: 'oder',
     generateArticleOnly: 'Nur Artikel generieren',
     generateSummary: 'Zusammenfassung generieren',
@@ -812,6 +868,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     save: 'Speichern',
     toutiao: 'Toutiao',
     zhihu: 'Zhihu',
+    weixin: 'WeChat',
     refinePromptPlaceholder: 'KI um Verbesserung bitten (z.B. "Kürzer machen")...',
     status: 'Status',
     
@@ -820,6 +877,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     contentExtracted: 'Inhalt extrahiert! Generierung starten...',
     publishingToToutiao: 'Veröffentlichung auf Toutiao...',
     publishingToZhihu: 'Veröffentlichung auf Zhihu...',
+    publishingToWeixin: 'Veröffentlichung auf WeChat...',
     publishSuccess: 'Erfolgreich veröffentlicht!',
     publishFailed: 'Veröffentlichung fehlgeschlagen',
     connectionFailed: 'Verbindung fehlgeschlagen. Bitte Seite aktualisieren.',
@@ -870,6 +928,14 @@ export const TRANSLATIONS: Record<string, Translation> = {
     zhihuConfigTitle: 'Zhihu-Spalten-Konfiguration',
     autoPublishHintZhihu: 'Nach der Artikelgenerierung automatisch in der Zhihu-Spalte veröffentlichen',
     noZhihuCookie: 'Keine Zhihu-Login-Cookies gefunden. Möchten Sie die Zhihu-Anmeldeseite öffnen?',
+    
+    // Weixin config
+    weixinConfigTitle: 'WeChat Offizielles Konto Konfiguration',
+    authorNameLabel: 'Autorenname (für Originalerklärung)',
+    authorNameHint: 'Geben Sie Ihren Autorennamen für die Originalinhaltserklärung ein',
+    autoGenerateAI: 'KI-Bilder automatisch generieren',
+    autoGenerateAIHint: 'Automatisch KI-Bilder beim Veröffentlichen generieren (dauert 30-60 Sekunden)',
+    noWeixinCookie: 'Keine WeChat-Login-Cookies gefunden. Möchten Sie die WeChat-Anmeldeseite öffnen?',
     
     // Article style
     articleStyleTitle: 'Artikelstil-Einstellungen',
@@ -945,6 +1011,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     homeDescription: 'Ouvrez une page de chat ChatGPT ou Gemini et cliquez sur le bouton ci-dessous',
     publishToToutiao: 'Toutiao',
     publishToZhihu: 'Zhihu',
+    publishToWeixin: 'WeChat',
     orSeparator: 'ou',
     generateArticleOnly: 'Générer article uniquement',
     generateSummary: 'Générer résumé',
@@ -964,6 +1031,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     save: 'Enregistrer',
     toutiao: 'Toutiao',
     zhihu: 'Zhihu',
+    weixin: 'WeChat',
     refinePromptPlaceholder: 'Demander à l\'IA d\'améliorer (ex: "Raccourcir")...',
     status: 'Statut',
     
@@ -972,6 +1040,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     contentExtracted: 'Contenu extrait ! Démarrage de la génération...',
     publishingToToutiao: 'Publication sur Toutiao...',
     publishingToZhihu: 'Publication sur Zhihu...',
+    publishingToWeixin: 'Publication sur WeChat...',
     publishSuccess: 'Publié avec succès !',
     publishFailed: 'Échec de la publication',
     connectionFailed: 'Connexion échouée. Veuillez rafraîchir la page.',
@@ -1022,6 +1091,14 @@ export const TRANSLATIONS: Record<string, Translation> = {
     zhihuConfigTitle: 'Configuration de la colonne Zhihu',
     autoPublishHintZhihu: 'Publier automatiquement dans la colonne Zhihu après la génération de l\'article',
     noZhihuCookie: 'Aucun cookie de connexion Zhihu trouvé. Voulez-vous ouvrir la page de connexion Zhihu ?',
+    
+    // Weixin config
+    weixinConfigTitle: 'Configuration du compte officiel WeChat',
+    authorNameLabel: 'Nom de l\'auteur (pour la déclaration d\'originalité)',
+    authorNameHint: 'Entrez votre nom d\'auteur pour la déclaration de contenu original',
+    autoGenerateAI: 'Générer automatiquement des images IA',
+    autoGenerateAIHint: 'Générer automatiquement des images IA lors de la publication (prend 30-60 secondes)',
+    noWeixinCookie: 'Aucun cookie de connexion WeChat trouvé. Voulez-vous ouvrir la page de connexion WeChat ?',
     
     // Article style
     articleStyleTitle: 'Paramètres de style d\'article',
@@ -1097,6 +1174,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     homeDescription: 'Abra una página de chat de ChatGPT o Gemini y haga clic en el botón de abajo',
     publishToToutiao: 'Toutiao',
     publishToZhihu: 'Zhihu',
+    publishToWeixin: 'WeChat',
     orSeparator: 'o',
     generateArticleOnly: 'Solo generar artículo',
     generateSummary: 'Generar resumen',
@@ -1116,6 +1194,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     save: 'Guardar',
     toutiao: 'Toutiao',
     zhihu: 'Zhihu',
+    weixin: 'WeChat',
     refinePromptPlaceholder: 'Pedir a la IA que mejore (ej: "Hazlo más corto")...',
     status: 'Estado',
     
@@ -1124,6 +1203,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     contentExtracted: '¡Contenido extraído! Iniciando generación...',
     publishingToToutiao: 'Publicando en Toutiao...',
     publishingToZhihu: 'Publicando en Zhihu...',
+    publishingToWeixin: 'Publicando en WeChat...',
     publishSuccess: '¡Publicado exitosamente!',
     publishFailed: 'Error al publicar',
     connectionFailed: 'Conexión fallida. Por favor actualice la página.',
@@ -1174,6 +1254,14 @@ export const TRANSLATIONS: Record<string, Translation> = {
     zhihuConfigTitle: 'Configuración de columna Zhihu',
     autoPublishHintZhihu: 'Publicar automáticamente en la columna Zhihu después de generar el artículo',
     noZhihuCookie: 'No se encontraron cookies de inicio de sesión de Zhihu. ¿Desea abrir la página de inicio de sesión de Zhihu?',
+    
+    // Weixin config
+    weixinConfigTitle: 'Configuración de cuenta oficial de WeChat',
+    authorNameLabel: 'Nombre del autor (para declaración de originalidad)',
+    authorNameHint: 'Ingrese su nombre de autor para la declaración de contenido original',
+    autoGenerateAI: 'Generar imágenes IA automáticamente',
+    autoGenerateAIHint: 'Generar automáticamente imágenes IA al publicar (toma 30-60 segundos)',
+    noWeixinCookie: 'No se encontraron cookies de inicio de sesión de WeChat. ¿Desea abrir la página de inicio de sesión de WeChat?',
     
     // Article style
     articleStyleTitle: 'Configuración de estilo de artículo',
