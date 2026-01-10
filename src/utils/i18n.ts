@@ -347,7 +347,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     verifyTitle: '验证连接',
     fillGithubAlert: '请填写 Token, Owner 和 仓库名',
     systemPromptLabel: '技术文档提示词',
-    resetButton: '重置为默认',
+    resetButton: '恢复默认',
     promptPlaceholder: '输入技术文档生成规则...',
     saveButton: '保存设置',
     savedButton: '保存成功!',

@@ -970,33 +970,6 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
-      {/* 系统提示词 */}
-      <div className="border-t pt-4 space-y-2">
-        <div className="flex justify-between items-center">
-            <label className="block text-xs font-medium text-gray-600 flex items-center gap-1">
-              <FileText className="w-3 h-3" />
-              {t.systemPromptLabel}
-            </label>
-            <button
-                type="button"
-                onClick={() => setSettings(prev => ({ 
-                  ...prev, 
-                  systemPrompt: SYSTEM_PROMPTS[prev.language || 'zh-CN'] || DEFAULT_SETTINGS.systemPrompt 
-                }))}
-                className="text-xs text-blue-600 hover:text-blue-800 underline"
-            >
-                {t.resetButton}
-            </button>
-        </div>
-        <textarea
-          name="systemPrompt"
-          value={settings.systemPrompt}
-          onChange={handleChange}
-          className="w-full p-2 border rounded h-32 text-sm font-mono"
-          placeholder={t.promptPlaceholder}
-        />
-      </div>
-
       {/* ========== 微信公众号配置 ========== */}
       <div className="border-t pt-4">
         <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
@@ -1319,6 +1292,39 @@ const Settings: React.FC = () => {
                 </label>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* ========== 技术文档提示词配置 ========== */}
+      <div className="border-t pt-4">
+        <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
+          <FileText className="w-4 h-4 text-purple-500" />
+          {t.systemPromptLabel}
+        </h3>
+        <div className="space-y-2">
+          <div className="flex justify-end">
+              <button
+                  type="button"
+                  onClick={() => setSettings(prev => ({ 
+                    ...prev, 
+                    systemPrompt: SYSTEM_PROMPTS[prev.language || 'zh-CN'] || DEFAULT_SETTINGS.systemPrompt 
+                  }))}
+                  className="text-purple-600 hover:text-purple-800 flex items-center gap-1 text-xs"
+              >
+                  <RotateCcw className="w-3 h-3" />
+                  {t.resetButton}
+              </button>
+          </div>
+          <textarea
+            name="systemPrompt"
+            value={settings.systemPrompt}
+            onChange={handleChange}
+            className="w-full p-2 border rounded h-32 text-sm font-mono"
+            placeholder={t.promptPlaceholder}
+          />
+          <p className="text-[10px] text-gray-400">
+            用于生成技术文档的系统提示词，影响文档的结构和风格
+          </p>
         </div>
       </div>
 

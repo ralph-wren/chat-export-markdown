@@ -1313,11 +1313,19 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
     // 组合完整提示词：通用模板 + 平台专属指南
     const fullPrompt = `${articlePrompt}\n\n${platformPrompt}`;
 
+    // 根据平台添加特殊提醒
+    let platformReminder = '';
+    if (platform === 'toutiao' || platform === 'zhihu') {
+      platformReminder = `\n\n⚠️ 重要提醒：${platformName}平台的图片提示词必须是2-5个字的简短关键词（如"卫星"、"星空"），严禁使用长句子描述！`;
+    } else if (platform === 'weixin') {
+      platformReminder = `\n\n⚠️ 重要提醒：公众号平台的图片提示词需要15-50字的详细场景描述，用于AI生成配图。文章最后必须包含[封面: xxx]和[摘要: xxx]。`;
+    }
+
     const initialMessages = [
       { role: 'system', content: fullPrompt },
       { 
         role: 'user', 
-        content: `请根据以下内容生成一篇自媒体文章，目标平台是${platformName}。\n\n来源：${extraction.url}\n\n原标题：${extraction.title}\n\n内容：\n${formattedContent}` 
+        content: `请根据以下内容生成一篇自媒体文章，目标平台是${platformName}。${platformReminder}\n\n来源：${extraction.url}\n\n原标题：${extraction.title}\n\n内容：\n${formattedContent}` 
       }
     ];
 
