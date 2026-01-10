@@ -116,8 +116,7 @@ export interface Translation {
   weixinConfigTitle: string;
   authorNameLabel: string;
   authorNameHint: string;
-  autoGenerateAI: string;
-  autoGenerateAIHint: string;
+  autoPublishHintWeixin: string;
   noWeixinCookie: string;
   
   // Article style
@@ -281,8 +280,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     weixinConfigTitle: 'WeChat Official Account Configuration',
     authorNameLabel: 'Author Name (for Original Declaration)',
     authorNameHint: 'Fill in your author name for original content declaration',
-    autoGenerateAI: 'Auto Generate AI Images',
-    autoGenerateAIHint: 'Automatically generate AI images when publishing (takes 30-60 seconds)',
+    autoPublishHintWeixin: 'Automatically publish after content is ready',
     noWeixinCookie: 'No WeChat login cookies found. Would you like to open the WeChat Official Account login page?',
     
     // Article style
@@ -444,8 +442,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     weixinConfigTitle: '微信公众号配置',
     authorNameLabel: '作者名称（原创声明用）',
     authorNameHint: '填写原创声明时显示的作者名',
-    autoGenerateAI: '自动生成 AI 配图',
-    autoGenerateAIHint: '发布时自动生成 AI 配图（需要 30-60 秒）',
+    autoPublishHintWeixin: '内容准备好后自动发布文章',
     noWeixinCookie: '未找到微信公众号登录 Cookie。是否打开公众号登录页面？',
     
     // Article style
@@ -607,8 +604,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     weixinConfigTitle: 'WeChat公式アカウント設定',
     authorNameLabel: '著者名（オリジナル宣言用）',
     authorNameHint: 'オリジナルコンテンツ宣言に表示される著者名を入力してください',
-    autoGenerateAI: 'AI画像を自動生成',
-    autoGenerateAIHint: '公開時にAI画像を自動生成します（30-60秒かかります）',
+    autoPublishHintWeixin: 'コンテンツの準備ができたら自動的に公開します',
     noWeixinCookie: 'WeChatのログインCookieが見つかりません。WeChat公式アカウントのログインページを開きますか？',
     
     // Article style
@@ -770,8 +766,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     weixinConfigTitle: 'WeChat 공식 계정 설정',
     authorNameLabel: '작성자 이름 (원본 선언용)',
     authorNameHint: '원본 콘텐츠 선언에 표시될 작성자 이름을 입력하세요',
-    autoGenerateAI: 'AI 이미지 자동 생성',
-    autoGenerateAIHint: '게시 시 AI 이미지를 자동으로 생성합니다 (30-60초 소요)',
+    autoPublishHintWeixin: '콘텐츠가 준비되면 자동으로 게시합니다',
     noWeixinCookie: 'WeChat 로그인 쿠키를 찾을 수 없습니다. WeChat 공식 계정 로그인 페이지를 여시겠습니까?',
     
     // Article style
@@ -933,8 +928,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     weixinConfigTitle: 'WeChat Offizielles Konto Konfiguration',
     authorNameLabel: 'Autorenname (für Originalerklärung)',
     authorNameHint: 'Geben Sie Ihren Autorennamen für die Originalinhaltserklärung ein',
-    autoGenerateAI: 'KI-Bilder automatisch generieren',
-    autoGenerateAIHint: 'Automatisch KI-Bilder beim Veröffentlichen generieren (dauert 30-60 Sekunden)',
+    autoPublishHintWeixin: 'Automatisch veröffentlichen, wenn der Inhalt bereit ist',
     noWeixinCookie: 'Keine WeChat-Login-Cookies gefunden. Möchten Sie die WeChat-Anmeldeseite öffnen?',
     
     // Article style
@@ -1096,8 +1090,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     weixinConfigTitle: 'Configuration du compte officiel WeChat',
     authorNameLabel: 'Nom de l\'auteur (pour la déclaration d\'originalité)',
     authorNameHint: 'Entrez votre nom d\'auteur pour la déclaration de contenu original',
-    autoGenerateAI: 'Générer automatiquement des images IA',
-    autoGenerateAIHint: 'Générer automatiquement des images IA lors de la publication (prend 30-60 secondes)',
+    autoPublishHintWeixin: 'Publier automatiquement lorsque le contenu est prêt',
     noWeixinCookie: 'Aucun cookie de connexion WeChat trouvé. Voulez-vous ouvrir la page de connexion WeChat ?',
     
     // Article style
@@ -1259,8 +1252,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     weixinConfigTitle: 'Configuración de cuenta oficial de WeChat',
     authorNameLabel: 'Nombre del autor (para declaración de originalidad)',
     authorNameHint: 'Ingrese su nombre de autor para la declaración de contenido original',
-    autoGenerateAI: 'Generar imágenes IA automáticamente',
-    autoGenerateAIHint: 'Generar automáticamente imágenes IA al publicar (toma 30-60 segundos)',
+    autoPublishHintWeixin: 'Publicar automáticamente cuando el contenido esté listo',
     noWeixinCookie: 'No se encontraron cookies de inicio de sesión de WeChat. ¿Desea abrir la página de inicio de sesión de WeChat?',
     
     // Article style

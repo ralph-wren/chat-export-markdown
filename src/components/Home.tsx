@@ -822,15 +822,15 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
               
               {!loading ? (
                 <div className="flex flex-col gap-3 w-full items-center">
-                  {/* 四个主要功能按钮放在一起 */}
+                  {/* 四个主要功能按钮放在一起 - 公众号放最前，写文档放最后 */}
                   <div className="flex gap-2 w-80">
                     <button
-                      onClick={handleSummarize}
-                      className="flex-1 bg-gray-700 text-white px-2 py-3 rounded-lg flex items-center gap-1 hover:bg-gray-800 transition justify-center"
-                      title={t.generateTechDoc}
+                      onClick={handleGenerateAndPublishToWeixin}
+                      className="flex-1 bg-green-500 text-white px-2 py-3 rounded-lg flex items-center gap-1 hover:bg-green-600 transition justify-center"
+                      title={t.publishToWeixin || '发公众号'}
                     >
-                      <FileText className="w-4 h-4" />
-                      <span className="text-xs font-medium">{t.generateTechDoc}</span>
+                      <MessageCircle className="w-4 h-4" />
+                      <span className="text-xs font-medium">{t.publishToWeixin || '公众号'}</span>
                     </button>
                     <button
                       onClick={handleGenerateAndPublishToToutiao}
@@ -849,12 +849,12 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                       <span className="text-xs font-medium">{t.publishToZhihu}</span>
                     </button>
                     <button
-                      onClick={handleGenerateAndPublishToWeixin}
-                      className="flex-1 bg-green-500 text-white px-2 py-3 rounded-lg flex items-center gap-1 hover:bg-green-600 transition justify-center"
-                      title={t.publishToWeixin || '发公众号'}
+                      onClick={handleSummarize}
+                      className="flex-1 bg-gray-700 text-white px-2 py-3 rounded-lg flex items-center gap-1 hover:bg-gray-800 transition justify-center"
+                      title={t.generateTechDoc}
                     >
-                      <MessageCircle className="w-4 h-4" />
-                      <span className="text-xs font-medium">{t.publishToWeixin || '公众号'}</span>
+                      <FileText className="w-4 h-4" />
+                      <span className="text-xs font-medium">{t.generateTechDoc}</span>
                     </button>
                   </div>
                 </div>
@@ -1064,6 +1064,14 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
 
             <div className="flex gap-2 shrink-0 mt-2">
                <button
+                onClick={handlePublishToWeixin}
+                className="flex-1 bg-green-500 text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-green-600 transition"
+                title={t.weixin || '公众号'}
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span className="text-xs">{t.weixin || '公众号'}</span>
+              </button>
+               <button
                 onClick={handlePublishToToutiao}
                 className="flex-1 bg-red-600 text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-red-700 transition"
                 title={t.toutiao}
@@ -1078,14 +1086,6 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
               >
                 <BookOpen className="w-4 h-4" />
                 <span className="text-xs">{t.zhihu}</span>
-              </button>
-               <button
-                onClick={handlePublishToWeixin}
-                className="flex-1 bg-green-500 text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-green-600 transition"
-                title={t.weixin || '公众号'}
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span className="text-xs">{t.weixin || '公众号'}</span>
               </button>
             </div>
             

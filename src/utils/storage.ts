@@ -40,7 +40,7 @@ export interface AppSettings {
   weixin?: {
     cookie: string;
     authorName?: string; // 原创声明作者名
-    autoGenerateAI?: boolean; // 是否自动生成 AI 配图
+    autoPublish?: boolean; // 是否自动发布
     customPrompt?: string; // 自定义提示词
   };
   sync?: {
@@ -70,18 +70,18 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   toutiao: {
     cookie: '',
-    autoPublish: false,
+    autoPublish: true,
     customPrompt: TOUTIAO_DEFAULT_PROMPT
   },
   zhihu: {
     cookie: '',
-    autoPublish: false,
+    autoPublish: true,
     customPrompt: ZHIHU_DEFAULT_PROMPT
   },
   weixin: {
     cookie: '',
     authorName: '',
-    autoGenerateAI: true,
+    autoPublish: true,
     customPrompt: ''
   },
   systemPrompt: SYSTEM_PROMPTS['zh-CN'],

@@ -1023,7 +1023,10 @@ const insertAIImage = async (): Promise<boolean> => {
  * 注意：封面的 AI 配图链接和正文的不同！
  * - 封面：getByRole('link', { name: 'AI 配图' }) - 在封面悬浮菜单中
  * - 正文：locator('#js_editor_insertimage').getByText('AI 配图') - 在图片按钮下拉菜单中
+ * 
+ * 注意：目前此函数未被使用，改为使用 setCoverFromContent 从正文选择封面，更稳定
  */
+// @ts-ignore - 保留此函数以备将来使用
 const setCoverWithAI = async (title?: string, content?: string): Promise<boolean> => {
   logger.log('🎨 使用 AI 生成封面图片...', 'info');
   
@@ -1054,70 +1057,56 @@ const setCoverWithAI = async (title?: string, content?: string): Promise<boolean
   window.scrollTo(0, document.body.scrollHeight);
   await new Promise(r => setTimeout(r, 500));
   
-  // 步骤1: 查找封面区域 - 使用精确的选择器
-  // 根据截图: div.select-cover__btn.js_cover_btn_area.select-cover__mask
+  // 步骤1: 查找封面区域 - 关键是找到"拖拽或选择封面"文字元素
+  // 悬浮在这个文字上才会显示 AI 配图菜单
   logger.log('查找封面区域...', 'info');
   
+  let coverTextElement: HTMLElement | null = null;
   let coverArea: HTMLElement | null = null;
   
-  // 方法1: 使用精确的类名选择器
-  coverArea = document.querySelector('.select-cover__btn.js_cover_btn_area.select-cover__mask') as HTMLElement;
-  if (coverArea) {
-    logger.log('找到封面区域: select-cover__btn', 'info');
+  // 方法1: 直接查找"拖拽或选择封面"文字元素（这是触发悬浮菜单的关键）
+  const allElements = document.querySelectorAll('div, span, p');
+  for (const el of allElements) {
+    const text = (el as HTMLElement).innerText?.trim();
+    // 精确匹配"拖拽或选择封面"文字
+    if (text === '拖拽或选择封面') {
+      coverTextElement = el as HTMLElement;
+      logger.log('找到封面文字元素: 拖拽或选择封面', 'info');
+      break;
+    }
   }
   
-  // 方法2: 查找包含"拖拽或选择封面"文本的区域
-  if (!coverArea) {
-    const allElements = document.querySelectorAll('div, span');
-    for (const el of allElements) {
-      const text = (el as HTMLElement).innerText?.trim();
-      if (text === '拖拽或选择封面' || text?.includes('拖拽或选择封面')) {
-        // 找到文本后，向上查找可悬浮的父容器
-        coverArea = el.closest('.select-cover__btn, .js_cover_btn_area, [class*="cover_btn"]') as HTMLElement;
-        if (!coverArea) {
-          coverArea = el.parentElement as HTMLElement;
-        }
-        logger.log('找到封面区域: 拖拽或选择封面', 'info');
-        break;
-      }
+  // 方法2: 使用精确的类名选择器
+  if (!coverTextElement) {
+    coverArea = document.querySelector('.select-cover__btn.js_cover_btn_area.select-cover__mask') as HTMLElement;
+    if (coverArea) {
+      logger.log('找到封面区域: select-cover__btn', 'info');
     }
   }
   
   // 方法3: 查找封面添加按钮区域
-  if (!coverArea) {
+  if (!coverTextElement && !coverArea) {
     coverArea = findElement(SELECTORS.coverAddButton);
   }
   
-  if (!coverArea) {
+  // 确定要悬浮的目标元素
+  const hoverTarget = coverTextElement || coverArea;
+  
+  if (!hoverTarget) {
     logger.log('未找到封面区域', 'error');
     return false;
   }
   
   // 滚动到封面区域
-  coverArea.scrollIntoView({ behavior: 'instant', block: 'center' });
+  hoverTarget.scrollIntoView({ behavior: 'instant', block: 'center' });
   await new Promise(r => setTimeout(r, 500));
   
-  // 步骤2: 关键！必须正确悬浮在封面区域上，触发封面专用的弹出菜单
-  // 根据 HTML 结构分析，封面的 AI 配图链接在 pop-opr__group 弹出菜单中
-  // 选择器是：a.pop-opr__button.js_aiImage
-  logger.log('悬浮在封面区域显示菜单...', 'action');
+  // 步骤2: 关键！必须悬浮在"拖拽或选择封面"文字上，触发封面专用的弹出菜单
+  logger.log('悬浮在封面文字上显示菜单...', 'action');
   
-  // 查找封面区域的可点击按钮（.select-cover__btn.js_cover_btn_area）
-  let coverBtn = coverArea.closest('.select-cover__btn.js_cover_btn_area') as HTMLElement;
-  if (!coverBtn) {
-    coverBtn = document.querySelector('.select-cover__btn.js_cover_btn_area') as HTMLElement;
-  }
-  if (!coverBtn) {
-    coverBtn = coverArea;
-  }
+  const rect = hoverTarget.getBoundingClientRect();
+  logger.log(`悬浮目标: ${(hoverTarget as HTMLElement).innerText?.substring(0, 20) || hoverTarget.className}`, 'info');
   
-  logger.log(`封面按钮: ${coverBtn.className || 'unknown'}`, 'info');
-  
-  // 滚动到封面按钮
-  coverBtn.scrollIntoView({ behavior: 'instant', block: 'center' });
-  await new Promise(r => setTimeout(r, 300));
-  
-  const rect = coverBtn.getBoundingClientRect();
   const hoverOptions = {
     bubbles: true,
     cancelable: true,
@@ -1127,11 +1116,11 @@ const setCoverWithAI = async (title?: string, content?: string): Promise<boolean
   };
   
   // 多次触发悬浮事件，确保弹出菜单显示
-  for (let i = 0; i < 3; i++) {
-    coverBtn.dispatchEvent(new MouseEvent('mouseenter', hoverOptions));
-    coverBtn.dispatchEvent(new MouseEvent('mouseover', hoverOptions));
-    coverBtn.dispatchEvent(new MouseEvent('mousemove', hoverOptions));
-    await new Promise(r => setTimeout(r, 300));
+  for (let i = 0; i < 5; i++) {
+    hoverTarget.dispatchEvent(new MouseEvent('mouseenter', hoverOptions));
+    hoverTarget.dispatchEvent(new MouseEvent('mouseover', hoverOptions));
+    hoverTarget.dispatchEvent(new MouseEvent('mousemove', hoverOptions));
+    await new Promise(r => setTimeout(r, 200));
   }
   
   // 等待弹出菜单出现
@@ -1168,12 +1157,13 @@ const setCoverWithAI = async (title?: string, content?: string): Promise<boolean
     }
   }
   
-  // 方法3: 如果弹出菜单没显示，点击封面区域触发
+  // 方法3: 如果弹出菜单没显示，点击封面文字元素触发
   if (!aiCoverBtn) {
-    logger.log('点击封面区域触发弹出菜单...', 'info');
+    logger.log('点击封面文字触发弹出菜单...', 'info');
     
-    // 点击封面按钮
-    simulateClick(coverBtn);
+    // 点击封面文字元素（优先）或封面区域
+    const clickTarget = coverTextElement || hoverTarget;
+    simulateClick(clickTarget);
     await new Promise(r => setTimeout(r, 1000));
     
     // 再次查找 a.js_aiImage
@@ -1235,113 +1225,133 @@ const setCoverWithAI = async (title?: string, content?: string): Promise<boolean
   // 步骤5: 输入封面提示词（使用前面提取或生成的 coverPrompt）
   logger.log(`封面提示词: ${coverPrompt.substring(0, 60)}...`, 'info');
   
-  // 查找并输入提示词 - 使用更全面的查找方法
-  let promptInput: HTMLElement | null = null;
+  // 打印当前页面上的弹窗信息，便于调试
+  const debugDialogs = () => {
+    const allDialogs = document.querySelectorAll('.weui-desktop-dialog');
+    logger.log(`当前页面有 ${allDialogs.length} 个 weui-desktop-dialog`, 'info');
+    for (let i = 0; i < allDialogs.length; i++) {
+      const dialog = allDialogs[i] as HTMLElement;
+      const visible = isElementVisible(dialog);
+      const style = window.getComputedStyle(dialog);
+      const hasAIList = !!dialog.querySelector('.ai-image-list');
+      const hasTextarea = !!dialog.querySelector('textarea');
+      const hasChatTextarea = !!dialog.querySelector('.chat_textarea');
+      logger.log(`弹窗 ${i + 1}: visible=${visible}, display=${style.display}, hasAIList=${hasAIList}, hasTextarea=${hasTextarea}, hasChatTextarea=${hasChatTextarea}`, 'info');
+    }
+  };
   
-  // 方法1: 在弹窗中查找输入框
-  const dialogs = document.querySelectorAll('.weui-desktop-dialog, [class*="dialog"], [class*="modal"]');
-  for (const dialog of dialogs) {
-    if (isElementVisible(dialog as HTMLElement)) {
-      const inputs = dialog.querySelectorAll('input, textarea');
-      for (const input of inputs) {
-        const placeholder = input.getAttribute('placeholder') || '';
-        if ((placeholder.includes('描述') || placeholder.includes('创作') || placeholder.includes('输入')) && 
-            isElementVisible(input as HTMLElement)) {
-          promptInput = input as HTMLElement;
-          logger.log('在弹窗中找到输入框', 'info');
-          break;
-        }
-      }
-      if (promptInput) break;
+  // 关键修复：不依赖弹窗的可见性，而是直接查找包含 AI 配图特征的弹窗
+  // 因为弹窗可能使用了动画或特殊的显示方式，导致 isElementVisible 返回 false
+  const findAIDialogAndInput = (): { dialog: HTMLElement | null; input: HTMLElement | null } => {
+    // 查找所有弹窗
+    const allDialogs = document.querySelectorAll('.weui-desktop-dialog');
+    
+    for (const dialog of allDialogs) {
+      // 关键：不检查弹窗的可见性，而是检查弹窗内是否有 AI 配图的特征元素
+      const hasChatTextarea = dialog.querySelector('.chat_textarea');
+      const hasAIImageList = dialog.querySelector('.ai-image-list');
       
-      // 如果没找到带 placeholder 的，尝试找任何可见的输入框
-      if (!promptInput) {
-        const anyInput = dialog.querySelector('input:not([type="hidden"]), textarea') as HTMLElement;
-        if (anyInput && isElementVisible(anyInput)) {
-          promptInput = anyInput;
-          logger.log('在弹窗中找到输入框（无 placeholder）', 'info');
-          break;
+      // 如果弹窗包含 chat_textarea 或 ai-image-list，说明是 AI 配图弹窗
+      if (hasChatTextarea || hasAIImageList) {
+        // 在这个弹窗内查找输入框
+        const inputSelectors = [
+          '#ai-image-prompt',
+          'textarea.chat_textarea',
+          '.chat_textarea',
+          'textarea[placeholder*="描述"]',
+          'textarea[placeholder*="创作"]'
+        ];
+        
+        for (const selector of inputSelectors) {
+          const input = dialog.querySelector(selector) as HTMLElement;
+          if (input) {
+            // 检查输入框本身是否可交互（不检查弹窗的可见性）
+            const inputStyle = window.getComputedStyle(input);
+            if (inputStyle.display !== 'none') {
+              logger.log(`在弹窗中找到 AI 配图输入框: ${selector}`, 'info');
+              return { dialog: dialog as HTMLElement, input };
+            }
+          }
+        }
+        
+        // 如果没找到特定输入框，查找任何 textarea
+        const textarea = dialog.querySelector('textarea') as HTMLElement;
+        if (textarea) {
+          const textareaStyle = window.getComputedStyle(textarea);
+          if (textareaStyle.display !== 'none') {
+            logger.log('在弹窗中找到 textarea', 'info');
+            return { dialog: dialog as HTMLElement, input: textarea };
+          }
         }
       }
     }
-  }
+    
+    return { dialog: null, input: null };
+  };
   
-  // 方法2: 通过 placeholder 全局查找
-  if (!promptInput) {
-    const inputs = document.querySelectorAll('input, textarea');
-    for (const input of inputs) {
-      const placeholder = input.getAttribute('placeholder') || '';
-      if ((placeholder.includes('描述') || placeholder.includes('创作')) && isElementVisible(input as HTMLElement)) {
-        promptInput = input as HTMLElement;
-        logger.log('通过 placeholder 找到输入框', 'info');
-        break;
-      }
-    }
-  }
+  // 第一次尝试查找
+  let { dialog: aiDialog, input: promptInput } = findAIDialogAndInput();
   
-  // 方法3: 使用预定义的选择器
+  // 如果没找到，等待一下再试
   if (!promptInput) {
-    promptInput = await waitForElement(SELECTORS.aiPromptInput, 5000);
-    if (promptInput) {
-      logger.log('通过预定义选择器找到输入框', 'info');
-    }
-  }
-  
-  // 方法4: 查找 AI 配图相关的输入框
-  if (!promptInput) {
-    const aiInputSelectors = [
-      '.ai-image-input input',
-      '.ai-image-input textarea',
-      '[class*="ai-image"] input',
-      '[class*="ai-image"] textarea',
-      '.weui-desktop-dialog input[type="text"]',
-      '.weui-desktop-dialog textarea'
-    ];
-    for (const selector of aiInputSelectors) {
-      const input = document.querySelector(selector) as HTMLElement;
-      if (input && isElementVisible(input)) {
-        promptInput = input;
-        logger.log(`通过选择器 ${selector} 找到输入框`, 'info');
-        break;
-      }
-    }
-  }
-  
-  // 方法5: 如果还没找到，等待更长时间再试
-  if (!promptInput) {
-    logger.log('输入框未立即出现，等待更长时间...', 'info');
+    logger.log('等待 AI 配图弹窗和输入框...', 'info');
     await new Promise(r => setTimeout(r, 2000));
     
-    // 再次尝试查找
-    const allInputs = document.querySelectorAll('input:not([type="hidden"]), textarea');
-    for (const input of allInputs) {
-      if (isElementVisible(input as HTMLElement)) {
-        const rect = (input as HTMLElement).getBoundingClientRect();
-        // 检查是否在屏幕可见区域内
-        if (rect.top > 0 && rect.top < window.innerHeight) {
-          promptInput = input as HTMLElement;
-          logger.log('延迟后找到可见输入框', 'info');
-          break;
-        }
-      }
-    }
+    // 打印调试信息
+    debugDialogs();
+    
+    // 再次尝试
+    const result = findAIDialogAndInput();
+    aiDialog = result.dialog;
+    promptInput = result.input;
   }
   
-  if (promptInput) {
+  // 如果还没找到，再等待一次
+  if (!promptInput) {
+    logger.log('继续等待弹窗加载...', 'info');
+    await new Promise(r => setTimeout(r, 2000));
+    
+    const result = findAIDialogAndInput();
+    aiDialog = result.dialog;
+    promptInput = result.input;
+  }
+  
+  if (promptInput && aiDialog) {
+    logger.log('✅ 找到 AI 配图弹窗和输入框', 'success');
+    
+    // 尝试让弹窗可见（如果它被隐藏了）
+    const dialogStyle = window.getComputedStyle(aiDialog);
+    if (dialogStyle.display === 'none') {
+      logger.log('弹窗被隐藏，尝试显示...', 'info');
+      aiDialog.style.display = 'block';
+    }
+    
+    // 滚动到输入框并聚焦
+    promptInput.scrollIntoView({ behavior: 'instant', block: 'center' });
+    await new Promise(r => setTimeout(r, 200));
+    
     simulateClick(promptInput);
     await new Promise(r => setTimeout(r, 200));
     simulateInput(promptInput, coverPrompt);
     logger.log('已输入封面提示词', 'success');
   } else {
-    logger.log('未找到提示词输入框', 'error');
-    // 打印当前页面上所有可见的输入框，便于调试
-    const visibleInputs = Array.from(document.querySelectorAll('input, textarea')).filter(el => isElementVisible(el as HTMLElement));
-    logger.log(`当前页面有 ${visibleInputs.length} 个可见输入框`, 'info');
-    for (let i = 0; i < Math.min(visibleInputs.length, 3); i++) {
-      const input = visibleInputs[i] as HTMLElement;
-      logger.log(`输入框 ${i + 1}: placeholder="${input.getAttribute('placeholder')}", class="${input.className}"`, 'info');
+    logger.log('❌ 未找到 AI 配图弹窗或输入框', 'error');
+    // 打印更多调试信息
+    debugDialogs();
+    
+    // 尝试全局查找任何可见的 textarea（最后的尝试）
+    const allTextareas = document.querySelectorAll('textarea');
+    logger.log(`页面上共有 ${allTextareas.length} 个 textarea`, 'info');
+    for (let i = 0; i < Math.min(allTextareas.length, 5); i++) {
+      const ta = allTextareas[i] as HTMLElement;
+      const visible = isElementVisible(ta);
+      const placeholder = ta.getAttribute('placeholder') || '';
+      const className = ta.className;
+      logger.log(`textarea ${i + 1}: visible=${visible}, placeholder="${placeholder.substring(0, 30)}", class="${className}"`, 'info');
     }
-    return false;
+    
+    logger.log('尝试从正文选择封面...', 'info');
+    return await setCoverFromContent();
   }
   
   await new Promise(r => setTimeout(r, 500));
@@ -1415,14 +1425,94 @@ const setCoverWithAI = async (title?: string, content?: string): Promise<boolean
   
   await new Promise(r => setTimeout(r, 300));
   
-  // 步骤7: 点击"重新创作"按钮
-  let createBtn = findElementByText('重新创作', ['button', 'div', 'span']);
+  // 步骤7: 点击"重新创作"或"开始创作"按钮
+  // 关键：需要在当前可见的 AI 配图弹窗中查找，而不是全局查找
+  // 注意：按钮可能在弹窗底部，需要先滚动到可见位置
+  let createBtn: HTMLElement | null = null;
+  
+  // 先尝试滚动弹窗内容到底部，确保创作按钮可见
+  const aiDialogBody = document.querySelector('.ai_image_dialog .weui-desktop-dialog__bd, .ai_image .weui-desktop-dialog__bd');
+  if (aiDialogBody) {
+    aiDialogBody.scrollTop = aiDialogBody.scrollHeight;
+    await new Promise(r => setTimeout(r, 300));
+  }
+  
+  // 方法1: 在 .ft_chat_area 或 .chat_combine 中查找（封面 AI 配图弹窗的底部区域）
+  const chatAreas = document.querySelectorAll('.ft_chat_area, .chat_combine');
+  for (const area of chatAreas) {
+    // 不检查 area 的可见性，直接查找内部按钮
+    const btn = area.querySelector('button.weui-desktop-btn_primary') as HTMLElement;
+    if (btn) {
+      // 滚动按钮到可见位置
+      btn.scrollIntoView({ behavior: 'instant', block: 'center' });
+      await new Promise(r => setTimeout(r, 200));
+      
+      // 再次检查可见性
+      if (isElementVisible(btn)) {
+        createBtn = btn;
+        logger.log(`在 ${(area as HTMLElement).className} 中找到创作按钮: ${btn.innerText}`, 'info');
+        break;
+      }
+    }
+  }
+  
+  // 方法2: 在可见的 AI 配图弹窗中查找
+  if (!createBtn) {
+    const aiDialogs = document.querySelectorAll('.ai_image_dialog, .ai_image');
+    for (const dialog of aiDialogs) {
+      // 查找主要按钮（不检查 disabled 状态，因为输入提示词后应该是可用的）
+      const btns = dialog.querySelectorAll('button.weui-desktop-btn_primary');
+      for (const btn of btns) {
+        const text = (btn as HTMLElement).innerText?.trim();
+        if (text === '重新创作' || text === '开始创作') {
+          // 滚动到按钮位置
+          (btn as HTMLElement).scrollIntoView({ behavior: 'instant', block: 'center' });
+          await new Promise(r => setTimeout(r, 200));
+          
+          createBtn = btn as HTMLElement;
+          logger.log(`在 AI 配图弹窗中找到创作按钮: ${text}`, 'info');
+          break;
+        }
+      }
+      if (createBtn) break;
+    }
+  }
+  
+  // 方法3: 全局查找（兜底）- 先滚动再检查
+  if (!createBtn) {
+    const allPrimaryBtns = document.querySelectorAll('button.weui-desktop-btn_primary');
+    for (const btn of allPrimaryBtns) {
+      const text = (btn as HTMLElement).innerText?.trim();
+      if (text === '重新创作' || text === '开始创作') {
+        // 滚动到按钮位置
+        (btn as HTMLElement).scrollIntoView({ behavior: 'instant', block: 'center' });
+        await new Promise(r => setTimeout(r, 200));
+        
+        createBtn = btn as HTMLElement;
+        logger.log(`全局找到创作按钮: ${text}`, 'info');
+        break;
+      }
+    }
+  }
+  
+  // 方法4: 使用 findElementByText（会检查可见性）
+  if (!createBtn) {
+    createBtn = findElementByText('重新创作', ['button', 'div', 'span']);
+  }
   if (!createBtn) {
     createBtn = findElementByText('开始创作', ['button', 'div', 'span']);
   }
   
   if (!createBtn) {
     logger.log('未找到创作按钮', 'error');
+    // 打印调试信息
+    const allBtns = document.querySelectorAll('button.weui-desktop-btn_primary');
+    logger.log(`页面上共有 ${allBtns.length} 个主要按钮`, 'info');
+    for (let i = 0; i < Math.min(allBtns.length, 5); i++) {
+      const btn = allBtns[i] as HTMLElement;
+      const rect = btn.getBoundingClientRect();
+      logger.log(`按钮 ${i + 1}: "${btn.innerText}", visible=${isElementVisible(btn)}, rect=(${Math.round(rect.top)},${Math.round(rect.left)},${Math.round(rect.width)}x${Math.round(rect.height)})`, 'info');
+    }
     return false;
   }
   
@@ -1517,12 +1607,8 @@ const setCoverWithAI = async (title?: string, content?: string): Promise<boolean
         const secondBtn = children[1] as HTMLElement;
         if (secondBtn) {
           const text = secondBtn.innerText?.trim();
-          // 如果第二个按钮不是"插入"，则使用它（封面弹窗中应该是"使用"或类似的）
-          // 如果是"插入"，说明打开的是正文的 AI 配图弹窗，需要警告
-          if (text === '插入') {
-            logger.log('⚠️ 检测到"插入"按钮，可能打开的是正文 AI 配图弹窗而非封面弹窗', 'warn');
-            logger.log('尝试继续，但封面可能无法正确设置', 'warn');
-          }
+          // 注意：封面 AI 配图弹窗和正文 AI 配图弹窗可能使用相同的按钮文字"插入"
+          // 所以不再把"插入"按钮当作错误的弹窗标志，直接使用它
           useBtn = secondBtn;
           logger.log(`使用第二个按钮: "${text}"`, 'info');
         }
@@ -1534,7 +1620,8 @@ const setCoverWithAI = async (title?: string, content?: string): Promise<boolean
         const btns = targetItem.querySelectorAll('div, span, button');
         for (const btn of btns) {
           const text = (btn as HTMLElement).innerText?.trim();
-          if (text === '使用' || text === '选择' || text === '设为封面') {
+          // 封面弹窗可能显示"使用"、"选择"、"设为封面"或"插入"
+          if (text === '使用' || text === '选择' || text === '设为封面' || text === '插入') {
             useBtn = btn as HTMLElement;
             logger.log(`通过文字找到按钮: "${text}"`, 'success');
             break;
@@ -1628,41 +1715,46 @@ const setCoverWithAI = async (title?: string, content?: string): Promise<boolean
 /**
  * 设置封面图片（从正文选择）- 备用方案
  * 需要先悬浮在封面区域，等菜单出现后再点击"从正文选择"
+ * 
+ * 根据调试发现的 DOM 结构：
+ * - 封面区域: <span class="btn-text js_share_type_none_image">拖拽或选择封面</span>
+ * - 弹出菜单: <div class="pop-opr__group pop-opr__group-select-cover js_cover_null_pop js_cover_opr">
+ * - 从正文选择链接: <a class="pop-opr__button js_selectCoverFromContent">从正文选择</a>
  */
 const setCoverFromContent = async (): Promise<boolean> => {
-  logger.log('设置封面图片...', 'info');
+  logger.log('设置封面图片（从正文选择）...', 'info');
   
   // 滚动到页面底部，确保封面区域可见
   window.scrollTo(0, document.body.scrollHeight);
   await new Promise(r => setTimeout(r, 500));
   
-  // 查找封面区域 - 查找包含"拖拽或选择封面"文本的区域
+  // 查找封面区域 - 使用精确的选择器
   let coverArea: HTMLElement | null = null;
   
-  // 方法1: 查找包含"拖拽或选择封面"文本的区域
-  const allElements = document.querySelectorAll('div, span');
-  for (const el of allElements) {
-    const text = (el as HTMLElement).innerText?.trim();
-    if (text === '拖拽或选择封面' || text?.includes('拖拽或选择封面')) {
-      coverArea = el as HTMLElement;
-      logger.log('找到封面区域: 拖拽或选择封面', 'info');
-      break;
+  // 方法1: 使用精确的类名选择器（调试发现的）
+  coverArea = document.querySelector('.btn-text.js_share_type_none_image') as HTMLElement;
+  if (coverArea) {
+    logger.log('找到封面区域: js_share_type_none_image', 'info');
+  }
+  
+  // 方法2: 查找 select-cover__btn 区域
+  if (!coverArea) {
+    coverArea = document.querySelector('.select-cover__btn.js_cover_btn_area') as HTMLElement;
+    if (coverArea) {
+      logger.log('找到封面区域: select-cover__btn', 'info');
     }
   }
   
-  // 方法2: 查找封面添加按钮区域
+  // 方法3: 查找包含"拖拽或选择封面"文本的区域
   if (!coverArea) {
-    coverArea = findElement(SELECTORS.coverAddButton);
-    if (coverArea) {
-      logger.log('找到封面区域: add_cover', 'info');
-    }
-  }
-  
-  // 方法3: 查找封面容器
-  if (!coverArea) {
-    coverArea = document.querySelector('.cover-wrap, .js_cover_area, [class*="cover"]') as HTMLElement;
-    if (coverArea) {
-      logger.log('找到封面区域: cover class', 'info');
+    const allElements = document.querySelectorAll('div, span');
+    for (const el of allElements) {
+      const text = (el as HTMLElement).innerText?.trim();
+      if (text === '拖拽或选择封面') {
+        coverArea = el as HTMLElement;
+        logger.log('找到封面区域: 拖拽或选择封面', 'info');
+        break;
+      }
     }
   }
   
@@ -1673,25 +1765,17 @@ const setCoverFromContent = async (): Promise<boolean> => {
   
   // 滚动到封面区域
   coverArea.scrollIntoView({ behavior: 'instant', block: 'center' });
-  await new Promise(r => setTimeout(r, 300));
+  await new Promise(r => setTimeout(r, 500));
   
-  // 关键：悬浮在封面区域上，触发菜单显示
-  logger.log('悬浮在封面区域显示菜单...', 'action');
+  // 关键：点击封面区域触发弹出菜单
+  // 根据调试结果，弹出菜单 pop-opr__group-select-cover 在点击后会显示
+  logger.log('点击封面区域触发菜单...', 'action');
   
-  // 获取封面区域的父容器（需要悬浮在更大的区域上）
-  // 尝试找到包含封面区域的父容器
-  let coverContainer = coverArea.closest('[class*="cover-wrap"], [class*="cover_wrap"], .cover-container') as HTMLElement;
-  if (!coverContainer) {
-    // 向上查找几层父元素
-    coverContainer = coverArea.parentElement?.parentElement as HTMLElement || coverArea;
-  }
-  
-  // 模拟鼠标悬浮事件 - 在封面区域上
   const rect = coverArea.getBoundingClientRect();
   const centerX = rect.left + rect.width / 2;
   const centerY = rect.top + rect.height / 2;
   
-  const hoverOptions = {
+  const eventOptions = {
     bubbles: true,
     cancelable: true,
     view: window,
@@ -1699,117 +1783,155 @@ const setCoverFromContent = async (): Promise<boolean> => {
     clientY: centerY
   };
   
-  // 先在父容器上触发悬浮
-  if (coverContainer && coverContainer !== coverArea) {
-    coverContainer.dispatchEvent(new MouseEvent('mouseenter', hoverOptions));
-    coverContainer.dispatchEvent(new MouseEvent('mouseover', hoverOptions));
-    coverContainer.dispatchEvent(new MouseEvent('mousemove', hoverOptions));
-  }
+  // 先触发悬浮事件
+  coverArea.dispatchEvent(new MouseEvent('mouseenter', eventOptions));
+  coverArea.dispatchEvent(new MouseEvent('mouseover', eventOptions));
+  await new Promise(r => setTimeout(r, 300));
   
-  // 再在封面区域上触发悬浮
-  coverArea.dispatchEvent(new MouseEvent('mouseenter', hoverOptions));
-  coverArea.dispatchEvent(new MouseEvent('mouseover', hoverOptions));
-  coverArea.dispatchEvent(new MouseEvent('mousemove', hoverOptions));
+  // 再触发点击事件
+  coverArea.dispatchEvent(new MouseEvent('mousedown', eventOptions));
+  coverArea.dispatchEvent(new MouseEvent('mouseup', eventOptions));
+  coverArea.dispatchEvent(new MouseEvent('click', eventOptions));
   
-  // 等待菜单出现
-  await new Promise(r => setTimeout(r, 1000));
+  // 等待弹出菜单出现
+  await new Promise(r => setTimeout(r, 800));
   
-  // 查找"从正文选择"选项
-  logger.log('查找"从正文选择"选项...', 'info');
+  // 查找"从正文选择"链接 - 使用精确的选择器
+  logger.log('查找"从正文选择"链接...', 'info');
   
   let selectFromContentLink: HTMLElement | null = null;
   
-  // 方法1: 通过文本查找
-  selectFromContentLink = findElementByText('从正文选择', ['a', 'span', 'div', 'li']);
-  
-  // 如果没找到，再次悬浮并等待
-  if (!selectFromContentLink) {
-    logger.log('第一次未找到，再次悬浮...', 'info');
-    
-    // 再次触发悬浮事件
-    coverArea.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, clientX: centerX, clientY: centerY }));
-    coverArea.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: centerX, clientY: centerY }));
-    
-    await new Promise(r => setTimeout(r, 1000));
-    
-    selectFromContentLink = findElementByText('从正文选择', ['a', 'span', 'div', 'li']);
+  // 方法1: 使用精确的类名选择器（调试发现的）
+  // 关键：不检查可见性，因为菜单可能使用特殊的显示方式
+  selectFromContentLink = document.querySelector('a.js_selectCoverFromContent') as HTMLElement;
+  if (selectFromContentLink) {
+    logger.log('通过 js_selectCoverFromContent 找到链接', 'info');
   }
   
-  // 方法2: 在下拉菜单中查找
+  // 方法2: 在 pop-opr__group 中查找
   if (!selectFromContentLink) {
-    const dropdowns = document.querySelectorAll('.weui-desktop-dropdown__list, .dropdown-menu, [class*="dropdown"], [class*="menu"], [class*="popover"]');
-    for (const dropdown of dropdowns) {
-      if (isElementVisible(dropdown as HTMLElement)) {
-        const items = dropdown.querySelectorAll('a, span, div, li');
-        for (const item of items) {
-          const text = (item as HTMLElement).innerText?.trim();
-          if (text === '从正文选择') {
-            selectFromContentLink = item as HTMLElement;
-            break;
-          }
+    const popOprGroups = document.querySelectorAll('.pop-opr__group, .pop-opr__group-select-cover, .js_cover_null_pop');
+    for (const group of popOprGroups) {
+      const link = group.querySelector('a.js_selectCoverFromContent, a.pop-opr__button') as HTMLElement;
+      if (link) {
+        const text = link.innerText?.trim();
+        if (text === '从正文选择') {
+          selectFromContentLink = link;
+          logger.log('在 pop-opr__group 中找到链接', 'info');
+          break;
         }
-        if (selectFromContentLink) break;
       }
     }
   }
   
-  // 方法3: 点击封面区域后再查找
+  // 方法3: 通过文本查找（不检查可见性）
   if (!selectFromContentLink) {
-    logger.log('尝试点击封面区域...', 'info');
-    
-    // 点击封面区域
-    coverArea.dispatchEvent(new MouseEvent('mousedown', hoverOptions));
-    coverArea.dispatchEvent(new MouseEvent('mouseup', hoverOptions));
-    coverArea.dispatchEvent(new MouseEvent('click', hoverOptions));
-    
-    await new Promise(r => setTimeout(r, 1000));
-    
-    selectFromContentLink = findElementByText('从正文选择', ['a', 'span', 'div', 'li']);
-  }
-  
-  // 方法4: 全局搜索所有可见的"从正文选择"
-  if (!selectFromContentLink) {
-    const allLinks = document.querySelectorAll('a, span, div');
+    const allLinks = document.querySelectorAll('a');
     for (const link of allLinks) {
       const text = (link as HTMLElement).innerText?.trim();
-      if (text === '从正文选择' && isElementVisible(link as HTMLElement)) {
+      if (text === '从正文选择') {
         selectFromContentLink = link as HTMLElement;
+        logger.log('通过文本找到链接', 'info');
         break;
       }
     }
   }
   
+  // 如果还没找到，再次点击封面区域并等待
   if (!selectFromContentLink) {
-    logger.log('未找到"从正文选择"链接，可能需要手动操作', 'error');
+    logger.log('第一次未找到，再次点击封面区域...', 'info');
+    
+    // 再次点击
+    simulateClick(coverArea);
+    await new Promise(r => setTimeout(r, 1000));
+    
+    // 再次查找
+    selectFromContentLink = document.querySelector('a.js_selectCoverFromContent') as HTMLElement;
+    if (!selectFromContentLink) {
+      const allLinks = document.querySelectorAll('a');
+      for (const link of allLinks) {
+        const text = (link as HTMLElement).innerText?.trim();
+        if (text === '从正文选择') {
+          selectFromContentLink = link as HTMLElement;
+          break;
+        }
+      }
+    }
+  }
+  
+  if (!selectFromContentLink) {
+    logger.log('未找到"从正文选择"链接', 'error');
+    
+    // 打印调试信息
+    const popGroups = document.querySelectorAll('.pop-opr__group');
+    logger.log(`页面上有 ${popGroups.length} 个 pop-opr__group`, 'info');
+    
     return false;
   }
   
-  logger.log('点击从正文选择', 'action');
+  // 点击"从正文选择"链接
+  logger.log('点击"从正文选择"', 'action');
+  
+  // 确保链接可见（强制显示）
+  const linkStyle = window.getComputedStyle(selectFromContentLink);
+  if (linkStyle.display === 'none' || linkStyle.visibility === 'hidden') {
+    logger.log('链接被隐藏，尝试强制显示...', 'info');
+    // 尝试显示父元素
+    let parent = selectFromContentLink.parentElement;
+    while (parent) {
+      const parentStyle = window.getComputedStyle(parent);
+      if (parentStyle.display === 'none') {
+        (parent as HTMLElement).style.display = 'block';
+      }
+      if (parentStyle.visibility === 'hidden') {
+        (parent as HTMLElement).style.visibility = 'visible';
+      }
+      parent = parent.parentElement;
+    }
+  }
+  
+  // 滚动到链接位置
+  selectFromContentLink.scrollIntoView({ behavior: 'instant', block: 'center' });
+  await new Promise(r => setTimeout(r, 200));
+  
+  // 点击链接
   simulateClick(selectFromContentLink);
   await new Promise(r => setTimeout(r, 1500));
   
   // 选择第一张图片
   logger.log('选择封面图片...', 'info');
   
+  // 等待图片选择弹窗出现
+  await new Promise(r => setTimeout(r, 1000));
+  
   // 查找图片选择项
   let imageSelect: HTMLElement | null = null;
   
-  // 方法1: 查找图片卡片
-  imageSelect = document.querySelector('.icon_card_selected_global, .card_mask_global, .cover-select-item') as HTMLElement;
+  // 方法1: 查找图片卡片（带选中标记的）
+  imageSelect = document.querySelector('.icon_card_selected_global, .card_mask_global') as HTMLElement;
   
-  // 方法2: 查找图片列表中的第一张
+  // 方法2: 查找封面选择弹窗中的图片
   if (!imageSelect) {
-    const imageItems = document.querySelectorAll('.cover-image-item, .image-item, [class*="cover-item"]');
-    if (imageItems.length > 0) {
-      imageSelect = imageItems[0] as HTMLElement;
+    const coverDialog = document.querySelector('.weui-desktop-dialog:not([style*="display: none"])');
+    if (coverDialog) {
+      // 查找弹窗中的图片项
+      const imageItems = coverDialog.querySelectorAll('.cover-image-item, .image-item, [class*="cover-item"], img');
+      if (imageItems.length > 0) {
+        // 选择第一张图片
+        imageSelect = imageItems[0].closest('div') as HTMLElement || imageItems[0] as HTMLElement;
+        logger.log(`在弹窗中找到 ${imageItems.length} 张图片`, 'info');
+      }
     }
   }
   
-  // 方法3: 查找可点击的图片
+  // 方法3: 查找任何可点击的图片
   if (!imageSelect) {
-    const images = document.querySelectorAll('.weui-desktop-dialog img, .cover-dialog img');
-    if (images.length > 0) {
-      imageSelect = images[0].closest('div') as HTMLElement || images[0] as HTMLElement;
+    const images = document.querySelectorAll('.weui-desktop-dialog img');
+    for (const img of images) {
+      if (isElementVisible(img as HTMLElement)) {
+        imageSelect = img.closest('div') as HTMLElement || img as HTMLElement;
+        break;
+      }
     }
   }
   
@@ -1821,38 +1943,83 @@ const setCoverFromContent = async (): Promise<boolean> => {
     logger.log('未找到可选择的图片', 'warn');
   }
   
-  // 点击下一步
-  let nextBtn = findElementByText('下一步', ['button']);
-  if (nextBtn) {
-    logger.log('点击下一步', 'action');
-    simulateClick(nextBtn);
+  // 封面设置流程可能有多个步骤，循环处理直到完成
+  // 步骤可能包括：选择图片 → 下一步 → 编辑封面（裁剪）→ 确认
+  for (let step = 0; step < 5; step++) {
+    await new Promise(r => setTimeout(r, 800));
+    
+    // 查找当前弹窗中的按钮
+    const visibleDialogs = document.querySelectorAll('.weui-desktop-dialog');
+    let currentDialog: Element | null = null;
+    
+    for (const dialog of visibleDialogs) {
+      if (isElementVisible(dialog as HTMLElement)) {
+        currentDialog = dialog;
+        break;
+      }
+    }
+    
+    if (!currentDialog) {
+      logger.log('弹窗已关闭，封面设置完成', 'success');
+      break;
+    }
+    
+    // 在当前弹窗中查找按钮
+    const buttons = currentDialog.querySelectorAll('button');
+    let nextBtn: HTMLElement | null = null;
+    let confirmBtn: HTMLElement | null = null;
+    
+    for (const btn of buttons) {
+      const text = (btn as HTMLElement).innerText?.trim();
+      if (text === '下一步' && isElementVisible(btn as HTMLElement)) {
+        nextBtn = btn as HTMLElement;
+      }
+      if (text === '确认' && isElementVisible(btn as HTMLElement)) {
+        confirmBtn = btn as HTMLElement;
+      }
+    }
+    
+    // 优先点击"确认"按钮（最后一步）
+    if (confirmBtn) {
+      logger.log('点击确认', 'action');
+      simulateClick(confirmBtn);
+      await new Promise(r => setTimeout(r, 1000));
+      logger.log('封面设置完成', 'success');
+      break;
+    }
+    
+    // 其次点击"下一步"按钮
+    if (nextBtn) {
+      logger.log('点击下一步', 'action');
+      simulateClick(nextBtn);
+      await new Promise(r => setTimeout(r, 1000));
+      continue;
+    }
+    
+    // 如果没有找到按钮，可能需要先选择图片
+    const imageSelect2 = currentDialog.querySelector('.icon_card_selected_global, .cover-crop-item, img') as HTMLElement;
+    if (imageSelect2 && isElementVisible(imageSelect2)) {
+      logger.log('选择图片', 'action');
+      simulateClick(imageSelect2);
+      await new Promise(r => setTimeout(r, 500));
+      continue;
+    }
+    
+    // 没有找到任何可操作的元素，退出循环
+    logger.log('未找到可操作的按钮，尝试继续...', 'warn');
+    break;
+  }
+  
+  // 最后再检查一次是否有确认按钮需要点击
+  await new Promise(r => setTimeout(r, 500));
+  const finalConfirmBtn = findElementByText('确认', ['button']);
+  if (finalConfirmBtn && isElementVisible(finalConfirmBtn)) {
+    logger.log('点击最终确认', 'action');
+    simulateClick(finalConfirmBtn);
     await new Promise(r => setTimeout(r, 1000));
   }
   
-  // 再次选择（裁剪确认页面）
-  const imageSelect2 = document.querySelector('.icon_card_selected_global, .cover-crop-item') as HTMLElement;
-  if (imageSelect2) {
-    simulateClick(imageSelect2);
-    await new Promise(r => setTimeout(r, 500));
-  }
-  
-  // 再次点击下一步
-  nextBtn = findElementByText('下一步', ['button']);
-  if (nextBtn) {
-    logger.log('点击下一步（裁剪确认）', 'action');
-    simulateClick(nextBtn);
-    await new Promise(r => setTimeout(r, 1000));
-  }
-  
-  // 点击确认
-  const confirmBtn = findElementByText('确认', ['button']);
-  if (confirmBtn) {
-    logger.log('点击确认', 'action');
-    simulateClick(confirmBtn);
-    await new Promise(r => setTimeout(r, 1000));
-  }
-  
-  logger.log('封面设置完成', 'success');
+  logger.log('封面设置流程结束', 'success');
   return true;
 };
 
@@ -2037,6 +2204,180 @@ const cancelPreview = async (): Promise<boolean> => {
 };
 
 /**
+ * 发布文章
+ * 根据 Playwright 录制：
+ * await page1.getByRole('button', { name: '发表' }).click();
+ * await page1.locator('#vue_app').getByRole('button', { name: '发表' }).click();
+ * 
+ * 流程：
+ * 1. 点击页面底部的"发表"按钮
+ * 2. 如果弹出"创作来源声明提醒"对话框，点击"继续发表"按钮
+ * 3. 如果弹出确认对话框，再次点击"发表"按钮
+ */
+const publishArticle = async (): Promise<boolean> => {
+  logger.log('📤 开始发布文章...', 'info');
+  
+  // 步骤1: 点击页面底部的"发表"按钮
+  logger.log('查找发表按钮...', 'info');
+  
+  let publishBtn: HTMLElement | null = null;
+  
+  // 方法1: 通过文本查找"发表"按钮（排除"保存为草稿"等）
+  const allButtons = document.querySelectorAll('button');
+  for (const btn of allButtons) {
+    const text = (btn as HTMLElement).innerText?.trim();
+    if (text === '发表' && isElementVisible(btn as HTMLElement)) {
+      publishBtn = btn as HTMLElement;
+      logger.log('找到发表按钮', 'info');
+      break;
+    }
+  }
+  
+  // 方法2: 在页面底部区域查找
+  if (!publishBtn) {
+    const footerArea = document.querySelector('.weui-desktop-btn-area, .appmsg_edit_ft, [class*="footer"]');
+    if (footerArea) {
+      const btns = footerArea.querySelectorAll('button');
+      for (const btn of btns) {
+        const text = (btn as HTMLElement).innerText?.trim();
+        if (text === '发表') {
+          publishBtn = btn as HTMLElement;
+          logger.log('在底部区域找到发表按钮', 'info');
+          break;
+        }
+      }
+    }
+  }
+  
+  if (!publishBtn) {
+    logger.log('未找到发表按钮', 'error');
+    return false;
+  }
+  
+  logger.log('点击发表按钮（第一次）', 'action');
+  simulateClick(publishBtn);
+  
+  // 等待弹窗出现
+  await new Promise(r => setTimeout(r, 2000));
+  
+  // 步骤2: 处理可能出现的多个弹窗
+  // 弹窗顺序可能是：
+  // 1. "创作来源声明提醒" -> 点击"继续发表"
+  // 2. 发表确认弹窗（群发通知、分组通知等选项）-> 点击"发表"
+  
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await new Promise(r => setTimeout(r, 1000));
+    
+    // 检查是否有可见的弹窗
+    const visibleDialogs = Array.from(document.querySelectorAll('.weui-desktop-dialog, [class*="dialog"], [class*="modal"]'))
+      .filter(d => isElementVisible(d as HTMLElement));
+    
+    if (visibleDialogs.length === 0) {
+      logger.log('没有弹窗了，发布流程可能已完成', 'info');
+      break;
+    }
+    
+    logger.log(`检测到 ${visibleDialogs.length} 个弹窗，尝试处理...`, 'info');
+    
+    let clickedButton = false;
+    
+    // 优先查找"继续发表"按钮（创作来源声明提醒弹窗）
+    const continuePublishBtn = findElementByText('继续发表', ['button']);
+    if (continuePublishBtn && isElementVisible(continuePublishBtn)) {
+      logger.log('点击"继续发表"按钮', 'action');
+      simulateClick(continuePublishBtn);
+      clickedButton = true;
+      await new Promise(r => setTimeout(r, 1500));
+      continue;
+    }
+    
+    // 在所有可见弹窗中查找"发表"按钮
+    for (const dialog of visibleDialogs) {
+      const btns = dialog.querySelectorAll('button');
+      for (const btn of btns) {
+        const text = (btn as HTMLElement).innerText?.trim();
+        // 优先点击绿色的"发表"按钮（主要操作按钮）
+        if (text === '发表' && isElementVisible(btn as HTMLElement)) {
+          // 检查是否是主要按钮（通常有 primary 类名或绿色背景）
+          const classList = btn.className || '';
+          const isPrimary = classList.includes('primary') || classList.includes('weui-desktop-btn_primary');
+          
+          logger.log(`在弹窗中点击"发表"按钮 (primary=${isPrimary})`, 'action');
+          simulateClick(btn as HTMLElement);
+          clickedButton = true;
+          await new Promise(r => setTimeout(r, 1500));
+          break;
+        }
+      }
+      if (clickedButton) break;
+    }
+    
+    // 如果没找到"发表"，尝试找"确认"按钮
+    if (!clickedButton) {
+      for (const dialog of visibleDialogs) {
+        const btns = dialog.querySelectorAll('button');
+        for (const btn of btns) {
+          const text = (btn as HTMLElement).innerText?.trim();
+          if (text === '确认' && isElementVisible(btn as HTMLElement)) {
+            logger.log('在弹窗中点击"确认"按钮', 'action');
+            simulateClick(btn as HTMLElement);
+            clickedButton = true;
+            await new Promise(r => setTimeout(r, 1500));
+            break;
+          }
+        }
+        if (clickedButton) break;
+      }
+    }
+    
+    // 特别处理：在 #vue_app 中查找发表按钮
+    if (!clickedButton) {
+      const vueApp = document.querySelector('#vue_app');
+      if (vueApp) {
+        const btns = vueApp.querySelectorAll('button');
+        for (const btn of btns) {
+          const text = (btn as HTMLElement).innerText?.trim();
+          if (text === '发表' && isElementVisible(btn as HTMLElement)) {
+            logger.log('在 #vue_app 中点击"发表"按钮', 'action');
+            simulateClick(btn as HTMLElement);
+            clickedButton = true;
+            await new Promise(r => setTimeout(r, 1500));
+            break;
+          }
+        }
+      }
+    }
+    
+    if (!clickedButton) {
+      logger.log('未找到可点击的按钮，等待...', 'warn');
+    }
+  }
+  
+  // 最后检查一次是否还有弹窗
+  await new Promise(r => setTimeout(r, 1000));
+  const finalDialogs = Array.from(document.querySelectorAll('.weui-desktop-dialog'))
+    .filter(d => isElementVisible(d as HTMLElement));
+  
+  if (finalDialogs.length > 0) {
+    // 再尝试点击一次发表按钮
+    for (const dialog of finalDialogs) {
+      const publishBtnInDialog = Array.from(dialog.querySelectorAll('button'))
+        .find(btn => (btn as HTMLElement).innerText?.trim() === '发表' && isElementVisible(btn as HTMLElement));
+      
+      if (publishBtnInDialog) {
+        logger.log('最后一次点击弹窗中的"发表"按钮', 'action');
+        simulateClick(publishBtnInDialog as HTMLElement);
+        await new Promise(r => setTimeout(r, 1500));
+        break;
+      }
+    }
+  }
+  
+  logger.log('✅ 文章发布流程完成', 'success');
+  return true;
+};
+
+/**
  * 从文章内容生成 AI 配图提示词
  * 提示词要复杂、具体，贴合文章内容
  * @param title 文章标题
@@ -2152,10 +2493,141 @@ const removeCoverPromptFromContent = (content: string): string => {
     .replace(/\[封面[：:]\s*[^\]]+\]\s*/g, '')
     .replace(/【封面[：:]\s*[^】]+】\s*/g, '');
   
+  // 移除 [摘要: xxx] 或 【摘要: xxx】 格式的摘要
+  cleaned = cleaned
+    .replace(/\[摘要[：:]\s*[^\]]+\]\s*/g, '')
+    .replace(/【摘要[：:]\s*[^】]+】\s*/g, '');
+  
   // 清理多余的空行
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
   
   return cleaned;
+};
+
+/**
+ * 从内容中提取摘要
+ * 格式: [摘要: xxx] 或 【摘要: xxx】
+ * @param content 文章内容
+ * @returns 摘要内容，如果没有则返回 null
+ */
+const extractSummary = (content: string): { text: string; summary: string } | null => {
+  const patterns = [
+    /\[摘要[：:]\s*([^\]]+)\]/,
+    /【摘要[：:]\s*([^】]+)】/,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = content.match(pattern);
+    if (match) {
+      let summary = match[1].trim();
+      // 确保摘要不超过120字
+      if (summary.length > 120) {
+        summary = summary.substring(0, 117) + '...';
+      }
+      return {
+        text: match[0],
+        summary: summary
+      };
+    }
+  }
+  
+  return null;
+};
+
+/**
+ * 填充封面摘要
+ * 摘要输入框在封面设置区域，用于显示在文章卡片和转发预览中
+ * @param summary 摘要内容（最多120字）
+ */
+const fillCoverSummary = async (summary: string): Promise<boolean> => {
+  logger.log('📝 填充封面摘要...', 'info');
+  
+  // 滚动到页面底部，确保摘要输入框可见
+  window.scrollTo(0, document.body.scrollHeight);
+  await new Promise(r => setTimeout(r, 500));
+  
+  // 查找摘要输入框
+  // 根据截图，摘要输入框的 placeholder 是 "选填，不填写则默认抓取正文开头部分文字，摘要会在转发卡片和公众号会话展示。"
+  let summaryInput: HTMLElement | null = null;
+  
+  // 方法1: 通过 placeholder 查找
+  const textareas = document.querySelectorAll('textarea');
+  for (const textarea of textareas) {
+    const placeholder = textarea.getAttribute('placeholder') || '';
+    if (placeholder.includes('摘要') || placeholder.includes('正文开头') || placeholder.includes('转发卡片')) {
+      summaryInput = textarea as HTMLElement;
+      logger.log('通过 placeholder 找到摘要输入框', 'info');
+      break;
+    }
+  }
+  
+  // 方法2: 通过类名或 ID 查找
+  if (!summaryInput) {
+    summaryInput = document.querySelector('#js_description, .js_description, [name="description"], textarea[name="digest"]') as HTMLElement;
+    if (summaryInput) {
+      logger.log('通过选择器找到摘要输入框', 'info');
+    }
+  }
+  
+  // 方法3: 在封面区域附近查找 textarea
+  if (!summaryInput) {
+    const coverArea = document.querySelector('.js_cover_area, .cover-area, [class*="cover"]');
+    if (coverArea) {
+      // 查找封面区域附近的 textarea
+      const parent = coverArea.parentElement;
+      if (parent) {
+        const nearbyTextarea = parent.querySelector('textarea');
+        if (nearbyTextarea) {
+          summaryInput = nearbyTextarea as HTMLElement;
+          logger.log('在封面区域附近找到摘要输入框', 'info');
+        }
+      }
+    }
+  }
+  
+  // 方法4: 查找所有可见的 textarea，排除正文编辑器
+  if (!summaryInput) {
+    const allTextareas = document.querySelectorAll('textarea');
+    for (const textarea of allTextareas) {
+      if (isElementVisible(textarea as HTMLElement)) {
+        // 排除正文编辑器（通常有 contenteditable 或特定类名）
+        const isEditor = textarea.closest('[contenteditable="true"]') || 
+                        textarea.closest('.edui-body-container') ||
+                        textarea.closest('#ueditor_0');
+        if (!isEditor) {
+          // 检查是否在页面底部区域（摘要通常在底部）
+          const rect = textarea.getBoundingClientRect();
+          if (rect.top > window.innerHeight * 0.5) {
+            summaryInput = textarea as HTMLElement;
+            logger.log('在页面底部找到 textarea', 'info');
+            break;
+          }
+        }
+      }
+    }
+  }
+  
+  if (!summaryInput) {
+    logger.log('未找到摘要输入框', 'warn');
+    return false;
+  }
+  
+  // 滚动到摘要输入框
+  summaryInput.scrollIntoView({ behavior: 'instant', block: 'center' });
+  await new Promise(r => setTimeout(r, 300));
+  
+  // 填充摘要
+  logger.log(`填充摘要: ${summary.substring(0, 30)}...`, 'action');
+  simulateClick(summaryInput);
+  await new Promise(r => setTimeout(r, 200));
+  
+  // 确保摘要不超过120字
+  const truncatedSummary = summary.length > 120 ? summary.substring(0, 117) + '...' : summary;
+  simulateInput(summaryInput, truncatedSummary);
+  
+  await new Promise(r => setTimeout(r, 300));
+  logger.log('✅ 摘要已填充', 'success');
+  return true;
 };
 
 /**
@@ -2343,6 +2815,7 @@ const runPublishFlow = async (options: {
   generateAI?: boolean;
   aiPrompt?: string;
   autoPreview?: boolean;
+  autoPublish?: boolean;  // 是否自动发布
 }) => {
   isFlowCancelled = false;
   logger.clear();
@@ -2443,16 +2916,24 @@ const runPublishFlow = async (options: {
     
     await new Promise(r => setTimeout(r, 1000));
     
-    // 4. 设置封面（使用 AI 生成吸引人的封面）
-    logger.log('🖼️ 步骤4: 设置封面图片（AI 生成）', 'info');
-    const coverSuccess = await setCoverWithAI(options.title, options.content);
-    if (!coverSuccess) {
-      logger.log('AI 封面生成失败，尝试从正文选择', 'warn');
-      await setCoverFromContent();
-    }
+    // 4. 设置封面（直接从正文选择，更可靠）
+    // 因为正文已经有 AI 生成的图片了，直接从正文选择作为封面更稳定
+    logger.log('🖼️ 步骤4: 设置封面图片（从正文选择）', 'info');
+    await setCoverFromContent();
     if (isFlowCancelled) return;
     
     await new Promise(r => setTimeout(r, 1000));
+    
+    // 4.5 填充封面摘要（如果有）
+    // 从文章内容中提取 [摘要: xxx] 格式的摘要
+    const summaryData = extractSummary(options.content);
+    if (summaryData) {
+      logger.log('📝 步骤4.5: 填充封面摘要', 'info');
+      await fillCoverSummary(summaryData.summary);
+    }
+    if (isFlowCancelled) return;
+    
+    await new Promise(r => setTimeout(r, 500));
     
     // 5. 声明原创
     // Playwright: await page1.getByText('未声明').click();
@@ -2476,8 +2957,18 @@ const runPublishFlow = async (options: {
       await new Promise(r => setTimeout(r, 3000));
       await cancelPreview();
     }
+    if (isFlowCancelled) return;
     
-    logger.log('✅ 公众号文章准备完成！请检查后手动发布', 'success');
+    // 7. 自动发布（可选）
+    // Playwright: await page1.getByRole('button', { name: '发表' }).click();
+    // Playwright: await page1.locator('#vue_app').getByRole('button', { name: '发表' }).click();
+    if (options.autoPublish) {
+      logger.log('📤 步骤7: 自动发布文章', 'info');
+      await publishArticle();
+      logger.log('🎉 文章已发布！', 'success');
+    } else {
+      logger.log('✅ 公众号文章准备完成！请检查后手动发布', 'success');
+    }
     
   } catch (e: unknown) {
     const errorMsg = e instanceof Error ? e.message : String(e);
@@ -2552,13 +3043,9 @@ const runSmartImageFlow = async (_autoPublish = false) => {
       logger.log(`图片处理完成: ${successCount}/${placeholders.length} 成功`, 'info');
     }
     
-    // 设置封面（使用 AI 生成）
-    logger.log('🖼️ 设置封面图片（AI 生成）...', 'info');
-    const coverSuccess = await setCoverWithAI();
-    if (!coverSuccess) {
-      logger.log('AI 封面生成失败，尝试从正文选择', 'warn');
-      await setCoverFromContent();
-    }
+    // 设置封面（直接从正文选择，更可靠）
+    logger.log('🖼️ 设置封面图片（从正文选择）...', 'info');
+    await setCoverFromContent();
     
     logger.log('✅ 图片处理完成！', 'success');
     
@@ -2710,7 +3197,7 @@ const autoFillContent = async () => {
     // 读取设置
     const settings = await chrome.storage.sync.get(['weixin']);
     const authorName = settings.weixin?.authorName || '';
-    const autoGenerateAI = settings.weixin?.autoGenerateAI !== false;
+    const autoPublish = settings.weixin?.autoPublish !== false;
 
     logger.log(`📄 准备填充内容: ${payload.title}`, 'info');
     logger.log('⏳ 检测页面状态...', 'info');
@@ -2783,7 +3270,8 @@ const autoFillContent = async () => {
       content: payload.content,
       htmlContent: payload.htmlContent,
       authorName: authorName,
-      generateAI: autoGenerateAI,
+      generateAI: true,  // 始终自动生成 AI 配图
+      autoPublish: autoPublish,
       autoPreview: false
     });
     
@@ -2814,6 +3302,7 @@ if (document.readyState === 'loading') {
 (window as any).memoraidWeixinSetCover = setCoverFromContent;
 (window as any).memoraidWeixinDeclareOriginal = declareOriginal;
 (window as any).memoraidWeixinPreview = clickPreview;
+(window as any).memoraidWeixinPublish = publishArticle;
 
 // 消息监听
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -2885,7 +3374,7 @@ console.log(`
 📱 Memoraid 微信公众号助手已加载
 
 可用命令：
-  memoraidWeixinRunFlow({title, content, authorName, generateAI})  - 运行完整发布流程
+  memoraidWeixinRunFlow({title, content, authorName, generateAI, autoPublish})  - 运行完整发布流程
   memoraidWeixinRunImageFlow()           - 运行智能图片处理
   memoraidWeixinFillTitle('标题')         - 填充标题
   memoraidWeixinFillContent('内容')       - 填充正文
@@ -2893,6 +3382,7 @@ console.log(`
   memoraidWeixinSetCover()               - 设置封面（从正文选择）
   memoraidWeixinDeclareOriginal('作者')   - 声明原创
   memoraidWeixinPreview()                - 预览文章
+  memoraidWeixinPublish()                - 发布文章
 
 🔧 远程调试命令：
   memoraidDebug.showPanel()              - 显示调试面板

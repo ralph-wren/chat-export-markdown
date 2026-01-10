@@ -997,6 +997,125 @@ const Settings: React.FC = () => {
         />
       </div>
 
+      {/* ========== 微信公众号配置 ========== */}
+      <div className="border-t pt-4">
+        <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
+          <MessageCircle className="w-4 h-4 text-green-500" />
+          {t.weixinConfigTitle}
+        </h3>
+        <div className="space-y-3">
+          <div className="space-y-1">
+             <div className="flex justify-between items-center">
+               <label className="block text-xs font-medium text-gray-600">{t.cookieLabel}</label>
+               <button
+                 type="button"
+                 onClick={handleAutoFetchWeixinCookie}
+                 disabled={fetchingWeixin}
+                 className="text-green-600 hover:text-green-800 flex items-center gap-1 text-xs"
+               >
+                 {fetchingWeixin ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                 {t.autoFetch}
+               </button>
+             </div>
+             <div className="relative">
+                <input
+                  type={showWeixinCookie ? "text" : "password"}
+                  name="cookie"
+                  value={settings.weixin?.cookie || ''}
+                  onChange={handleWeixinChange}
+                  className="w-full p-2 border rounded pr-10 text-sm"
+                  placeholder={t.cookieLabel}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowWeixinCookie(!showWeixinCookie)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"
+                >
+                  {showWeixinCookie ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                </button>
+             </div>
+             <p className="text-[10px] text-gray-400">
+               {t.cookieHint}
+             </p>
+          </div>
+          
+          {/* 作者名称（原创声明用） */}
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-gray-600">{t.authorNameLabel}</label>
+            <input
+              type="text"
+              name="authorName"
+              value={settings.weixin?.authorName || ''}
+              onChange={handleWeixinChange}
+              className="w-full p-2 border rounded text-sm"
+              placeholder={t.authorNameLabel}
+            />
+            <p className="text-[10px] text-gray-400">
+              {t.authorNameHint}
+            </p>
+          </div>
+          
+          {/* 微信自定义提示词 */}
+          <div className="space-y-1">
+            <div className="flex justify-between items-center">
+              <label className="block text-xs font-medium text-gray-600">{t.customPromptLabel}</label>
+              <button
+                type="button"
+                onClick={() => setSettings(prev => ({
+                  ...prev,
+                  weixin: {
+                    ...prev.weixin || { cookie: '' },
+                    customPrompt: WEIXIN_DEFAULT_PROMPT
+                  }
+                }))}
+                className="text-green-600 hover:text-green-800 flex items-center gap-1 text-xs"
+              >
+                <RotateCcw className="w-3 h-3" />
+                {t.resetToDefault}
+              </button>
+            </div>
+            <textarea
+              name="customPrompt"
+              value={settings.weixin?.customPrompt || WEIXIN_DEFAULT_PROMPT}
+              onChange={handleWeixinChange}
+              className="w-full p-2 border rounded h-32 text-sm font-mono"
+              placeholder={t.customPromptPlaceholder}
+            />
+            <p className="text-[10px] text-gray-400">
+              {t.customPromptHint}
+            </p>
+          </div>
+          
+          {/* 微信自动发布开关 */}
+          <div className="bg-white rounded-lg border border-gray-100 p-3">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Send className={`w-4 h-4 ${settings.weixin?.autoPublish !== false ? 'text-green-500' : 'text-gray-400'}`} />
+                    <div>
+                        <span className="font-medium text-gray-800 text-sm">{t.autoPublish}</span>
+                        <p className="text-[10px] text-gray-500">{t.autoPublishHintWeixin}</p>
+                    </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                        type="checkbox" 
+                        className="sr-only peer"
+                        checked={settings.weixin?.autoPublish !== false}
+                        onChange={(e) => setSettings({ 
+                          ...settings, 
+                          weixin: {
+                            ...settings.weixin || { cookie: '' },
+                            autoPublish: e.target.checked
+                          }
+                        })}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ========== 头条配置 ========== */}
       <div className="border-t pt-4">
         <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
@@ -1197,125 +1316,6 @@ const Settings: React.FC = () => {
                         })}
                     />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
-                </label>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ========== 微信公众号配置 ========== */}
-      <div className="border-t pt-4">
-        <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
-          <MessageCircle className="w-4 h-4 text-green-500" />
-          {t.weixinConfigTitle}
-        </h3>
-        <div className="space-y-3">
-          <div className="space-y-1">
-             <div className="flex justify-between items-center">
-               <label className="block text-xs font-medium text-gray-600">{t.cookieLabel}</label>
-               <button
-                 type="button"
-                 onClick={handleAutoFetchWeixinCookie}
-                 disabled={fetchingWeixin}
-                 className="text-green-600 hover:text-green-800 flex items-center gap-1 text-xs"
-               >
-                 {fetchingWeixin ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                 {t.autoFetch}
-               </button>
-             </div>
-             <div className="relative">
-                <input
-                  type={showWeixinCookie ? "text" : "password"}
-                  name="cookie"
-                  value={settings.weixin?.cookie || ''}
-                  onChange={handleWeixinChange}
-                  className="w-full p-2 border rounded pr-10 text-sm"
-                  placeholder={t.cookieLabel}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowWeixinCookie(!showWeixinCookie)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"
-                >
-                  {showWeixinCookie ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                </button>
-             </div>
-             <p className="text-[10px] text-gray-400">
-               {t.cookieHint}
-             </p>
-          </div>
-          
-          {/* 作者名称（原创声明用） */}
-          <div className="space-y-1">
-            <label className="block text-xs font-medium text-gray-600">{t.authorNameLabel}</label>
-            <input
-              type="text"
-              name="authorName"
-              value={settings.weixin?.authorName || ''}
-              onChange={handleWeixinChange}
-              className="w-full p-2 border rounded text-sm"
-              placeholder={t.authorNameLabel}
-            />
-            <p className="text-[10px] text-gray-400">
-              {t.authorNameHint}
-            </p>
-          </div>
-          
-          {/* 微信自定义提示词 */}
-          <div className="space-y-1">
-            <div className="flex justify-between items-center">
-              <label className="block text-xs font-medium text-gray-600">{t.customPromptLabel}</label>
-              <button
-                type="button"
-                onClick={() => setSettings(prev => ({
-                  ...prev,
-                  weixin: {
-                    ...prev.weixin || { cookie: '' },
-                    customPrompt: WEIXIN_DEFAULT_PROMPT
-                  }
-                }))}
-                className="text-green-600 hover:text-green-800 flex items-center gap-1 text-xs"
-              >
-                <RotateCcw className="w-3 h-3" />
-                {t.resetToDefault}
-              </button>
-            </div>
-            <textarea
-              name="customPrompt"
-              value={settings.weixin?.customPrompt || WEIXIN_DEFAULT_PROMPT}
-              onChange={handleWeixinChange}
-              className="w-full p-2 border rounded h-32 text-sm font-mono"
-              placeholder={t.customPromptPlaceholder}
-            />
-            <p className="text-[10px] text-gray-400">
-              {t.customPromptHint}
-            </p>
-          </div>
-          
-          {/* 自动生成 AI 配图开关 */}
-          <div className="bg-white rounded-lg border border-gray-100 p-3">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Palette className={`w-4 h-4 ${settings.weixin?.autoGenerateAI !== false ? 'text-green-500' : 'text-gray-400'}`} />
-                    <div>
-                        <span className="font-medium text-gray-800 text-sm">{t.autoGenerateAI}</span>
-                        <p className="text-[10px] text-gray-500">{t.autoGenerateAIHint}</p>
-                    </div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                        type="checkbox" 
-                        className="sr-only peer"
-                        checked={settings.weixin?.autoGenerateAI !== false}
-                        onChange={(e) => setSettings({ 
-                          ...settings, 
-                          weixin: {
-                            ...settings.weixin || { cookie: '' },
-                            autoGenerateAI: e.target.checked
-                          }
-                        })}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
                 </label>
             </div>
           </div>
