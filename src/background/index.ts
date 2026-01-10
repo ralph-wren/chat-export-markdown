@@ -243,7 +243,96 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch(e => sendResponse({ success: false, error: e.message || String(e) }));
     return true;
   }
+
+  // 处理链接内容获取请求（用于增强版内容抓取）
+  if (message.type === 'FETCH_LINK_CONTENT') {
+    fetchLinkContent(message.payload.url, message.payload.timeout)
+      .then(content => sendResponse({ success: true, content }))
+      .catch(e => sendResponse({ success: false, error: e.message || String(e) }));
+    return true;
+  }
 });
+
+/**
+ * 获取链接页面的文本内容
+ * @param url 要获取的链接URL
+ * @param timeout 超时时间（毫秒）
+ */
+async function fetchLinkContent(url: string, timeout: number = 5000): Promise<string> {
+  console.log(`[Background] Fetching link content: ${url}`);
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    const html = await response.text();
+    
+    // 简单提取文本内容（移除HTML标签）
+    // 创建一个临时的DOM解析器
+    const textContent = extractTextFromHtml(html);
+    
+    console.log(`[Background] Fetched ${textContent.length} chars from ${url}`);
+    return textContent;
+    
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * 从HTML中提取纯文本内容
+ */
+function extractTextFromHtml(html: string): string {
+  // 移除script和style标签及其内容
+  let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+  text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  text = text.replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '');
+  
+  // 移除HTML注释
+  text = text.replace(/<!--[\s\S]*?-->/g, '');
+  
+  // 移除所有HTML标签
+  text = text.replace(/<[^>]+>/g, ' ');
+  
+  // 解码HTML实体
+  text = text.replace(/&nbsp;/g, ' ');
+  text = text.replace(/&amp;/g, '&');
+  text = text.replace(/&lt;/g, '<');
+  text = text.replace(/&gt;/g, '>');
+  text = text.replace(/&quot;/g, '"');
+  text = text.replace(/&#39;/g, "'");
+  text = text.replace(/&ldquo;/g, '"');
+  text = text.replace(/&rdquo;/g, '"');
+  text = text.replace(/&lsquo;/g, "'");
+  text = text.replace(/&rsquo;/g, "'");
+  text = text.replace(/&mdash;/g, '—');
+  text = text.replace(/&ndash;/g, '–');
+  text = text.replace(/&#\d+;/g, ''); // 移除其他数字实体
+  
+  // 清理多余空白
+  text = text.replace(/\s+/g, ' ');
+  text = text.trim();
+  
+  return text;
+}
 
 async function handleAnalyzeScreenshot({ prompt, history }: { prompt: string, history?: any[] }) {
   try {
