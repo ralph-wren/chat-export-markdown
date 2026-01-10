@@ -129,6 +129,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     return () => chrome.runtime.onMessage.removeListener(listener);
   }, []);
 
+  // 从已有结果发布到头条
   const handlePublishToToutiao = async () => {
     const settings = await getSettings();
     if (!settings.toutiao?.cookie) {
@@ -151,7 +152,6 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       
       if (response && response.success) {
         setStatus('Published successfully!');
-        // alert('Published to Toutiao successfully!');
       } else {
         throw new Error(response?.error || 'Unknown error');
       }
@@ -162,6 +162,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     }
   };
 
+  // 从已有结果发布到知乎
   const handlePublishToZhihu = async () => {
     const settings = await getSettings();
     if (!settings.zhihu?.cookie) {
@@ -191,6 +192,162 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       console.error(e);
       setStatus('Publish Failed');
       alert(`发布失败: ${e.message}`);
+    }
+  };
+
+  // 一键生成文章并发布到头条
+  const handleGenerateAndPublishToToutiao = async () => {
+    const settings = await getSettings();
+    if (!settings.toutiao?.cookie) {
+      if (confirm('头条 Cookie 未配置，是否前往设置？')) {
+        onOpenSettings();
+      }
+      return;
+    }
+
+    setLoading(true);
+    setProgress(5);
+    setStatus('Extracting content...');
+    setLogMessage('正在提取页面内容...');
+    setResult(null);
+    setErrorMessage(null);
+    setConversationHistory([]);
+    setUserClosedResult(false);
+
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab.id) throw new Error('No active tab');
+
+      const response = await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_CONTENT' });
+      
+      if (!response) {
+        throw new Error('No response from content script. Refresh the page?');
+      }
+      
+      if (response.type === 'ERROR') {
+        throw new Error(response.payload);
+      }
+
+      setLogMessage('内容提取成功！开始生成文章并发布到头条...');
+
+      const extraction: ExtractionResult = response.payload;
+      
+      if (extraction.title) {
+        setCurrentTitle(extraction.title);
+      }
+
+      // 发送生成并发布到头条的请求
+      chrome.runtime.sendMessage({ 
+        type: 'GENERATE_AND_PUBLISH_TOUTIAO', 
+        payload: extraction 
+      });
+
+    } catch (error: any) {
+      console.error(error);
+      let errorMsg = error.message;
+      
+      if (errorMsg.includes('Could not establish connection') || errorMsg.includes('Receiving end does not exist')) {
+        setErrorMessage(
+          <div className="flex flex-col gap-2">
+            <span>连接失败，请刷新页面后重试。</span>
+            <button 
+              onClick={async () => {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (tab?.id) {
+                  chrome.tabs.reload(tab.id);
+                  window.close();
+                }
+              }}
+              className="text-xs bg-red-100 hover:bg-red-200 text-red-800 py-1 px-2 rounded font-medium transition w-fit"
+            >
+              刷新页面
+            </button>
+          </div> as any
+        );
+      } else {
+        setErrorMessage(errorMsg);
+      }
+      
+      setStatus('Error');
+      setLoading(false);
+    }
+  };
+
+  // 一键生成文章并发布到知乎
+  const handleGenerateAndPublishToZhihu = async () => {
+    const settings = await getSettings();
+    if (!settings.zhihu?.cookie) {
+      if (confirm('知乎 Cookie 未配置，是否前往设置？')) {
+        onOpenSettings();
+      }
+      return;
+    }
+
+    setLoading(true);
+    setProgress(5);
+    setStatus('Extracting content...');
+    setLogMessage('正在提取页面内容...');
+    setResult(null);
+    setErrorMessage(null);
+    setConversationHistory([]);
+    setUserClosedResult(false);
+
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab.id) throw new Error('No active tab');
+
+      const response = await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_CONTENT' });
+      
+      if (!response) {
+        throw new Error('No response from content script. Refresh the page?');
+      }
+      
+      if (response.type === 'ERROR') {
+        throw new Error(response.payload);
+      }
+
+      setLogMessage('内容提取成功！开始生成文章并发布到知乎...');
+
+      const extraction: ExtractionResult = response.payload;
+      
+      if (extraction.title) {
+        setCurrentTitle(extraction.title);
+      }
+
+      // 发送生成并发布到知乎的请求
+      chrome.runtime.sendMessage({ 
+        type: 'GENERATE_AND_PUBLISH_ZHIHU', 
+        payload: extraction 
+      });
+
+    } catch (error: any) {
+      console.error(error);
+      let errorMsg = error.message;
+      
+      if (errorMsg.includes('Could not establish connection') || errorMsg.includes('Receiving end does not exist')) {
+        setErrorMessage(
+          <div className="flex flex-col gap-2">
+            <span>连接失败，请刷新页面后重试。</span>
+            <button 
+              onClick={async () => {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (tab?.id) {
+                  chrome.tabs.reload(tab.id);
+                  window.close();
+                }
+              }}
+              className="text-xs bg-red-100 hover:bg-red-200 text-red-800 py-1 px-2 rounded font-medium transition w-fit"
+            >
+              刷新页面
+            </button>
+          </div> as any
+        );
+      } else {
+        setErrorMessage(errorMsg);
+      }
+      
+      setStatus('Error');
+      setLoading(false);
     }
   };
 
@@ -241,7 +398,10 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
         setConversationHistory(task.conversationHistory);
       }
     } else {
-      setLoading(task.status !== 'Done!');
+      // 保持 loading 状态，直到任务完成（Done!）或发布完成后跳转
+      // Publishing... 状态也应该保持 loading
+      const isDone = task.status === 'Done!' || task.status === 'Refined!';
+      setLoading(!isDone);
     }
 
     setStatus(task.status);
@@ -604,24 +764,52 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
               )}
 
               <p className="text-gray-600 text-sm px-4">
-                Open a ChatGPT or Gemini chat page and click the button below.
+                打开 ChatGPT 或 Gemini 对话页面，点击下方按钮一键发布
               </p>
               
               {!loading ? (
                 <div className="flex flex-col gap-3 w-full items-center">
-                  <button
-                    onClick={handleSummarize}
-                    className="bg-black text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-gray-800 transition w-64 justify-center"
-                  >
-                    <FileText className="w-5 h-5" />
-                    Summarize & Export
-                  </button>
+                  {/* 一键发布按钮 - 最显眼的位置 */}
+                  <div className="flex gap-2 w-64">
+                    <button
+                      onClick={handleGenerateAndPublishToToutiao}
+                      className="flex-1 bg-red-600 text-white px-4 py-3 rounded-lg flex items-center gap-2 hover:bg-red-700 transition justify-center"
+                      title="生成文章并发布到头条"
+                    >
+                      <Newspaper className="w-5 h-5" />
+                      <span className="text-sm font-medium">发头条</span>
+                    </button>
+                    <button
+                      onClick={handleGenerateAndPublishToZhihu}
+                      className="flex-1 bg-blue-500 text-white px-4 py-3 rounded-lg flex items-center gap-2 hover:bg-blue-600 transition justify-center"
+                      title="生成文章并发布到知乎"
+                    >
+                      <BookOpen className="w-5 h-5" />
+                      <span className="text-sm font-medium">发知乎</span>
+                    </button>
+                  </div>
+                  
+                  {/* 分隔线 */}
+                  <div className="flex items-center w-64 gap-2 my-1">
+                    <div className="flex-1 h-px bg-gray-200"></div>
+                    <span className="text-xs text-gray-400">或</span>
+                    <div className="flex-1 h-px bg-gray-200"></div>
+                  </div>
+                  
+                  {/* 其他功能按钮 */}
                   <button
                     onClick={handleGenerateArticle}
-                    className="bg-purple-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-purple-700 transition w-64 justify-center"
+                    className="bg-purple-600 text-white px-6 py-2.5 rounded-lg flex items-center gap-2 hover:bg-purple-700 transition w-64 justify-center"
                   >
-                    <PenTool className="w-5 h-5" />
-                    Generate Article
+                    <PenTool className="w-4 h-4" />
+                    <span className="text-sm">仅生成文章</span>
+                  </button>
+                  <button
+                    onClick={handleSummarize}
+                    className="bg-gray-700 text-white px-6 py-2.5 rounded-lg flex items-center gap-2 hover:bg-gray-800 transition w-64 justify-center"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span className="text-sm">生成摘要</span>
                   </button>
                 </div>
               ) : (

@@ -60,6 +60,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+
+  // 一键生成文章并发布到头条
+  if (message.type === 'GENERATE_AND_PUBLISH_TOUTIAO') {
+    startArticleGenerationAndPublish(message.payload, 'toutiao');
+    sendResponse({ success: true });
+    return true;
+  }
+
+  // 一键生成文章并发布到知乎
+  if (message.type === 'GENERATE_AND_PUBLISH_ZHIHU') {
+    startArticleGenerationAndPublish(message.payload, 'zhihu');
+    sendResponse({ success: true });
+    return true;
+  }
   
   if (message.type === 'CANCEL_SUMMARIZATION') {
     if (abortController) {
@@ -976,10 +990,12 @@ async function startArticleGeneration(extraction: ExtractionResult) {
     // 注意：已移除自动发布功能
     // 用户可以在结果页面手动选择发布到头条或知乎
 
+    return summary; // 返回生成的文章内容，供其他函数使用
+
   } catch (error: any) {
     if (error.name === 'AbortError') {
       console.log('Article generation cancelled');
-      return;
+      return null;
     }
 
     console.error('Article generation error:', error);
@@ -997,8 +1013,209 @@ async function startArticleGeneration(extraction: ExtractionResult) {
       title: 'Article Generation Failed',
       message: error.message || 'Unknown error occurred'
     });
+    return null;
   } finally {
     stopTimer();
+    abortController = null;
+  }
+}
+
+// 一键生成文章并发布到指定平台
+async function startArticleGenerationAndPublish(extraction: ExtractionResult, platform: 'toutiao' | 'zhihu') {
+  try {
+    abortController = new AbortController();
+    
+    const platformName = platform === 'toutiao' ? '头条' : '知乎';
+    
+    // 初始化任务状态
+    currentTask = { 
+      status: 'Processing...', 
+      message: `正在生成文章并准备发布到${platformName}...`, 
+      progress: 5,
+      title: extraction.title 
+    };
+    chrome.storage.local.set({ currentTask });
+    broadcastUpdate();
+
+    const settings = await getSettings();
+    
+    let effectiveApiKey = settings.apiKeys?.[settings.provider] || settings.apiKey;
+    
+    if (!effectiveApiKey) {
+      throw new Error(`API Key for ${settings.provider} is missing. Please check settings.`);
+    }
+
+    const openai = new OpenAI({
+      apiKey: effectiveApiKey,
+      baseURL: settings.baseUrl,
+    });
+
+    updateTaskState({ status: 'Processing...', message: '正在发送请求到 AI...', progress: 20 });
+
+    const formattedContent = Array.isArray(extraction.messages) 
+      ? extraction.messages.map((m: any) => `### ${m.role ? m.role.toUpperCase() : 'CONTENT'}:\n${m.content}`).join('\n\n')
+      : String(extraction.messages);
+
+    const articlePrompt = generateArticlePrompt(settings.articleStyle);
+
+    const initialMessages = [
+      { role: 'system', content: articlePrompt },
+      { 
+        role: 'user', 
+        content: `请根据以下内容生成一篇自媒体文章。\n\n来源：${extraction.url}\n\n原标题：${extraction.title}\n\n内容：\n${formattedContent}` 
+      }
+    ];
+
+    const timeoutId = setTimeout(() => {
+        if (abortController) {
+            abortController.abort();
+        }
+    }, 180000); 
+
+    const stream = await openai.chat.completions.create({
+      model: settings.model,
+      messages: initialMessages as any,
+      stream: true,
+    }, { signal: abortController.signal });
+
+    const baseMessage = '正在生成文章...';
+    updateTaskState({ status: 'Processing...', message: baseMessage, progress: 30 });
+    startTimer(baseMessage);
+
+    let summary = '';
+    let lastUpdate = Date.now();
+
+    try {
+        for await (const chunk of stream) {
+            const content = chunk.choices[0]?.delta?.content || '';
+            summary += content;
+            
+            const now = Date.now();
+            if (now - lastUpdate > 500) {
+                lastUpdate = now;
+                currentTask = {
+                    ...currentTask,
+                    status: 'Processing...',
+                    message: `${baseMessage} (${Math.floor(summary.length / 100)}k 字符)`,
+                    result: summary,
+                    progress: 30 + Math.min(50, Math.floor(summary.length / 80))
+                } as ActiveTask;
+                broadcastUpdate();
+            }
+        }
+    } finally {
+        clearTimeout(timeoutId);
+    }
+    
+    stopTimer();
+
+    updateTaskState({ status: 'Processing...', message: '正在处理文章...', progress: 85 });
+    
+    // 清理文章内容
+    const outerCodeBlockRegex = /^```(?:markdown)?\s*([\s\S]*?)\s*```$/i;
+    const outerMatch = summary.trim().match(outerCodeBlockRegex);
+    
+    if (outerMatch && outerMatch[1]) {
+        summary = outerMatch[1];
+    } else {
+        summary = summary.trim();
+    }
+
+    // 确保有标题
+    const hasH1 = /^\s*#\s+/.test(summary);
+    
+    if (!hasH1) {
+         const genericTitles = ['微博搜索', 'Weibo Search', '搜索', 'Search', '主页', 'Home'];
+         const isGeneric = genericTitles.some(t => extraction.title?.includes(t));
+
+         if (!isGeneric && extraction.title) {
+             summary = `# ${extraction.title}\n\n` + summary;
+         } else {
+             const lines = summary.split('\n');
+             const firstLine = lines[0]?.trim();
+             if (firstLine && firstLine.length > 0 && firstLine.length < 100) {
+                 const cleanTitle = firstLine.replace(/^\*\*|\*\*$/g, '').replace(/^#+\s*/, '');
+                 summary = `# ${cleanTitle}\n\n` + lines.slice(1).join('\n');
+             }
+         }
+    }
+
+    summary = summary.trim();
+    if (summary.endsWith('```')) {
+        summary = summary.substring(0, summary.length - 3).trim();
+    }
+
+    // 提取标题
+    let finalTitle = extraction.title || 'Untitled Article';
+    const h1TitleMatch = summary.match(/^#\s+(.+)$/m);
+    if (h1TitleMatch && h1TitleMatch[1]) {
+      const extractedTitle = h1TitleMatch[1].trim();
+      if (extractedTitle.length >= 3 && extractedTitle.length <= 50) {
+        finalTitle = extractedTitle;
+      }
+    }
+
+    // 保存到历史记录
+    const newItem = {
+      id: Date.now().toString(),
+      title: finalTitle,
+      date: Date.now(),
+      content: summary,
+      url: extraction.url
+    };
+    
+    await addHistoryItem(newItem);
+
+    updateTaskState({ 
+      status: 'Publishing...', 
+      message: `文章生成完成，正在跳转到${platformName}发布页面...`,
+      progress: 95, 
+      result: summary, 
+      title: finalTitle
+    });
+
+    // 根据平台发布
+    if (platform === 'toutiao') {
+      await handlePublishToToutiao({
+        title: finalTitle,
+        content: summary
+      });
+    } else {
+      await handlePublishToZhihu({
+        title: finalTitle,
+        content: summary
+      });
+    }
+
+    // 清除任务状态（因为已经跳转到发布页面）
+    currentTask = null;
+    chrome.storage.local.remove('currentTask');
+    broadcastUpdate();
+
+  } catch (error: any) {
+    stopTimer();
+    
+    if (error.name === 'AbortError') {
+      console.log('Article generation cancelled');
+      return;
+    }
+
+    console.error('Article generation and publish error:', error);
+    updateTaskState({ 
+      status: 'Error', 
+      message: error.message || '发生错误',
+      progress: 0, 
+      error: error.message 
+    });
+
+    const iconUrl = chrome.runtime.getURL('public/icon-128.png');
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: iconUrl,
+      title: '文章生成失败',
+      message: error.message || '未知错误'
+    });
+  } finally {
     abortController = null;
   }
 }
