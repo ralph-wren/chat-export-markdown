@@ -52,9 +52,9 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = {
   apiKey: '',
   apiKeys: {}, // Initialize empty map
-  baseUrl: 'https://api.apiyi.com/v1',
-  model: 'gpt-4o',
-  provider: 'apiyi',
+  baseUrl: 'https://integrate.api.nvidia.com/v1',
+  model: 'meta/llama-3.1-405b-instruct',
+  provider: 'nvidia',
   language: 'zh-CN',
   github: {
     token: '',

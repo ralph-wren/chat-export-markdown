@@ -20,11 +20,21 @@ interface ProviderConfig {
   name: string;
   baseUrl: string;
   models: string[];
+  isShared?: boolean; // 是否是共享密钥（用户无法查看）
 }
 
+// 英伟达共享密钥（所有用户共用，有限制）
+const NVIDIA_SHARED_KEY = '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';
+
 const PROVIDERS: Record<string, ProviderConfig> = {
+  'nvidia': {
+    name: '🆓 NVIDIA (Free - Shared, Rate Limited)',
+    baseUrl: 'https://integrate.api.nvidia.com/v1',
+    models: ['meta/llama-3.1-405b-instruct', 'meta/llama-3.1-70b-instruct', 'meta/llama-3.1-8b-instruct', 'mistralai/mixtral-8x22b-instruct-v0.1', 'google/gemma-2-27b-it'],
+    isShared: true
+  },
   'apiyi': {
-    name: 'API Yi (Default - Recommended, Supports Multiple Models)',
+    name: 'API Yi (Recommended, Supports Multiple Models)',
     baseUrl: 'https://api.apiyi.com/v1',
     models: ['gpt-4o', 'gpt-4-turbo', 'claude-3-5-sonnet', 'claude-3-opus', 'gemini-1.5-pro', 'yi-large', 'deepseek-chat']
   },
@@ -67,6 +77,8 @@ const PROVIDERS: Record<string, ProviderConfig> = {
 
 const getProviderLink = (provider: string): string | null => {
   switch (provider) {
+    case 'nvidia':
+      return 'https://build.nvidia.com/explore/discover';
     case 'apiyi':
       return 'https://api.apiyi.com/register/?aff_code=pBOp';
     case 'yi':
@@ -169,7 +181,7 @@ const StyleSlider: React.FC<StyleSliderProps> = ({ label, leftLabel, rightLabel,
 const Settings: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [status, setStatus] = useState<string>('');
-  const [selectedProvider, setSelectedProvider] = useState<string>('apiyi');
+  const [selectedProvider, setSelectedProvider] = useState<string>('nvidia');
   const [showApiKey, setShowApiKey] = useState(false);
   const [showGithubToken, setShowGithubToken] = useState(false);
   const [showToutiaoCookie, setShowToutiaoCookie] = useState(false);
@@ -246,8 +258,13 @@ const Settings: React.FC = () => {
         newSettings.model = config.models[0] || '';
       }
       
-      // Switch to the stored API Key for this provider
-      newSettings.apiKey = prev.apiKeys?.[providerKey] || '';
+      // 如果是共享密钥的 provider（如 nvidia），使用共享密钥
+      if (config.isShared) {
+        newSettings.apiKey = NVIDIA_SHARED_KEY;
+      } else {
+        // Switch to the stored API Key for this provider
+        newSettings.apiKey = prev.apiKeys?.[providerKey] || '';
+      }
       
       return newSettings;
     });
@@ -628,29 +645,31 @@ const Settings: React.FC = () => {
           <div className="flex justify-between items-center">
             <label className="block text-sm font-medium">{t.apiKeyLabel}</label>
             <div className="flex items-center gap-3">
-              <button
-                onClick={handleVerifyApi}
-                disabled={verifyingApi}
-                className={`flex items-center gap-1 text-xs transition ${
-                  apiVerifyStatus === 'success' 
-                    ? 'text-green-600' 
-                    : apiVerifyStatus === 'error'
-                    ? 'text-red-600'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {verifyingApi ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : apiVerifyStatus === 'success' ? (
-                  <CheckCircle className="w-3 h-3" />
-                ) : apiVerifyStatus === 'error' ? (
-                  <XCircle className="w-3 h-3" />
-                ) : (
-                  <CheckCircle className="w-3 h-3" />
-                )}
-                {verifyingApi ? t.verifying : t.verifyButton}
-              </button>
-              {getProviderLink(selectedProvider) && (
+              {!PROVIDERS[selectedProvider]?.isShared && (
+                <button
+                  onClick={handleVerifyApi}
+                  disabled={verifyingApi}
+                  className={`flex items-center gap-1 text-xs transition ${
+                    apiVerifyStatus === 'success' 
+                      ? 'text-green-600' 
+                      : apiVerifyStatus === 'error'
+                      ? 'text-red-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {verifyingApi ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : apiVerifyStatus === 'success' ? (
+                    <CheckCircle className="w-3 h-3" />
+                  ) : apiVerifyStatus === 'error' ? (
+                    <XCircle className="w-3 h-3" />
+                  ) : (
+                    <CheckCircle className="w-3 h-3" />
+                  )}
+                  {verifyingApi ? t.verifying : t.verifyButton}
+                </button>
+              )}
+              {getProviderLink(selectedProvider) && !PROVIDERS[selectedProvider]?.isShared && (
                 <a 
                   href={getProviderLink(selectedProvider)!} 
                   target="_blank" 
@@ -662,23 +681,41 @@ const Settings: React.FC = () => {
               )}
             </div>
           </div>
-          <div className="relative">
-            <input
-              type={showApiKey ? "text" : "password"}
-              name="apiKey"
-              value={settings.apiKey}
-              onChange={handleChange}
-              className="w-full p-2 border rounded pr-10"
-              placeholder={t.apiKeyPlaceholder}
-            />
-            <button
-              type="button"
-              onClick={() => setShowApiKey(!showApiKey)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"
-            >
-              {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
+          
+          {/* 共享密钥提示（如 NVIDIA） */}
+          {PROVIDERS[selectedProvider]?.isShared ? (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-green-800">
+                    🎉 免费共享密钥已自动配置
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">
+                    所有用户共用此密钥，有速率限制。如遇到限流，请稍后重试或切换其他服务商。
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="relative">
+              <input
+                type={showApiKey ? "text" : "password"}
+                name="apiKey"
+                value={settings.apiKey}
+                onChange={handleChange}
+                className="w-full p-2 border rounded pr-10"
+                placeholder={t.apiKeyPlaceholder}
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKey(!showApiKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"
+              >
+                {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">
