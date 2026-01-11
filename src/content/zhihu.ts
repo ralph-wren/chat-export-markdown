@@ -266,6 +266,7 @@ const logger = new ZhihuLogger();
 // ============================================
 
 let isFlowCancelled = false;
+let isFlowRunning = false; // 添加锁机制，防止多个流程同时执行
 
 const openImageDialog = async (): Promise<boolean> => {
   logger.log('查找图片按钮...', 'info');
@@ -539,64 +540,76 @@ const clickPublicLibrary = async (): Promise<boolean> => {
 
 const searchImage = async (keyword: string): Promise<boolean> => {
   logger.log(`搜索图片: ${keyword}`, 'info');
-  await new Promise(r => setTimeout(r, 500));
   
-  // 首先确保我们在公共图片库界面内
-  // 查找对话框/模态框
-  const modal = document.querySelector('[role="dialog"], [class*="Modal"], [class*="modal"], [class*="Popover"], [class*="popover"]');
-  
-  // 方法1: 在模态框内查找搜索框
+  // 增加等待时间，确保公共图片库界面完全加载
+  // 公共图片库界面加载需要时间，搜索框可能延迟出现
+  const maxSearchAttempts = 10;
   let searchInput: HTMLElement | null = null;
   
-  if (modal && isElementVisible(modal as HTMLElement)) {
-    const inputs = modal.querySelectorAll('input');
-    for (const input of inputs) {
-      const placeholder = input.getAttribute('placeholder') || '';
-      if (placeholder.includes('关键字') || placeholder.includes('查找') || placeholder.includes('搜索')) {
-        if (isElementVisible(input as HTMLElement)) {
-          searchInput = input as HTMLElement;
-          logger.log(`在模态框中找到搜索框 (placeholder: ${placeholder})`, 'info');
+  for (let attempt = 1; attempt <= maxSearchAttempts; attempt++) {
+    await new Promise(r => setTimeout(r, 800));
+    
+    // 首先确保我们在公共图片库界面内
+    // 查找对话框/模态框
+    const modal = document.querySelector('[role="dialog"], [class*="Modal"], [class*="modal"], [class*="Popover"], [class*="popover"]');
+    
+    // 方法1: 在模态框内查找搜索框
+    if (modal && isElementVisible(modal as HTMLElement)) {
+      const inputs = modal.querySelectorAll('input');
+      for (const input of inputs) {
+        const placeholder = input.getAttribute('placeholder') || '';
+        if (placeholder.includes('关键字') || placeholder.includes('查找') || placeholder.includes('搜索')) {
+          if (isElementVisible(input as HTMLElement)) {
+            searchInput = input as HTMLElement;
+            logger.log(`在模态框中找到搜索框 (placeholder: ${placeholder}) [尝试 ${attempt}/${maxSearchAttempts}]`, 'info');
+            break;
+          }
+        }
+      }
+      
+      // 如果没找到带 placeholder 的，找第一个可见的 input
+      if (!searchInput) {
+        for (const input of inputs) {
+          if (isElementVisible(input as HTMLElement)) {
+            searchInput = input as HTMLElement;
+            logger.log(`在模态框中找到输入框 [尝试 ${attempt}/${maxSearchAttempts}]`, 'info');
+            break;
+          }
+        }
+      }
+    }
+    
+    // 方法2: 全局查找 - Playwright 录制的选择器
+    if (!searchInput) {
+      searchInput = document.querySelector('input[placeholder*="输入关键字查找图片"]') as HTMLElement;
+      if (searchInput && isElementVisible(searchInput)) {
+        logger.log(`通过 placeholder 找到搜索框 [尝试 ${attempt}/${maxSearchAttempts}]`, 'info');
+      } else {
+        searchInput = null;
+      }
+    }
+    
+    // 方法3: 部分匹配
+    if (!searchInput) {
+      const selectors = [
+        'input[placeholder*="输入关键字"]',
+        'input[placeholder*="关键字查找"]',
+        'input[placeholder*="查找图片"]'
+      ];
+      for (const selector of selectors) {
+        const el = document.querySelector(selector) as HTMLElement;
+        if (el && isElementVisible(el)) {
+          searchInput = el;
+          logger.log(`通过选择器 ${selector} 找到搜索框 [尝试 ${attempt}/${maxSearchAttempts}]`, 'info');
           break;
         }
       }
     }
     
-    // 如果没找到带 placeholder 的，找第一个可见的 input
-    if (!searchInput) {
-      for (const input of inputs) {
-        if (isElementVisible(input as HTMLElement)) {
-          searchInput = input as HTMLElement;
-          logger.log('在模态框中找到输入框', 'info');
-          break;
-        }
-      }
-    }
-  }
-  
-  // 方法2: 全局查找 - Playwright 录制的选择器
-  if (!searchInput) {
-    searchInput = document.querySelector('input[placeholder*="输入关键字查找图片"]') as HTMLElement;
-    if (searchInput && isElementVisible(searchInput)) {
-      logger.log('通过 placeholder 找到搜索框', 'info');
-    } else {
-      searchInput = null;
-    }
-  }
-  
-  // 方法3: 部分匹配
-  if (!searchInput) {
-    const selectors = [
-      'input[placeholder*="输入关键字"]',
-      'input[placeholder*="关键字查找"]',
-      'input[placeholder*="查找图片"]'
-    ];
-    for (const selector of selectors) {
-      const el = document.querySelector(selector) as HTMLElement;
-      if (el && isElementVisible(el)) {
-        searchInput = el;
-        logger.log(`通过选择器 ${selector} 找到搜索框`, 'info');
-        break;
-      }
+    if (searchInput) break;
+    
+    if (attempt < maxSearchAttempts) {
+      logger.log(`等待搜索框加载... (${attempt}/${maxSearchAttempts})`, 'info');
     }
   }
   
@@ -621,54 +634,119 @@ const searchImage = async (keyword: string): Promise<boolean> => {
   simulateInput(searchInput, keyword);
   await new Promise(r => setTimeout(r, 500));
   
-  // 查找搜索确认按钮 - 只在模态框内查找，避免误点击页面上的其他按钮
-  logger.log('查找搜索确认按钮...', 'info');
-  let searchConfirmBtn: HTMLElement | null = null;
+  // ============================================
+  // 关键修复：触发搜索
+  // 从截图看到搜索框右边有一个放大镜图标按钮，需要点击它来触发搜索
+  // ============================================
+  logger.log('触发搜索...', 'info');
   
-  // 在模态框内查找 .css-13oeh20 按钮
-  if (modal && isElementVisible(modal as HTMLElement)) {
-    searchConfirmBtn = modal.querySelector('.css-13oeh20') as HTMLElement;
-    if (searchConfirmBtn && isElementVisible(searchConfirmBtn)) {
-      logger.log('在模态框内找到搜索确认按钮 (.css-13oeh20)', 'info');
-    } else {
-      searchConfirmBtn = null;
-    }
-  }
+  // 重新获取模态框引用
+  const currentModal = document.querySelector('[role="dialog"], [class*="Modal"], [class*="modal"], [class*="Popover"], [class*="popover"]');
   
-  if (searchConfirmBtn) {
-    logger.log('点击搜索确认按钮', 'action');
-    simulateClick(searchConfirmBtn);
-    await new Promise(r => setTimeout(r, 500));
-  } else {
-    // 备用方法：在模态框内查找搜索按钮
-    let searchBtn: HTMLElement | null = null;
-    if (modal) {
-      const btns = modal.querySelectorAll('button');
-      for (const btn of btns) {
-        const text = (btn as HTMLElement).innerText?.trim();
-        if (text === '搜索' || text?.includes('搜索')) {
-          if (isElementVisible(btn as HTMLElement)) {
-            searchBtn = btn as HTMLElement;
-            break;
-          }
+  let searchTriggered = false;
+  
+  // 方法1: 查找搜索框旁边的放大镜图标按钮（最可能的方式）
+  // 搜索框通常在一个容器内，放大镜图标在搜索框右边
+  const searchInputParent = searchInput.parentElement;
+  if (searchInputParent) {
+    // 查找同级或子级的 svg/button/span 元素（放大镜图标）
+    const iconElements = searchInputParent.querySelectorAll('svg, button, span, i, [class*="icon"], [class*="Icon"], [class*="search"], [class*="Search"]');
+    for (const icon of iconElements) {
+      if (icon !== searchInput && isElementVisible(icon as HTMLElement)) {
+        const rect = (icon as HTMLElement).getBoundingClientRect();
+        // 放大镜图标通常比较小，且在搜索框右边
+        if (rect.width > 0 && rect.width < 50 && rect.height > 0 && rect.height < 50) {
+          logger.log('找到搜索图标，点击触发搜索', 'action');
+          simulateClick(icon as HTMLElement);
+          searchTriggered = true;
+          await new Promise(r => setTimeout(r, 500));
+          break;
         }
       }
     }
-    
-    if (searchBtn) {
-      logger.log('点击搜索按钮', 'action');
-      simulateClick(searchBtn);
-    } else {
-      // 按回车键
-      logger.log('按回车键搜索', 'action');
-      searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
-      searchInput.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
-      searchInput.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+  }
+  
+  // 方法2: 查找搜索框容器内的可点击元素
+  if (!searchTriggered && searchInputParent) {
+    // 有时候放大镜是 input 的兄弟元素
+    const siblings = searchInputParent.children;
+    for (const sibling of siblings) {
+      if (sibling !== searchInput && isElementVisible(sibling as HTMLElement)) {
+        const tagName = sibling.tagName.toLowerCase();
+        if (tagName === 'svg' || tagName === 'button' || tagName === 'span' || tagName === 'i') {
+          logger.log(`点击搜索框旁边的 ${tagName} 元素`, 'action');
+          simulateClick(sibling as HTMLElement);
+          searchTriggered = true;
+          await new Promise(r => setTimeout(r, 500));
+          break;
+        }
+      }
     }
   }
   
+  // 方法3: 在模态框内查找 .css-13oeh20 按钮（之前的方法）
+  if (!searchTriggered && currentModal && isElementVisible(currentModal as HTMLElement)) {
+    const searchConfirmBtn = currentModal.querySelector('.css-13oeh20') as HTMLElement;
+    if (searchConfirmBtn && isElementVisible(searchConfirmBtn)) {
+      logger.log('点击搜索确认按钮 (.css-13oeh20)', 'action');
+      simulateClick(searchConfirmBtn);
+      searchTriggered = true;
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+  
+  // 方法4: 在模态框内查找"搜索"按钮
+  if (!searchTriggered && currentModal) {
+    const btns = currentModal.querySelectorAll('button');
+    for (const btn of btns) {
+      const text = (btn as HTMLElement).innerText?.trim();
+      if (text === '搜索' || text?.includes('搜索')) {
+        if (isElementVisible(btn as HTMLElement)) {
+          logger.log('点击"搜索"按钮', 'action');
+          simulateClick(btn as HTMLElement);
+          searchTriggered = true;
+          await new Promise(r => setTimeout(r, 500));
+          break;
+        }
+      }
+    }
+  }
+  
+  // 方法5: 模拟回车键（多种方式）
+  if (!searchTriggered) {
+    logger.log('尝试按回车键搜索', 'action');
+    
+    // 确保搜索框获得焦点
+    searchInput.focus();
+    await new Promise(r => setTimeout(r, 100));
+    
+    // 方式1: 使用 KeyboardEvent
+    const enterEvent = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      bubbles: true,
+      cancelable: true
+    });
+    searchInput.dispatchEvent(enterEvent);
+    
+    // 方式2: 也发送 keypress 和 keyup
+    searchInput.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+    searchInput.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+    
+    // 方式3: 如果是 form 表单，尝试提交
+    const form = searchInput.closest('form');
+    if (form) {
+      logger.log('找到表单，尝试提交', 'action');
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    }
+    
+    searchTriggered = true;
+  }
+  
   logger.log('等待搜索结果...', 'info');
-  await new Promise(r => setTimeout(r, 2500));
+  await new Promise(r => setTimeout(r, 3000)); // 增加等待时间，确保搜索结果加载
   
   return true;
 };
@@ -923,6 +1001,196 @@ const clickPublish = async (): Promise<boolean> => {
   return true;
 };
 
+/**
+ * 投稿至问题功能
+ * 根据 Playwright 录制：
+ * 1. 点击 #Popover6-toggle（投稿按钮）
+ * 2. 点击"选择"按钮选择第一个推荐问题
+ * 3. 点击"确定"按钮确认
+ * 4. 再次点击 #Popover6-toggle
+ * 5. 点击"关闭"按钮关闭弹窗
+ */
+const submitToQuestion = async (): Promise<boolean> => {
+  logger.log('🎯 开始投稿至问题...', 'info');
+  
+  // 步骤1: 查找并点击投稿按钮（#Popover6-toggle 或类似的 Popover toggle）
+  // 知乎的 Popover ID 可能会变化，所以我们需要多种方式查找
+  let submitToggle: HTMLElement | null = null;
+  
+  // 方法1: 直接通过 ID 查找（ID 可能是 Popover5-toggle, Popover6-toggle 等）
+  for (let i = 1; i <= 20; i++) {
+    const toggle = document.querySelector(`#Popover${i}-toggle`) as HTMLElement;
+    if (toggle && isElementVisible(toggle)) {
+      // 检查这个 toggle 是否是投稿相关的
+      const text = toggle.innerText?.trim() || '';
+      const ariaLabel = toggle.getAttribute('aria-label') || '';
+      // 投稿按钮通常包含"投稿"、"问题"等文字，或者在发布设置区域
+      if (text.includes('投稿') || text.includes('问题') || ariaLabel.includes('投稿')) {
+        submitToggle = toggle;
+        logger.log(`找到投稿按钮: #Popover${i}-toggle`, 'info');
+        break;
+      }
+    }
+  }
+  
+  // 方法2: 查找包含"投稿至问题"或"投稿"文本的按钮/元素
+  if (!submitToggle) {
+    const allElements = document.querySelectorAll('button, [role="button"], [class*="toggle"], [id*="Popover"]');
+    for (const el of allElements) {
+      const text = (el as HTMLElement).innerText?.trim() || '';
+      if ((text.includes('投稿至问题') || text === '投稿') && isElementVisible(el as HTMLElement)) {
+        submitToggle = el as HTMLElement;
+        logger.log('通过文本找到投稿按钮', 'info');
+        break;
+      }
+    }
+  }
+  
+  // 方法3: 在发布设置面板中查找
+  if (!submitToggle) {
+    const settingsPanel = document.querySelector('[class*="PublishPanel"], [class*="publish"], [class*="Settings"]');
+    if (settingsPanel) {
+      const toggles = settingsPanel.querySelectorAll('[id*="Popover"][id*="toggle"]');
+      for (const toggle of toggles) {
+        if (isElementVisible(toggle as HTMLElement)) {
+          // 检查附近是否有"投稿"相关文字
+          const parent = toggle.parentElement;
+          if (parent && parent.innerText?.includes('投稿')) {
+            submitToggle = toggle as HTMLElement;
+            logger.log('在设置面板中找到投稿按钮', 'info');
+            break;
+          }
+        }
+      }
+    }
+  }
+  
+  if (!submitToggle) {
+    logger.log('未找到投稿按钮，尝试直接查找 Popover toggle...', 'warn');
+    // 最后尝试：查找所有 Popover toggle，选择可见的
+    const allToggles = document.querySelectorAll('[id*="Popover"][id*="toggle"]');
+    for (const toggle of allToggles) {
+      if (isElementVisible(toggle as HTMLElement)) {
+        submitToggle = toggle as HTMLElement;
+        logger.log(`使用 Popover toggle: ${toggle.id}`, 'info');
+        break;
+      }
+    }
+  }
+  
+  if (!submitToggle) {
+    logger.log('未找到投稿按钮', 'error');
+    return false;
+  }
+  
+  // 点击投稿按钮打开问题选择面板
+  logger.log('点击投稿按钮', 'action');
+  simulateClick(submitToggle);
+  await new Promise(r => setTimeout(r, 1500));
+  
+  // 步骤2: 查找并点击"选择"按钮（选择第一个推荐问题）
+  logger.log('查找"选择"按钮...', 'info');
+  let selectBtn: HTMLElement | null = null;
+  
+  // 等待问题列表加载
+  const maxSelectAttempts = 8;
+  for (let attempt = 1; attempt <= maxSelectAttempts; attempt++) {
+    const buttons = document.querySelectorAll('button');
+    for (const btn of buttons) {
+      const text = (btn as HTMLElement).innerText?.trim();
+      if (text === '选择' && isElementVisible(btn as HTMLElement)) {
+        selectBtn = btn as HTMLElement;
+        logger.log(`找到"选择"按钮 [尝试 ${attempt}/${maxSelectAttempts}]`, 'info');
+        break;
+      }
+    }
+    
+    if (selectBtn) break;
+    
+    if (attempt < maxSelectAttempts) {
+      logger.log(`等待问题列表加载... (${attempt}/${maxSelectAttempts})`, 'info');
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+  
+  if (!selectBtn) {
+    logger.log('未找到"选择"按钮，可能没有推荐问题', 'warn');
+    // 关闭弹窗
+    const closeBtn = document.querySelector('button') as HTMLElement;
+    if (closeBtn && closeBtn.innerText?.includes('关闭')) {
+      simulateClick(closeBtn);
+    }
+    return false;
+  }
+  
+  // 点击"选择"按钮选择第一个问题
+  logger.log('点击"选择"按钮选择第一个问题', 'action');
+  simulateClick(selectBtn);
+  await new Promise(r => setTimeout(r, 1000));
+  
+  // 步骤3: 查找并点击"确定"按钮
+  logger.log('查找"确定"按钮...', 'info');
+  let confirmBtn: HTMLElement | null = null;
+  
+  const maxConfirmAttempts = 5;
+  for (let attempt = 1; attempt <= maxConfirmAttempts; attempt++) {
+    const buttons = document.querySelectorAll('button');
+    for (const btn of buttons) {
+      const text = (btn as HTMLElement).innerText?.trim();
+      if (text === '确定' && isElementVisible(btn as HTMLElement)) {
+        confirmBtn = btn as HTMLElement;
+        logger.log('找到"确定"按钮', 'info');
+        break;
+      }
+    }
+    
+    if (confirmBtn) break;
+    
+    if (attempt < maxConfirmAttempts) {
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
+  
+  if (confirmBtn) {
+    logger.log('点击"确定"按钮', 'action');
+    simulateClick(confirmBtn);
+    await new Promise(r => setTimeout(r, 1000));
+  } else {
+    logger.log('未找到"确定"按钮', 'warn');
+  }
+  
+  // 步骤4: 再次点击投稿按钮（根据 Playwright 录制）
+  logger.log('再次点击投稿按钮', 'action');
+  simulateClick(submitToggle);
+  await new Promise(r => setTimeout(r, 800));
+  
+  // 步骤5: 点击"关闭"按钮关闭弹窗
+  logger.log('查找"关闭"按钮...', 'info');
+  let closeBtn: HTMLElement | null = null;
+  
+  const buttons = document.querySelectorAll('button');
+  for (const btn of buttons) {
+    const text = (btn as HTMLElement).innerText?.trim();
+    // 精确匹配"关闭"
+    if (text === '关闭' && isElementVisible(btn as HTMLElement)) {
+      closeBtn = btn as HTMLElement;
+      logger.log('找到"关闭"按钮', 'info');
+      break;
+    }
+  }
+  
+  if (closeBtn) {
+    logger.log('点击"关闭"按钮', 'action');
+    simulateClick(closeBtn);
+    await new Promise(r => setTimeout(r, 500));
+  } else {
+    logger.log('未找到"关闭"按钮', 'warn');
+  }
+  
+  logger.log('✅ 投稿至问题完成！', 'success');
+  return true;
+};
+
 // 关闭图片对话框的辅助函数
 const closeImageDialog = async (): Promise<void> => {
   // 尝试多种方式关闭对话框
@@ -1077,10 +1345,20 @@ const insertImageAtPlaceholder = async (placeholder: { text: string; keyword: st
 // ============================================
 
 const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
+  // 检查是否已有流程在运行，防止多个流程同时执行
+  if (isFlowRunning) {
+    logger.log('⚠️ 已有图片处理流程在运行，请等待完成', 'warn');
+    return;
+  }
+  
+  isFlowRunning = true; // 设置锁
   isFlowCancelled = false;
   logger.clear();
   logger.show();
-  logger.setStopCallback(() => { isFlowCancelled = true; });
+  logger.setStopCallback(() => { 
+    isFlowCancelled = true; 
+    isFlowRunning = false; // 取消时释放锁
+  });
   logger.log('🚀 开始知乎图片处理...', 'info');
   
   try {
@@ -1201,6 +1479,7 @@ const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
     logger.log(`❌ 流程错误: ${errorMsg}`, 'error');
   } finally {
     logger.hideStopButton();
+    isFlowRunning = false; // 释放锁，允许下次执行
   }
 };
 
@@ -1605,6 +1884,7 @@ if (document.readyState === 'loading') {
 (window as any).memoraidZhihuRunImageFlow = runSmartImageFlow;
 (window as any).memoraidZhihuAddTopic = addTopic;
 (window as any).memoraidZhihuPublish = clickPublish;
+(window as any).memoraidZhihuSubmitToQuestion = submitToQuestion; // 新增：投稿至问题
 
 // 消息监听
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -1625,6 +1905,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+  
+  // 新增：投稿至问题消息处理
+  if (message.type === 'ZHIHU_SUBMIT_TO_QUESTION') {
+    submitToQuestion();
+    sendResponse({ success: true });
+    return true;
+  }
 });
 
 console.log(`
@@ -1633,5 +1920,6 @@ console.log(`
 可用命令：
   memoraidZhihuRunImageFlow("关键词")  - 插入图片
   memoraidZhihuAddTopic("话题")        - 添加话题
+  memoraidZhihuSubmitToQuestion()      - 投稿至问题（新增）
   memoraidZhihuPublish()               - 发布文章
 `);
