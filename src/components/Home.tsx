@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, FileText, Settings as SettingsIcon, Loader2, Copy, Eye, Code, Send, History, Trash2, ArrowLeft, X, RefreshCw, Square, Github, Folder, UploadCloud, Check, Newspaper, BookOpen, MessageCircle } from 'lucide-react';
+import { Download, FileText, Settings as SettingsIcon, Loader2, Copy, Eye, Code, Send, History, Trash2, ArrowLeft, X, Square, Github, Folder, UploadCloud, Check, Newspaper, BookOpen, MessageCircle, Bug } from 'lucide-react';
 import { getHistory, deleteHistoryItem, HistoryItem, clearHistory, getSettings } from '../utils/storage';
 import { getDirectories, pushToGitHub } from '../utils/github';
 import { ExtractionResult } from '../utils/types';
@@ -779,10 +779,13 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   return (
     <div className="p-4 flex flex-col h-full">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-xl font-bold flex items-center gap-2">
-          <img src="/logo.svg" className="w-8 h-8" alt="Logo" />
-          Memoraid
-        </h1>
+        <div className="flex flex-col">
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            <img src="/logo.svg" className="w-8 h-8" alt="Logo" />
+            Memoraid
+          </h1>
+          <p className="text-[10px] text-gray-400 ml-10">{t.slogan}</p>
+        </div>
         <div className="flex gap-1">
           <a 
             href="https://github.com/ralph-wren/memoraid" 
@@ -793,9 +796,15 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
           >
             <Github className="w-5 h-5 text-gray-600" />
           </a>
-          <button onClick={loadHistory} className="p-2 hover:bg-gray-100 rounded-full" title="Refresh History">
-            <RefreshCw className="w-5 h-5 text-gray-600" />
-          </button>
+          <a 
+            href="https://github.com/ralph-wren/memoraid/issues" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="p-2 hover:bg-gray-100 rounded-full transition"
+            title="Report Bug / Feedback"
+          >
+            <Bug className="w-5 h-5 text-gray-600" />
+          </a>
           <button onClick={onOpenSettings} className="p-2 hover:bg-gray-100 rounded-full" title="Settings">
             <SettingsIcon className="w-5 h-5 text-gray-600" />
           </button>

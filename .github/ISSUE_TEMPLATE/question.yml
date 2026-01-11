@@ -1,0 +1,74 @@
+name: ❓ 使用问题 / Question
+description: 询问使用方法或寻求帮助 / Ask a question or seek help
+title: "[Question] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        有问题？我们很乐意帮助！请先查看 [README](https://github.com/ralph-wren/memoraid#readme) 和已有的 Issues。
+        
+        Have a question? We're happy to help! Please check the [README](https://github.com/ralph-wren/memoraid#readme) and existing Issues first.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 检查清单 / Checklist
+      description: 请确认您已经完成以下步骤
+      options:
+        - label: 我已阅读 README 文档 / I have read the README
+          required: true
+        - label: 我已搜索现有的 Issues / I have searched existing Issues
+          required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: 问题类别 / Category
+      description: 您的问题属于哪个类别？
+      options:
+        - 安装配置 / Installation & Setup
+        - API Key 配置 / API Key configuration
+        - Cookie 获取 / Cookie fetching
+        - 文章生成 / Article generation
+        - 内容发布 / Content publishing
+        - 其他 / Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: 问题描述 / Question
+      description: 请详细描述您的问题
+      placeholder: |
+        我不知道如何获取头条的 Cookie...
+        
+        I don't know how to get the Toutiao Cookie...
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: 已尝试的方法 / What I've Tried
+      description: 您已经尝试过什么方法？
+      placeholder: |
+        我尝试了点击"自动获取"按钮，但是没有反应...
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境信息 / Environment
+      description: 您的使用环境
+      placeholder: |
+        - 浏览器: Chrome 120
+        - 操作系统: Windows 11
+        - 插件版本: 1.0.0
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 截图 / Screenshots
+      description: 如果有相关截图，请粘贴在这里
+      placeholder: 拖拽或粘贴图片...

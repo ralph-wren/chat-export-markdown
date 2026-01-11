@@ -1,0 +1,111 @@
+name: 🌐 新平台支持 / New Platform Request
+description: 请求支持新的发布平台 / Request support for a new publishing platform
+title: "[Platform] 支持 XXX 平台"
+labels: ["new-platform", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢您的建议！添加新平台需要一些技术调研，请提供尽可能多的信息。
+        
+        Thanks for your suggestion! Adding a new platform requires technical research, please provide as much information as possible.
+
+  - type: input
+    id: platform-name
+    attributes:
+      label: 平台名称 / Platform Name
+      description: 您希望支持的平台名称
+      placeholder: 小红书 / Xiaohongshu
+    validations:
+      required: true
+
+  - type: input
+    id: platform-url
+    attributes:
+      label: 平台网址 / Platform URL
+      description: 平台的官方网址
+      placeholder: https://www.xiaohongshu.com
+    validations:
+      required: true
+
+  - type: input
+    id: publish-url
+    attributes:
+      label: 发布页面 / Publish Page URL
+      description: 创作者发布内容的页面地址
+      placeholder: https://creator.xiaohongshu.com/publish
+
+  - type: dropdown
+    id: content-type
+    attributes:
+      label: 内容类型 / Content Type
+      description: 该平台主要支持什么类型的内容？
+      options:
+        - 图文文章 / Article with images
+        - 纯文字 / Text only
+        - 视频 / Video
+        - 图片 / Images only
+        - 多种类型 / Multiple types
+    validations:
+      required: true
+
+  - type: textarea
+    id: platform-features
+    attributes:
+      label: 平台特点 / Platform Features
+      description: 该平台有什么特殊的功能或限制？
+      placeholder: |
+        - 标题限制 20 字
+        - 必须添加话题标签
+        - 需要选择封面图
+        - 支持 Markdown
+        ...
+
+  - type: textarea
+    id: why-needed
+    attributes:
+      label: 为什么需要 / Why Needed
+      description: 为什么您需要支持这个平台？
+      placeholder: |
+        小红书是国内最大的生活方式分享平台，很多自媒体创作者需要同步内容到这个平台...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: user-count
+    attributes:
+      label: 预估需求 / Estimated Demand
+      description: 您认为有多少用户会使用这个功能？
+      options:
+        - 很多人需要 / Many users need this
+        - 一部分人需要 / Some users need this
+        - 少数人需要 / Few users need this
+        - 不确定 / Not sure
+
+  - type: checkboxes
+    id: help
+    attributes:
+      label: 协助意愿 / Willing to Help
+      description: 您是否愿意协助开发？
+      options:
+        - label: 我可以提供该平台的账号用于测试 / I can provide an account for testing
+        - label: 我可以帮忙分析该平台的技术实现 / I can help analyze the technical implementation
+        - label: 我可以帮忙测试开发版本 / I can help test development versions
+        - label: 我可以提交 PR 实现这个功能 / I can submit a PR to implement this
+
+  - type: textarea
+    id: technical-notes
+    attributes:
+      label: 技术备注 / Technical Notes
+      description: 如果您了解该平台的技术细节，请分享
+      placeholder: |
+        - 该平台使用 React 框架
+        - 编辑器是 Draft.js
+        - API 接口是 xxx
+        ...
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充信息 / Additional Context
+      description: 其他任何相关信息

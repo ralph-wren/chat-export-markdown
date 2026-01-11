@@ -28,6 +28,7 @@ export interface Translation {
   savedMessage: string;
   
   // Home page
+  slogan: string;
   homeDescription: string;
   publishToToutiao: string;
   publishToZhihu: string;
@@ -192,7 +193,8 @@ export const TRANSLATIONS: Record<string, Translation> = {
     savedMessage: 'Saved!',
     
     // Home page
-    homeDescription: 'Open a ChatGPT or Gemini chat page and click the button below to publish',
+    slogan: 'Empower everyone to share ideas, publish to all platforms with one click',
+    homeDescription: 'Browse any webpage, click the button below to generate and publish articles',
     publishToToutiao: 'Toutiao',
     publishToZhihu: 'Zhihu',
     publishToWeixin: 'WeChat',
@@ -354,7 +356,8 @@ export const TRANSLATIONS: Record<string, Translation> = {
     savedMessage: '已保存!',
     
     // Home page
-    homeDescription: '打开 ChatGPT 或 Gemini 对话页面，点击下方按钮一键发布',
+    slogan: '让每个人都能轻松发声，一键发布到全平台',
+    homeDescription: '浏览任意网页，点击下方按钮即可生成文章并一键发布',
     publishToToutiao: '发头条',
     publishToZhihu: '发知乎',
     publishToWeixin: '公众号',
@@ -516,6 +519,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     savedMessage: '保存しました！',
     
     // Home page
+    slogan: '誰でも簡単に発信、ワンクリックで全プラットフォームに公開',
     homeDescription: 'ChatGPTまたはGeminiのチャットページを開き、下のボタンをクリックして公開',
     publishToToutiao: '头条',
     publishToZhihu: '知乎',
@@ -678,6 +682,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     savedMessage: '저장됨!',
     
     // Home page
+    slogan: '누구나 쉽게 목소리를 내고, 원클릭으로 모든 플랫폼에 게시',
     homeDescription: 'ChatGPT 또는 Gemini 채팅 페이지를 열고 아래 버튼을 클릭하여 게시',
     publishToToutiao: '头条',
     publishToZhihu: '知乎',
@@ -840,6 +845,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     savedMessage: 'Gespeichert!',
     
     // Home page
+    slogan: 'Jeder kann sich leicht äußern, mit einem Klick auf allen Plattformen veröffentlichen',
     homeDescription: 'Öffnen Sie eine ChatGPT- oder Gemini-Chatseite und klicken Sie auf die Schaltfläche unten',
     publishToToutiao: 'Toutiao',
     publishToZhihu: 'Zhihu',
@@ -1002,6 +1008,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     savedMessage: 'Enregistré !',
     
     // Home page
+    slogan: 'Permettre à chacun de s\'exprimer facilement, publier sur toutes les plateformes en un clic',
     homeDescription: 'Ouvrez une page de chat ChatGPT ou Gemini et cliquez sur le bouton ci-dessous',
     publishToToutiao: 'Toutiao',
     publishToZhihu: 'Zhihu',
@@ -1164,6 +1171,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     savedMessage: '¡Guardado!',
     
     // Home page
+    slogan: 'Permitir que todos se expresen fácilmente, publicar en todas las plataformas con un clic',
     homeDescription: 'Abra una página de chat de ChatGPT o Gemini y haga clic en el botón de abajo',
     publishToToutiao: 'Toutiao',
     publishToZhihu: 'Zhihu',

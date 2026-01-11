@@ -1,0 +1,168 @@
+name: 🐛 Bug 反馈 / Bug Report
+description: 报告使用过程中遇到的问题 / Report a bug or issue
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢您反馈问题！请尽可能详细地填写以下信息，这将帮助我们更快地定位和解决问题。
+        
+        Thanks for reporting! Please fill in the following information as detailed as possible.
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 发布平台 / Platform
+      description: 问题发生在哪个平台？
+      options:
+        - 头条 / Toutiao
+        - 知乎 / Zhihu
+        - 微信公众号 / WeChat
+        - 通用功能 / General
+        - 其他 / Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: 问题类型 / Issue Type
+      description: 这是什么类型的问题？
+      options:
+        - 文章生成失败 / Article generation failed
+        - 内容填充失败 / Content filling failed
+        - 图片插入失败 / Image insertion failed
+        - 自动发布失败 / Auto publish failed
+        - Cookie 获取失败 / Cookie fetch failed
+        - AI 调用失败 / AI API failed
+        - 界面显示问题 / UI display issue
+        - 其他 / Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述 / Description
+      description: 请详细描述您遇到的问题
+      placeholder: |
+        例如：点击"发头条"按钮后，页面跳转到头条发布页，但内容没有自动填充...
+        
+        Example: After clicking "Publish to Toutiao", the page redirects but content is not filled...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤 / Steps to Reproduce
+      description: 请提供复现问题的步骤
+      placeholder: |
+        1. 打开某个网页
+        2. 点击插件图标
+        3. 点击"发头条"按钮
+        4. 观察到...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为 / Expected Behavior
+      description: 您期望发生什么？
+      placeholder: 内容应该自动填充到编辑器中...
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为 / Actual Behavior
+      description: 实际发生了什么？
+      placeholder: 编辑器是空的，没有任何内容...
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 📋 发文日志 / Publish Logs
+      description: |
+        请粘贴插件左上角弹出的日志面板内容（点击"复制"按钮）
+        
+        Please paste the log panel content (click "Copy" button on the log panel)
+      placeholder: |
+        [12:34:56] ℹ️ 📄 准备填充内容: 文章标题
+        [12:34:57] ✅ 标题已填充
+        [12:34:58] ❌ 未找到编辑器
+        ...
+      render: text
+
+  - type: textarea
+    id: console-errors
+    attributes:
+      label: 🔧 控制台报错 / Console Errors
+      description: |
+        请打开浏览器开发者工具 (F12)，切换到 Console 标签，粘贴红色的错误信息
+        
+        Open DevTools (F12), go to Console tab, paste any red error messages
+      placeholder: |
+        Uncaught Error: xxx
+        at xxx.js:123
+        ...
+      render: text
+
+  - type: textarea
+    id: source-url
+    attributes:
+      label: 🔗 原文链接 / Source URL
+      description: 您尝试生成文章的原始网页链接（如果方便提供）
+      placeholder: https://weibo.com/xxx 或 https://zhihu.com/xxx
+
+  - type: input
+    id: browser
+    attributes:
+      label: 浏览器 / Browser
+      description: 您使用的浏览器和版本
+      placeholder: Chrome 120.0.6099.130
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: 操作系统 / Operating System
+      description: 您的操作系统
+      placeholder: Windows 11 / macOS 14.2 / Ubuntu 22.04
+    validations:
+      required: true
+
+  - type: input
+    id: extension-version
+    attributes:
+      label: 插件版本 / Extension Version
+      description: Memoraid 插件版本（在扩展管理页面查看）
+      placeholder: "1.0.0"
+
+  - type: dropdown
+    id: ai-provider
+    attributes:
+      label: AI 服务商 / AI Provider
+      description: 您使用的 AI 服务商
+      options:
+        - OpenAI
+        - DeepSeek
+        - 豆包 / Doubao
+        - 通义千问 / Qwen
+        - 自定义 / Custom
+        - 不确定 / Not sure
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 📸 截图 / Screenshots
+      description: 如果有相关截图，请粘贴在这里
+      placeholder: 拖拽或粘贴图片...
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充信息 / Additional Context
+      description: 其他任何可能有帮助的信息

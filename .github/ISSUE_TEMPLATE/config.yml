@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 使用文档 / Documentation
+    url: https://github.com/ralph-wren/memoraid#readme
+    about: 查看 README 获取使用说明 / Check README for usage instructions
+  - name: 💬 讨论区 / Discussions
+    url: https://github.com/ralph-wren/memoraid/discussions
+    about: 一般性讨论和交流 / General discussions and conversations
