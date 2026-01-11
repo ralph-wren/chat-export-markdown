@@ -541,46 +541,61 @@ const searchImage = async (keyword: string): Promise<boolean> => {
   logger.log(`搜索图片: ${keyword}`, 'info');
   await new Promise(r => setTimeout(r, 500));
   
-  // 方法1: Playwright 录制的选择器 - getByRole('textbox', { name: '输入关键字查找图片' })
-  let searchInput = document.querySelector('input[placeholder*="输入关键字查找图片"]') as HTMLElement;
+  // 首先确保我们在公共图片库界面内
+  // 查找对话框/模态框
+  const modal = document.querySelector('[role="dialog"], [class*="Modal"], [class*="modal"], [class*="Popover"], [class*="popover"]');
   
-  // 方法2: 部分匹配
-  if (!searchInput) {
-    searchInput = document.querySelector('input[placeholder*="输入关键字"]') as HTMLElement;
-  }
-  if (!searchInput) {
-    searchInput = document.querySelector('input[placeholder*="关键字查找"]') as HTMLElement;
-  }
-  if (!searchInput) {
-    searchInput = document.querySelector('input[placeholder*="查找图片"]') as HTMLElement;
-  }
+  // 方法1: 在模态框内查找搜索框
+  let searchInput: HTMLElement | null = null;
   
-  // 方法3: 查找所有可见的 input 元素
-  if (!searchInput) {
-    const inputs = document.querySelectorAll('input[type="text"], input:not([type])');
+  if (modal && isElementVisible(modal as HTMLElement)) {
+    const inputs = modal.querySelectorAll('input');
     for (const input of inputs) {
       const placeholder = input.getAttribute('placeholder') || '';
-      if (placeholder.includes('关键') || placeholder.includes('查找') || placeholder.includes('搜索')) {
+      if (placeholder.includes('关键字') || placeholder.includes('查找') || placeholder.includes('搜索')) {
         if (isElementVisible(input as HTMLElement)) {
           searchInput = input as HTMLElement;
-          logger.log(`找到搜索框 (placeholder: ${placeholder})`, 'info');
+          logger.log(`在模态框中找到搜索框 (placeholder: ${placeholder})`, 'info');
+          break;
+        }
+      }
+    }
+    
+    // 如果没找到带 placeholder 的，找第一个可见的 input
+    if (!searchInput) {
+      for (const input of inputs) {
+        if (isElementVisible(input as HTMLElement)) {
+          searchInput = input as HTMLElement;
+          logger.log('在模态框中找到输入框', 'info');
           break;
         }
       }
     }
   }
   
-  // 方法4: 查找对话框内的第一个可见 input
+  // 方法2: 全局查找 - Playwright 录制的选择器
   if (!searchInput) {
-    const modal = document.querySelector('[class*="Modal"], [class*="modal"], [class*="Dialog"], [role="dialog"]');
-    if (modal) {
-      const inputs = modal.querySelectorAll('input');
-      for (const input of inputs) {
-        if (isElementVisible(input as HTMLElement)) {
-          searchInput = input as HTMLElement;
-          logger.log('在对话框中找到输入框', 'info');
-          break;
-        }
+    searchInput = document.querySelector('input[placeholder*="输入关键字查找图片"]') as HTMLElement;
+    if (searchInput && isElementVisible(searchInput)) {
+      logger.log('通过 placeholder 找到搜索框', 'info');
+    } else {
+      searchInput = null;
+    }
+  }
+  
+  // 方法3: 部分匹配
+  if (!searchInput) {
+    const selectors = [
+      'input[placeholder*="输入关键字"]',
+      'input[placeholder*="关键字查找"]',
+      'input[placeholder*="查找图片"]'
+    ];
+    for (const selector of selectors) {
+      const el = document.querySelector(selector) as HTMLElement;
+      if (el && isElementVisible(el)) {
+        searchInput = el;
+        logger.log(`通过选择器 ${selector} 找到搜索框`, 'info');
+        break;
       }
     }
   }
@@ -604,27 +619,38 @@ const searchImage = async (keyword: string): Promise<boolean> => {
   
   logger.log('输入搜索关键词', 'action');
   simulateInput(searchInput, keyword);
-  await new Promise(r => setTimeout(r, 300));
+  await new Promise(r => setTimeout(r, 500));
   
-  // 根据 Playwright 录制：await page.locator('.css-13oeh20').click();
-  // .css-13oeh20 是搜索确认按钮
-  logger.log('查找搜索确认按钮 (.css-13oeh20)...', 'info');
-  const searchConfirmBtn = document.querySelector('.css-13oeh20') as HTMLElement;
+  // 查找搜索确认按钮 - 只在模态框内查找，避免误点击页面上的其他按钮
+  logger.log('查找搜索确认按钮...', 'info');
+  let searchConfirmBtn: HTMLElement | null = null;
   
-  if (searchConfirmBtn && isElementVisible(searchConfirmBtn)) {
-    logger.log('点击搜索确认按钮 (.css-13oeh20)', 'action');
+  // 在模态框内查找 .css-13oeh20 按钮
+  if (modal && isElementVisible(modal as HTMLElement)) {
+    searchConfirmBtn = modal.querySelector('.css-13oeh20') as HTMLElement;
+    if (searchConfirmBtn && isElementVisible(searchConfirmBtn)) {
+      logger.log('在模态框内找到搜索确认按钮 (.css-13oeh20)', 'info');
+    } else {
+      searchConfirmBtn = null;
+    }
+  }
+  
+  if (searchConfirmBtn) {
+    logger.log('点击搜索确认按钮', 'action');
     simulateClick(searchConfirmBtn);
     await new Promise(r => setTimeout(r, 500));
   } else {
-    // 备用方法：按回车键或点击搜索按钮
-    const searchBtns = document.querySelectorAll('button');
+    // 备用方法：在模态框内查找搜索按钮
     let searchBtn: HTMLElement | null = null;
-    for (const btn of searchBtns) {
-      const text = (btn as HTMLElement).innerText?.trim();
-      if (text === '搜索' || text?.includes('搜索')) {
-        if (isElementVisible(btn as HTMLElement)) {
-          searchBtn = btn as HTMLElement;
-          break;
+    if (modal) {
+      const btns = modal.querySelectorAll('button');
+      for (const btn of btns) {
+        const text = (btn as HTMLElement).innerText?.trim();
+        if (text === '搜索' || text?.includes('搜索')) {
+          if (isElementVisible(btn as HTMLElement)) {
+            searchBtn = btn as HTMLElement;
+            break;
+          }
         }
       }
     }
@@ -1058,6 +1084,17 @@ const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
   logger.log('🚀 开始知乎图片处理...', 'info');
   
   try {
+    // 先取消任何选中状态，避免干扰
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    
+    // 点击编辑器外部区域，确保没有弹窗干扰
+    const editor = findElement(SELECTORS.editor);
+    if (editor) {
+      editor.click();
+      await new Promise(r => setTimeout(r, 300));
+    }
+    
     // 查找所有图片占位符
     const placeholders = findImagePlaceholders();
     
@@ -1067,27 +1104,54 @@ const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
       logger.log(`未找到图片占位符，使用关键词: ${searchKeyword}`, 'info');
       
       // 移动光标到编辑器末尾
-      const editor = findElement(SELECTORS.editor);
       if (editor) {
         editor.focus();
-        const selection = window.getSelection();
+        const sel = window.getSelection();
         const range = document.createRange();
         range.selectNodeContents(editor);
         range.collapse(false);
-        selection?.removeAllRanges();
-        selection?.addRange(range);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
       }
       
-      // 插入图片
-      if (await openImageDialog()) {
-        if (await clickPublicLibrary()) {
-          if (await searchImage(searchKeyword)) {
-            if (await selectImage(0)) {
-              await clickInsertImage();
-              logger.log('✅ 图片插入成功！', 'success');
-            }
-          }
-        }
+      // 按顺序执行图片插入流程
+      logger.log('步骤 1/5: 打开图片对话框', 'info');
+      const dialogOpened = await openImageDialog();
+      if (!dialogOpened) {
+        logger.log('无法打开图片对话框，流程终止', 'error');
+        return;
+      }
+      
+      logger.log('步骤 2/5: 点击公共图片库', 'info');
+      const publicLibraryOpened = await clickPublicLibrary();
+      if (!publicLibraryOpened) {
+        logger.log('无法打开公共图片库，流程终止', 'error');
+        await closeImageDialog();
+        return;
+      }
+      
+      logger.log('步骤 3/5: 搜索图片', 'info');
+      const searchSuccess = await searchImage(searchKeyword);
+      if (!searchSuccess) {
+        logger.log('搜索图片失败，流程终止', 'error');
+        await closeImageDialog();
+        return;
+      }
+      
+      logger.log('步骤 4/5: 选择图片', 'info');
+      const selectSuccess = await selectImage(0);
+      if (!selectSuccess) {
+        logger.log('选择图片失败，流程终止', 'error');
+        await closeImageDialog();
+        return;
+      }
+      
+      logger.log('步骤 5/5: 插入图片', 'info');
+      const insertSuccess = await clickInsertImage();
+      if (insertSuccess) {
+        logger.log('✅ 图片插入成功！', 'success');
+      } else {
+        logger.log('插入图片失败', 'error');
       }
     } else {
       logger.log(`找到 ${placeholders.length} 个图片占位符`, 'info');
@@ -1155,6 +1219,188 @@ const extractKeywordFromTitle = (): string => {
 // 自动填充逻辑
 // ============================================
 
+/**
+ * 检测并点击 Markdown 解析确认按钮
+ * 当粘贴 Markdown 内容时，知乎会弹出一个 Notification 提示：
+ * "识别到特殊格式，请确认是否 Markdown"，旁边有"确认并解析"按钮
+ * 
+ * 关键元素：
+ * - 提示容器: <div class="css-vdqn4r Notification Notification--white ...">
+ * - 确认按钮: <button class="Button css-1s3fe44 Button--link">确认并解析</button>
+ * 
+ * 注意：
+ * 1. 这个提示会在几秒后自动消失，需要快速点击！
+ * 2. 如果内容太短，可能不会显示提示，但底部会显示"Markdown 语法输入中"
+ */
+const handleMarkdownParse = async (): Promise<boolean> => {
+  logger.log('🔍 检测 Markdown 格式解析提示...', 'info');
+  
+  // 首先检查是否已经在 Markdown 模式（底部显示"Markdown 语法输入中"）
+  const markdownIndicator = document.evaluate(
+    "//*[contains(text(), 'Markdown 语法输入中')]",
+    document,
+    null,
+    XPathResult.FIRST_ORDERED_NODE_TYPE,
+    null
+  ).singleNodeValue;
+  
+  if (markdownIndicator && isElementVisible(markdownIndicator as HTMLElement)) {
+    logger.log('✅ 已在 Markdown 模式（底部显示"Markdown 语法输入中"）', 'success');
+    // 已经在 Markdown 模式，不需要点击确认按钮
+    // 但我们仍然尝试查找并点击"确认并解析"按钮，以防有更好的渲染效果
+  }
+  
+  // 快速检测，因为提示会自动消失
+  const maxAttempts = 8;
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // 第一次立即检测，之后每次等待 300ms
+    if (attempt > 1) {
+      await new Promise(r => setTimeout(r, 300));
+    }
+    
+    // 方法1: 直接查找 Notification 容器内的"确认并解析"按钮（最精确）
+    const notifications = document.querySelectorAll('[class*="Notification"]');
+    for (const notification of notifications) {
+      if (!isElementVisible(notification as HTMLElement)) continue;
+      
+      // 在 Notification 内查找按钮
+      const btns = notification.querySelectorAll('button');
+      for (const btn of btns) {
+        const text = (btn as HTMLElement).innerText?.trim();
+        if (text === '确认并解析') {
+          logger.log('在 Notification 中找到"确认并解析"按钮', 'info');
+          simulateClick(btn as HTMLElement);
+          await new Promise(r => setTimeout(r, 1000));
+          logger.log('✅ Markdown 格式已解析', 'success');
+          return true;
+        }
+      }
+    }
+    
+    // 方法2: 查找 class 包含 Button--link 的"确认并解析"按钮
+    const linkButtons = document.querySelectorAll('button[class*="Button--link"]');
+    for (const btn of linkButtons) {
+      const text = (btn as HTMLElement).innerText?.trim();
+      if (text === '确认并解析' && isElementVisible(btn as HTMLElement)) {
+        logger.log('找到 Button--link 类型的"确认并解析"按钮', 'info');
+        simulateClick(btn as HTMLElement);
+        await new Promise(r => setTimeout(r, 1000));
+        logger.log('✅ Markdown 格式已解析', 'success');
+        return true;
+      }
+    }
+    
+    // 方法3: 查找所有包含"确认并解析"文本的按钮
+    const allButtons = document.querySelectorAll('button');
+    for (const btn of allButtons) {
+      const text = (btn as HTMLElement).innerText?.trim();
+      if (text === '确认并解析' && isElementVisible(btn as HTMLElement)) {
+        logger.log('找到"确认并解析"按钮', 'info');
+        simulateClick(btn as HTMLElement);
+        await new Promise(r => setTimeout(r, 1000));
+        logger.log('✅ Markdown 格式已解析', 'success');
+        return true;
+      }
+    }
+    
+    if (attempt < maxAttempts) {
+      logger.log(`等待 Markdown 解析提示... (${attempt}/${maxAttempts})`, 'info');
+    }
+  }
+  
+  // 如果没找到"确认并解析"按钮，但已经在 Markdown 模式，也算成功
+  if (markdownIndicator) {
+    logger.log('ℹ️ 未找到"确认并解析"按钮，但已在 Markdown 模式', 'info');
+    return true;
+  }
+  
+  logger.log('未检测到 Markdown 解析提示（提示可能已消失或内容不是 Markdown 格式）', 'info');
+  return false;
+};
+
+/**
+ * 使用 Ctrl+A 全选编辑器内容，触发 Markdown 解析
+ * 根据 Playwright 录制：
+ * 1. await page.getByRole('textbox').filter({ hasText: '...' }).press('ControlOrMeta+a');
+ * 2. await page.locator('div').filter({ hasText: /^请输入正文$/ }).nth(1).click();
+ * 3. await page.getByRole('button', { name: '确认并解析' }).nth(1).click();
+ * 
+ * 关键：第2步点击"请输入正文"区域可能是触发 Markdown 解析提示的关键！
+ */
+const selectAllAndTriggerMarkdownParse = async (editorEl: HTMLElement): Promise<void> => {
+  logger.log('📝 全选内容以触发 Markdown 解析...', 'info');
+  
+  // 1. 先点击编辑器确保获得焦点
+  editorEl.click();
+  editorEl.focus();
+  await new Promise(r => setTimeout(r, 300));
+  
+  // 2. 查找可编辑的 textbox 区域（根据 Playwright: getByRole('textbox')）
+  const textboxes = document.querySelectorAll('[role="textbox"], [contenteditable="true"]');
+  let targetTextbox: HTMLElement | null = null;
+  
+  for (const tb of textboxes) {
+    if (isElementVisible(tb as HTMLElement) && (tb as HTMLElement).innerText?.length > 0) {
+      targetTextbox = tb as HTMLElement;
+      break;
+    }
+  }
+  
+  if (targetTextbox) {
+    targetTextbox.focus();
+    await new Promise(r => setTimeout(r, 200));
+  }
+  
+  // 3. 模拟 Ctrl+A 全选 - 使用多种方式确保生效
+  const target = targetTextbox || editorEl;
+  
+  // 方式1: 使用 Selection API 全选
+  const selection = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(target);
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+  
+  // 方式2: 发送键盘事件
+  const ctrlADown = new KeyboardEvent('keydown', {
+    key: 'a',
+    code: 'KeyA',
+    keyCode: 65,
+    which: 65,
+    ctrlKey: true,
+    metaKey: true, // 兼容 Mac
+    bubbles: true,
+    cancelable: true
+  });
+  target.dispatchEvent(ctrlADown);
+  
+  await new Promise(r => setTimeout(r, 500));
+  logger.log('内容已全选', 'info');
+  
+  // 4. 关键步骤：点击"请输入正文"区域（根据 Playwright 录制）
+  // 这可能是触发 Markdown 解析提示的关键！
+  logger.log('尝试点击编辑器占位符区域触发解析提示...', 'info');
+  
+  // 查找包含"请输入正文"文本的 div
+  const allDivs = document.querySelectorAll('div');
+  for (const div of allDivs) {
+    const text = (div as HTMLElement).innerText?.trim();
+    if (text === '请输入正文' && isElementVisible(div as HTMLElement)) {
+      logger.log('找到"请输入正文"占位符，点击触发', 'action');
+      simulateClick(div as HTMLElement);
+      await new Promise(r => setTimeout(r, 500));
+      break;
+    }
+  }
+  
+  // 5. 也尝试点击编辑器工具栏区域，可能触发解析
+  const toolbar = document.querySelector('[class*="Toolbar"], [class*="toolbar"]');
+  if (toolbar && isElementVisible(toolbar as HTMLElement)) {
+    // 不点击工具栏，可能会触发其他操作
+  }
+};
+
 const fillContent = async () => {
   try {
     const data = await chrome.storage.local.get('pending_zhihu_publish');
@@ -1205,12 +1451,112 @@ const fillContent = async () => {
         const hasPlaceholderOnly = existingContent === '请输入正文' || existingContent === '';
         
         if (hasPlaceholderOnly) {
-          if (payload.htmlContent) {
+          // 判断内容是否为 Markdown 格式
+          const isMarkdown = payload.content && (
+            payload.content.includes('##') ||
+            payload.content.includes('**') ||
+            payload.content.includes('- ') ||
+            payload.content.includes('1. ') ||
+            payload.content.includes('```') ||
+            payload.content.includes('> ')
+          );
+          
+          if (isMarkdown) {
+            logger.log('📝 检测到 Markdown 格式内容', 'info');
+          }
+          
+          if (payload.htmlContent && !isMarkdown) {
             document.execCommand('insertHTML', false, payload.htmlContent);
             logger.log('✅ 内容已填充 (HTML)', 'success');
           } else {
-            document.execCommand('insertText', false, payload.content);
-            logger.log('✅ 内容已填充 (文本)', 'success');
+            // 对于 Markdown 内容，尝试模拟真实的粘贴操作来触发知乎的 Markdown 检测
+            if (isMarkdown) {
+              logger.log('📋 使用粘贴方式填充 Markdown 内容...', 'info');
+              
+              // 方法1: 尝试使用 ClipboardEvent 模拟粘贴
+              try {
+                const clipboardData = new DataTransfer();
+                clipboardData.setData('text/plain', payload.content);
+                const pasteEvent = new ClipboardEvent('paste', {
+                  bubbles: true,
+                  cancelable: true,
+                  clipboardData: clipboardData
+                });
+                editorEl.dispatchEvent(pasteEvent);
+                logger.log('✅ 内容已通过粘贴事件填充', 'success');
+              } catch (e) {
+                // 如果粘贴事件失败，回退到 insertText
+                logger.log('粘贴事件失败，使用 insertText 方式', 'info');
+                document.execCommand('insertText', false, payload.content);
+                logger.log('✅ 内容已填充 (文本)', 'success');
+              }
+            } else {
+              document.execCommand('insertText', false, payload.content);
+              logger.log('✅ 内容已填充 (文本)', 'success');
+            };
+            
+            // 如果是 Markdown 格式，立即检测并点击"确认并解析"按钮
+            // 注意：知乎会在粘贴后显示一个 Notification 提示，几秒后会自动消失
+            // 所以需要立即检测并点击，不能等待！
+            if (isMarkdown) {
+              logger.log('⏳ 立即检测 Markdown 解析提示...', 'info');
+              // 不等待，立即开始检测
+              // 使用一个快速循环来检测按钮
+              let found = false;
+              for (let i = 0; i < 20 && !found; i++) {
+                // 每 200ms 检测一次，共 4 秒
+                if (i > 0) {
+                  await new Promise(r => setTimeout(r, 200));
+                }
+                
+                // 查找 Notification 中的"确认并解析"按钮
+                const notifications = document.querySelectorAll('[class*="Notification"]');
+                for (const notification of notifications) {
+                  if (!isElementVisible(notification as HTMLElement)) continue;
+                  const btns = notification.querySelectorAll('button');
+                  for (const btn of btns) {
+                    const text = (btn as HTMLElement).innerText?.trim();
+                    if (text === '确认并解析') {
+                      logger.log('🎯 找到"确认并解析"按钮，立即点击！', 'action');
+                      simulateClick(btn as HTMLElement);
+                      await new Promise(r => setTimeout(r, 1000));
+                      logger.log('✅ Markdown 格式已解析', 'success');
+                      found = true;
+                      break;
+                    }
+                  }
+                  if (found) break;
+                }
+                
+                // 也查找 Button--link 类型的按钮
+                if (!found) {
+                  const linkButtons = document.querySelectorAll('button[class*="Button--link"]');
+                  for (const btn of linkButtons) {
+                    const text = (btn as HTMLElement).innerText?.trim();
+                    if (text === '确认并解析' && isElementVisible(btn as HTMLElement)) {
+                      logger.log('🎯 找到"确认并解析"按钮，立即点击！', 'action');
+                      simulateClick(btn as HTMLElement);
+                      await new Promise(r => setTimeout(r, 1000));
+                      logger.log('✅ Markdown 格式已解析', 'success');
+                      found = true;
+                      break;
+                    }
+                  }
+                }
+                
+                if (!found && i < 19) {
+                  logger.log(`检测中... (${i + 1}/20)`, 'info');
+                }
+              }
+              
+              if (!found) {
+                logger.log('⚠️ 未找到"确认并解析"按钮，尝试全选触发...', 'warn');
+                await selectAllAndTriggerMarkdownParse(editorEl);
+                await new Promise(r => setTimeout(r, 500));
+                // 再次快速检测
+                await handleMarkdownParse();
+              }
+            }
           }
         } else {
           logger.log('ℹ️ 编辑器已有内容，跳过填充', 'info');
@@ -1231,8 +1577,10 @@ const fillContent = async () => {
         if (!success) {
           logger.log('❌ 自动填充失败：未找到编辑器', 'error');
         } else {
-          logger.log('⏳ 2秒后开始智能图片处理...', 'info');
-          setTimeout(() => runSmartImageFlow(undefined, autoPublish), 2000);
+          // 等待 Markdown 解析完成后再开始图片处理
+          // 增加等待时间，确保 Markdown 解析流程完全结束
+          logger.log('⏳ 3秒后开始智能图片处理...', 'info');
+          setTimeout(() => runSmartImageFlow(undefined, autoPublish), 3000);
         }
       }
     }, 1000);
