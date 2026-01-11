@@ -1545,7 +1545,7 @@ ${content.substring(0, 3000)}
 
 const runSmartImageFlow = async (autoPublish = false) => {
   isFlowCancelled = false;
-  logger.clear();
+  // logger.clear();
   logger.show();
   logger.setStopCallback(() => { isFlowCancelled = true; });
   logger.log('🚀 开始智能图片处理（元素识别模式）...', 'info');
@@ -1603,7 +1603,7 @@ const runSmartImageFlow = async (autoPublish = false) => {
  */
 const manualInsertCover = async (keyword?: string) => {
   isFlowCancelled = false;
-  logger.clear();
+  // logger.clear();
   logger.show();
   logger.setStopCallback(() => { isFlowCancelled = true; });
   
@@ -1626,7 +1626,7 @@ const manualInsertCover = async (keyword?: string) => {
  */
 const manualInsertInlineImage = async (keyword: string, afterText?: string) => {
   isFlowCancelled = false;
-  logger.clear();
+  // logger.clear();
   logger.show();
   logger.setStopCallback(() => { isFlowCancelled = true; });
   
@@ -1647,7 +1647,7 @@ const manualInsertInlineImage = async (keyword: string, afterText?: string) => {
  * 调试：打印页面元素信息
  */
 const debugPageElements = () => {
-  logger.clear();
+  // logger.clear();
   logger.show();
   logger.log('🔍 调试：页面元素分析', 'info');
   

@@ -2818,7 +2818,7 @@ const runPublishFlow = async (options: {
   autoPublish?: boolean;  // 是否自动发布
 }) => {
   isFlowCancelled = false;
-  logger.clear();
+  // logger.clear();
   logger.show();
   logger.setStopCallback(() => { isFlowCancelled = true; });
   logger.log('🚀 开始微信公众号发布流程...', 'info');
@@ -2985,7 +2985,7 @@ const runPublishFlow = async (options: {
  */
 const runSmartImageFlow = async (_autoPublish = false) => {
   isFlowCancelled = false;
-  logger.clear();
+  // logger.clear();
   logger.show();
   logger.setStopCallback(() => { isFlowCancelled = true; });
   logger.log('🚀 开始智能图片处理...', 'info');

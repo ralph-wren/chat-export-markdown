@@ -1011,7 +1011,7 @@ const clickPublish = async (): Promise<boolean> => {
  * 5. 关闭弹窗
  */
 const submitToQuestion = async (): Promise<boolean> => {
-  logger.clear();
+  // 不清除日志，保持连续显示
   logger.show();
   logger.log('🎯 开始投稿至问题...', 'info');
   
@@ -1192,29 +1192,52 @@ const submitToQuestion = async (): Promise<boolean> => {
   // 使用更强的点击方式
   logger.log('点击"选择"按钮选择第一个问题', 'action');
   selectBtn.scrollIntoView({ behavior: 'instant', block: 'center' });
-  await new Promise(r => setTimeout(r, 300));
+  await new Promise(r => setTimeout(r, 500));
   
   // 使用多种点击方式确保点击成功
   const rect = selectBtn.getBoundingClientRect();
   const centerX = rect.left + rect.width / 2;
   const centerY = rect.top + rect.height / 2;
   
-  selectBtn.dispatchEvent(new MouseEvent('mousedown', {
+  // 先 focus
+  selectBtn.focus();
+  await new Promise(r => setTimeout(r, 100));
+  
+  // 方式1: 完整的鼠标事件序列
+  selectBtn.dispatchEvent(new MouseEvent('mouseover', {
     bubbles: true, cancelable: true, view: window,
-    clientX: centerX, clientY: centerY, button: 0
+    clientX: centerX, clientY: centerY
   }));
   await new Promise(r => setTimeout(r, 50));
+  
+  selectBtn.dispatchEvent(new MouseEvent('mouseenter', {
+    bubbles: true, cancelable: true, view: window,
+    clientX: centerX, clientY: centerY
+  }));
+  await new Promise(r => setTimeout(r, 50));
+  
+  selectBtn.dispatchEvent(new MouseEvent('mousedown', {
+    bubbles: true, cancelable: true, view: window,
+    clientX: centerX, clientY: centerY, button: 0, buttons: 1
+  }));
+  await new Promise(r => setTimeout(r, 100));
+  
   selectBtn.dispatchEvent(new MouseEvent('mouseup', {
     bubbles: true, cancelable: true, view: window,
     clientX: centerX, clientY: centerY, button: 0
   }));
+  await new Promise(r => setTimeout(r, 50));
+  
   selectBtn.dispatchEvent(new MouseEvent('click', {
     bubbles: true, cancelable: true, view: window,
     clientX: centerX, clientY: centerY, button: 0
   }));
+  
+  // 方式2: 直接调用 click()
   selectBtn.click();
   
-  await new Promise(r => setTimeout(r, 1500));
+  logger.log('已点击"选择"按钮', 'info');
+  await new Promise(r => setTimeout(r, 2000)); // 增加等待时间
   
   // ============================================
   // 步骤3: 点击"确定"按钮确认选择
@@ -1401,62 +1424,52 @@ const deleteTextInEditor = async (searchText: string): Promise<boolean> => {
   return !finalContent.includes(searchText);
 };
 
+
 /**
- * 在占位符位置插入图片（先删除占位符，再插入图片）
- * 注意：无论图片是否插入成功，都要删除占位符文本
+ * 只插入图片（不处理占位符）
  */
-const insertImageAtPlaceholder = async (placeholder: { text: string; keyword: string }): Promise<boolean> => {
+const insertImageOnly = async (keyword: string): Promise<boolean> => {
   if (isFlowCancelled) return false;
   
-  logger.log(`处理占位符: ${placeholder.text}`, 'info');
-  
-  // 1. 先删除占位符文本（无论后续是否成功，都要删除）
-  logger.log('删除占位符文本', 'action');
-  const deleted = await deleteTextInEditor(placeholder.text);
-  if (!deleted) {
-    logger.log(`警告：占位符可能未完全删除: ${placeholder.text}`, 'warn');
-  }
-  await new Promise(r => setTimeout(r, 300));
-  
-  // 2. 打开图片对话框
+  // 1. 打开图片对话框
   if (!await openImageDialog()) {
-    logger.log('无法打开图片对话框，占位符已删除', 'warn');
+    logger.log('无法打开图片对话框', 'warn');
     return false;
   }
   if (isFlowCancelled) return false;
   
-  // 3. 点击公共图片库
+  // 2. 点击公共图片库
   const publicLibrarySuccess = await clickPublicLibrary();
   if (!publicLibrarySuccess) {
-    logger.log('无法打开公共图片库，占位符已删除', 'warn');
+    logger.log('无法打开公共图片库', 'warn');
     await closeImageDialog();
     return false;
   }
   if (isFlowCancelled) return false;
   
-  // 4. 搜索图片
-  if (!await searchImage(placeholder.keyword)) {
-    logger.log('搜索图片失败，占位符已删除', 'warn');
+  // 3. 搜索图片
+  if (!await searchImage(keyword)) {
+    logger.log('搜索图片失败', 'warn');
     await closeImageDialog();
     return false;
   }
   if (isFlowCancelled) return false;
   
-  // 5. 选择图片
+  // 4. 选择图片
   if (!await selectImage(0)) {
-    logger.log('选择图片失败（可能没有搜索结果），占位符已删除', 'warn');
+    logger.log('选择图片失败（可能没有搜索结果）', 'warn');
     await closeImageDialog();
     return false;
   }
   if (isFlowCancelled) return false;
   
-  // 6. 插入图片
+  // 5. 插入图片
   if (!await clickInsertImage()) {
-    logger.log('插入图片失败，占位符已删除', 'warn');
+    logger.log('插入图片失败', 'warn');
     return false;
   }
   
-  logger.log(`占位符 "${placeholder.text}" 已替换为图片`, 'success');
+  logger.log(`图片 "${keyword}" 插入成功`, 'success');
   return true;
 };
 
@@ -1473,7 +1486,7 @@ const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
   
   isFlowRunning = true; // 设置锁
   isFlowCancelled = false;
-  logger.clear();
+  // logger.clear();
   logger.show();
   logger.setStopCallback(() => { 
     isFlowCancelled = true; 
@@ -1559,25 +1572,47 @@ const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
       
       let successCount = 0;
       
-      // 按顺序处理每个占位符（从后往前处理，避免位置偏移）
-      const reversedPlaceholders = [...placeholders].reverse();
+      // 先删除所有占位符，再逐个插入图片
+      // 这样可以避免位置偏移问题
+      logger.log('先删除所有占位符...', 'info');
+      for (const placeholder of placeholders) {
+        const deleted = await deleteTextInEditor(placeholder.text);
+        if (deleted) {
+          logger.log(`已删除: ${placeholder.text}`, 'success');
+        } else {
+          logger.log(`删除失败: ${placeholder.text}`, 'warn');
+        }
+        await new Promise(r => setTimeout(r, 300));
+      }
       
-      for (let i = 0; i < reversedPlaceholders.length; i++) {
+      // 然后逐个插入图片（在编辑器末尾插入）
+      for (let i = 0; i < placeholders.length; i++) {
         if (isFlowCancelled) {
           logger.log('用户取消操作', 'warn');
           break;
         }
         
-        const placeholder = reversedPlaceholders[i];
-        const displayIndex = placeholders.length - i;
-        logger.log(`\n📷 处理第 ${displayIndex}/${placeholders.length} 个占位符: ${placeholder.keyword}`, 'info');
+        const placeholder = placeholders[i];
+        logger.log(`\n📷 插入第 ${i + 1}/${placeholders.length} 张图片: ${placeholder.keyword}`, 'info');
         
-        const success = await insertImageAtPlaceholder(placeholder);
+        // 移动光标到编辑器末尾
+        if (editor) {
+          editor.focus();
+          const sel = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(editor);
+          range.collapse(false);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }
+        
+        // 插入图片
+        const success = await insertImageOnly(placeholder.keyword);
         
         if (success) {
           successCount++;
         } else {
-          logger.log(`第 ${displayIndex} 个占位符处理失败`, 'error');
+          logger.log(`第 ${i + 1} 张图片插入失败`, 'error');
         }
         
         // 等待图片加载完成后再继续下一个
