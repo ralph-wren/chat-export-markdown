@@ -137,7 +137,20 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       }
     };
     chrome.runtime.onMessage.addListener(listener);
-    return () => chrome.runtime.onMessage.removeListener(listener);
+    
+    // 监听标签页更新事件，当页面导航时清除错误状态
+    const tabUpdateListener = (_tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
+      if (changeInfo.status === 'loading') {
+        // 页面正在导航，清除可能的 bfcache 相关错误
+        setErrorMessage(null);
+      }
+    };
+    chrome.tabs.onUpdated.addListener(tabUpdateListener);
+    
+    return () => {
+      chrome.runtime.onMessage.removeListener(listener);
+      chrome.tabs.onUpdated.removeListener(tabUpdateListener);
+    };
   }, []);
 
   // 从已有结果发布到头条
@@ -501,6 +514,19 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     }
     
     if (task.error) {
+      // 过滤掉 bfcache 相关的错误，这些是页面导航时的正常行为，不需要显示给用户
+      const errorStr = String(task.error).toLowerCase();
+      const isBfcacheError = errorStr.includes('back/forward cache') || 
+                            errorStr.includes('bfcache') ||
+                            errorStr.includes('message channel is closed') ||
+                            errorStr.includes('extension port is moved');
+      
+      if (isBfcacheError) {
+        // 静默忽略 bfcache 错误，只在控制台记录
+        console.log('[Memoraid] Ignoring bfcache-related error:', task.error);
+        return;
+      }
+      
       setLoading(false);
       setStatus(`Error`);
       setErrorMessage(task.error);

@@ -241,6 +241,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch(e => sendResponse({ success: false, error: e.message || String(e) }));
     return true;
   }
+
+  // 处理图片 OCR 识别请求（使用 AI 视觉能力识别图片中的文字）
+  if (message.type === 'OCR_IMAGE') {
+    handleOcrImage(message.payload.imageUrl)
+      .then(text => sendResponse({ success: true, text }))
+      .catch(e => sendResponse({ success: false, error: e.message || String(e) }));
+    return true;
+  }
+
+  // 处理 PING 请求（用于检测扩展连接是否有效，特别是 bfcache 恢复后）
+  if (message.type === 'PING') {
+    sendResponse({ success: true, pong: true });
+    return false; // 同步响应
+  }
 });
 
 /**
@@ -284,6 +298,70 @@ async function fetchLinkContent(url: string, timeout: number = 5000): Promise<st
     throw error;
   } finally {
     clearTimeout(timeoutId);
+  }
+}
+
+import Tesseract from 'tesseract.js';
+
+/**
+ * 使用 Tesseract.js 识别图片中的文字（OCR）
+ * 不需要调用大模型 API，完全本地运行
+ * @param imageUrl 图片的 URL 或 base64 data URL
+ */
+async function handleOcrImage(imageUrl: string): Promise<string> {
+  console.log(`[Background] OCR image with Tesseract: ${imageUrl.substring(0, 100)}...`);
+  
+  try {
+    // 如果是普通 URL，先获取图片并转换为 base64
+    let finalImageUrl = imageUrl;
+    if (!imageUrl.startsWith('data:')) {
+      try {
+        const response = await fetch(imageUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          }
+        });
+        if (response.ok) {
+          const blob = await response.blob();
+          const arrayBuffer = await blob.arrayBuffer();
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          const mimeType = blob.type || 'image/jpeg';
+          finalImageUrl = `data:${mimeType};base64,${base64}`;
+        }
+      } catch (e) {
+        console.warn('[Background] Failed to fetch image, using original URL:', e);
+        // 继续使用原始 URL
+      }
+    }
+
+    console.log('[Background] Starting Tesseract OCR...');
+    
+    // 使用 Tesseract.js 进行 OCR
+    // 支持中文(chi_sim)和英文(eng)
+    const result = await Tesseract.recognize(
+      finalImageUrl,
+      'chi_sim+eng', // 同时识别简体中文和英文
+      {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            console.log(`[Background] OCR progress: ${Math.round(m.progress * 100)}%`);
+          }
+        }
+      }
+    );
+
+    const text = result.data.text.trim();
+    console.log(`[Background] OCR result: ${text.substring(0, 100)}...`);
+    
+    if (!text || text.length === 0) {
+      return '无文字内容';
+    }
+    
+    return text;
+    
+  } catch (error: any) {
+    console.error('[Background] Tesseract OCR failed:', error);
+    throw new Error(`OCR 识别失败: ${error.message}`);
   }
 }
 

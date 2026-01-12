@@ -403,6 +403,148 @@ const openImageDialog = async (): Promise<boolean> => {
   return true;
 };
 
+/**
+ * 打开图片对话框，但保持编辑器中的选中状态
+ * 用于在占位符位置插入图片（替换选中的占位符文本）
+ * @param preserveSelection 是否保持选中状态
+ */
+const openImageDialogPreserveSelection = async (preserveSelection: boolean): Promise<boolean> => {
+  logger.log('查找图片按钮...', 'info');
+  
+  // 如果不需要保持选中状态，使用原来的方法
+  if (!preserveSelection) {
+    return openImageDialog();
+  }
+  
+  // 保存当前选中状态
+  const selection = window.getSelection();
+  const savedRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0).cloneRange() : null;
+  
+  if (savedRange) {
+    logger.log('已保存选中状态', 'info');
+  }
+  
+  // 查找图片按钮 - 不点击编辑器，直接查找按钮
+  let imageBtn: HTMLElement | null = null;
+  
+  // 方法1: 通过 aria-label (最精确)
+  imageBtn = document.querySelector('button[aria-label="图片"]') as HTMLElement;
+  if (imageBtn) {
+    logger.log('通过 aria-label 找到图片按钮', 'info');
+  }
+  
+  // 方法2: 通过 data-tooltip
+  if (!imageBtn) {
+    imageBtn = document.querySelector('button[data-tooltip="图片"]') as HTMLElement;
+    if (imageBtn) {
+      logger.log('通过 data-tooltip 找到图片按钮', 'info');
+    }
+  }
+  
+  // 方法3: 通过按钮文本精确匹配
+  if (!imageBtn) {
+    const buttons = document.querySelectorAll('button');
+    for (const btn of buttons) {
+      const text = (btn as HTMLElement).innerText?.trim();
+      if (text === '图片' && isElementVisible(btn as HTMLElement)) {
+        imageBtn = btn as HTMLElement;
+        logger.log('通过文本找到图片按钮', 'info');
+        break;
+      }
+    }
+  }
+  
+  // 方法4: 通过包含"图片"的按钮
+  if (!imageBtn) {
+    const buttons = document.querySelectorAll('button');
+    for (const btn of buttons) {
+      if ((btn as HTMLElement).innerText?.includes('图片') && isElementVisible(btn as HTMLElement)) {
+        imageBtn = btn as HTMLElement;
+        break;
+      }
+    }
+  }
+  
+  if (!imageBtn) {
+    logger.log('未找到图片按钮', 'error');
+    return false;
+  }
+  
+  logger.log('点击图片按钮（保持选中状态）', 'action');
+  
+  // 点击图片按钮，但不使用 focus() 以避免丢失选中状态
+  imageBtn.click();
+  await new Promise(r => setTimeout(r, 500));
+  
+  // 检查是否有下拉菜单出现
+  let menuAppeared = false;
+  const checkMenu = () => {
+    const menus = document.querySelectorAll('[class*="Popover"], [class*="popover"], [class*="Dropdown"], [class*="dropdown"], [class*="Menu"], [class*="menu"], [role="menu"], [role="listbox"]');
+    for (const menu of menus) {
+      if (isElementVisible(menu as HTMLElement)) {
+        const text = (menu as HTMLElement).innerText;
+        if (text?.includes('公共图片库') || text?.includes('本地上传')) {
+          return true;
+        }
+      }
+    }
+    const xpath = "//*[contains(text(), '公共图片库')]";
+    const result = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+    for (let i = 0; i < result.snapshotLength; i++) {
+      const el = result.snapshotItem(i) as HTMLElement;
+      if (el && isElementVisible(el)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  
+  menuAppeared = checkMenu();
+  
+  // 如果菜单没出现，尝试用 simulateClick（但不使用 scrollIntoView）
+  if (!menuAppeared) {
+    logger.log('下拉菜单未出现，尝试模拟点击...', 'info');
+    const rect = imageBtn.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    const eventOptions = {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      clientX: centerX,
+      clientY: centerY
+    };
+    
+    imageBtn.dispatchEvent(new MouseEvent('mousedown', eventOptions));
+    imageBtn.dispatchEvent(new MouseEvent('mouseup', eventOptions));
+    imageBtn.dispatchEvent(new MouseEvent('click', eventOptions));
+    
+    await new Promise(r => setTimeout(r, 800));
+    menuAppeared = checkMenu();
+  }
+  
+  if (menuAppeared) {
+    logger.log('图片菜单已弹出', 'success');
+  } else {
+    logger.log('图片菜单可能未完全加载，继续尝试...', 'warn');
+  }
+  
+  // 等待图片上传弹窗出现
+  logger.log('等待图片弹窗加载...', 'info');
+  await new Promise(r => setTimeout(r, 1000));
+  
+  // 恢复选中状态（如果之前有保存）
+  if (savedRange) {
+    const newSelection = window.getSelection();
+    newSelection?.removeAllRanges();
+    newSelection?.addRange(savedRange);
+    logger.log('已恢复选中状态', 'info');
+  }
+  
+  return true;
+};
+
 const clickPublicLibrary = async (): Promise<boolean> => {
   logger.log('查找公共图片库按钮...', 'info');
   
@@ -1410,12 +1552,14 @@ const selectTextInEditor = async (searchText: string): Promise<boolean> => {
 
 /**
  * 只插入图片（不处理占位符）
+ * @param keyword 搜索关键词
+ * @param preserveSelection 是否在打开对话框前保持选中状态（用于替换占位符）
  */
-const insertImageOnly = async (keyword: string): Promise<boolean> => {
+const insertImageOnly = async (keyword: string, preserveSelection = false): Promise<boolean> => {
   if (isFlowCancelled) return false;
   
-  // 1. 打开图片对话框
-  if (!await openImageDialog()) {
+  // 1. 打开图片对话框（不点击编辑器，保持选中状态）
+  if (!await openImageDialogPreserveSelection(preserveSelection)) {
     logger.log('无法打开图片对话框', 'warn');
     return false;
   }
@@ -1584,7 +1728,8 @@ const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
         }
         
         // 步骤2: 插入图片（会替换选中的文本）
-        const success = await insertImageOnly(placeholder.keyword);
+        // 传入 true 表示需要保持选中状态，这样图片会插入到占位符位置
+        const success = await insertImageOnly(placeholder.keyword, selected);
         
         if (success) {
           successCount++;
