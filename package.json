@@ -1,6 +1,7 @@
 {
   "name": "memoraid",
-  "version": "1.0.0",
+  "displayName": "Memoraid",
+  "version": "1.1.2",
   "description": "Export AI chat to Markdown with summarization",
   "type": "module",
   "scripts": {

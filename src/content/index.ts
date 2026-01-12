@@ -43,12 +43,6 @@ window.addEventListener('memoraid-debug-request', async (event: Event) => {
   }));
 });
 
-// 请求 background script 注入调试桥接脚本到页面 MAIN world
-// 这样可以绕过 CSP 限制
-chrome.runtime.sendMessage({ type: 'INJECT_DEBUG_BRIDGE' }).catch(() => {
-  // 可能 background 还没准备好，忽略错误
-});
-
 // 监听调试相关消息（来自 popup 或 background）
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'SHOW_DEBUG_PANEL') {
@@ -70,12 +64,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     stopDebugSession().then(() => {
       sendResponse({ success: true });
     });
-    return true;
-  }
-  
-  if (message.type === 'DEBUG_BRIDGE_INJECTED') {
-    console.log('[Memoraid] 调试桥接已通过 background 注入');
-    sendResponse({ success: true });
     return true;
   }
   
