@@ -18,5 +18,5 @@ Insert overview text here. The agent will only see this should they choose to ap
 11. 任务完成后检查下是否符合要求
 12. 使用 npx playwright codegen --channel=chrome --user-data-dir="C:\Users\ralph\AppData\Local\Chrome-Automation" https://mp.weixin.qq.com/ 这种命令打开浏览器查看相关页面操作
 13. 需要时参考docs\REMOTE_DEBUG.md的调试步骤进行远程调试，需要我在浏览器生成验证码发给你进行调试
-14. 生成所有临时文件、测试文件都统一放在跟目录的test目录下，用完删除
-15. 每次执行npm run build前，更新一下版本信息，版本信息在package.json里
+14. 生成所有临时文件、测试文件、调试文件都统一放在根目录的test目录下，用完视情况删除
+15. 每次执行npm run release前，更新一下版本信息，版本信息在package.json里

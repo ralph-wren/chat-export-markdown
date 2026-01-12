@@ -581,8 +581,20 @@ const Settings: React.FC = () => {
 
     setFetchingToutiao(true);
     try {
-      const cookies = await chrome.cookies.getAll({ domain: 'toutiao.com' });
-      const relevantCookies = cookies.filter(c => c.domain.includes('toutiao.com'));
+      // 使用 URL 方式获取 cookie，这样可以获取到所有相关域名的 cookie
+      const cookies = await chrome.cookies.getAll({ url: 'https://mp.toutiao.com/' });
+      
+      // 过滤：只保留未过期的 cookie
+      const now = Date.now() / 1000; // 当前时间戳（秒）
+      const relevantCookies = cookies.filter(c => {
+        // 检查是否过期（expirationDate 为 undefined 表示会话 cookie，不会过期）
+        if (c.expirationDate && c.expirationDate < now) return false;
+        // 过滤掉空值的 cookie
+        if (!c.value || c.value.trim() === '') return false;
+        return true;
+      });
+      
+      console.log(`[Cookie] Fetched ${relevantCookies.length} toutiao cookies`);
       
       if (relevantCookies.length > 0) {
         const cookieStr = relevantCookies.map(c => `${c.name}=${c.value}`).join('; ');
@@ -615,8 +627,20 @@ const Settings: React.FC = () => {
 
     setFetchingZhihu(true);
     try {
-      const cookies = await chrome.cookies.getAll({ domain: 'zhihu.com' });
-      const relevantCookies = cookies.filter(c => c.domain.includes('zhihu.com'));
+      // 使用 URL 方式获取 cookie，这样可以获取到所有相关域名的 cookie（包括 .zhihu.com 和 zhuanlan.zhihu.com）
+      const cookies = await chrome.cookies.getAll({ url: 'https://zhuanlan.zhihu.com/' });
+      
+      // 过滤：只保留未过期的 cookie
+      const now = Date.now() / 1000; // 当前时间戳（秒）
+      const relevantCookies = cookies.filter(c => {
+        // 检查是否过期（expirationDate 为 undefined 表示会话 cookie，不会过期）
+        if (c.expirationDate && c.expirationDate < now) return false;
+        // 过滤掉空值的 cookie
+        if (!c.value || c.value.trim() === '') return false;
+        return true;
+      });
+      
+      console.log(`[Cookie] Fetched ${relevantCookies.length} zhihu cookies`);
       
       if (relevantCookies.length > 0) {
         const cookieStr = relevantCookies.map(c => `${c.name}=${c.value}`).join('; ');
@@ -650,8 +674,20 @@ const Settings: React.FC = () => {
 
     setFetchingWeixin(true);
     try {
-      const cookies = await chrome.cookies.getAll({ domain: 'qq.com' });
-      const relevantCookies = cookies.filter(c => c.domain.includes('qq.com'));
+      // 使用 URL 方式获取 cookie，这样可以获取到所有相关域名的 cookie
+      const cookies = await chrome.cookies.getAll({ url: 'https://mp.weixin.qq.com/' });
+      
+      // 过滤：只保留未过期的 cookie
+      const now = Date.now() / 1000; // 当前时间戳（秒）
+      const relevantCookies = cookies.filter(c => {
+        // 检查是否过期（expirationDate 为 undefined 表示会话 cookie，不会过期）
+        if (c.expirationDate && c.expirationDate < now) return false;
+        // 过滤掉空值的 cookie
+        if (!c.value || c.value.trim() === '') return false;
+        return true;
+      });
+      
+      console.log(`[Cookie] Fetched ${relevantCookies.length} weixin cookies`);
       
       if (relevantCookies.length > 0) {
         const cookieStr = relevantCookies.map(c => `${c.name}=${c.value}`).join('; ');

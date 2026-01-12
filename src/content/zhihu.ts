@@ -1003,11 +1003,11 @@ const clickPublish = async (): Promise<boolean> => {
 
 /**
  * 投稿至问题功能
- * 根据 Playwright 录制和实际页面结构：
- * 1. 找到"投稿至问题"区域并点击（显示"未选择"的下拉框）
- * 2. 等待问题列表弹出
- * 3. 点击第一个问题的"选择"按钮
- * 4. 点击"确定"按钮确认
+ * 根据远程调试分析的实际页面结构：
+ * 1. 找到 #Popover6-toggle（显示"未选择"的下拉框）
+ * 2. 等待问题列表弹出（.Modal 或 .QuestionSearchModal）
+ * 3. 点击第一个问题的"选择"按钮（.css-1335jw2 button）
+ * 4. 点击"确定"按钮确认（.Modal .Button--primary.Button--blue）
  * 5. 关闭弹窗
  */
 const submitToQuestion = async (): Promise<boolean> => {
@@ -1016,153 +1016,129 @@ const submitToQuestion = async (): Promise<boolean> => {
   logger.log('🎯 开始投稿至问题...', 'info');
   
   // ============================================
-  // 步骤1: 找到"投稿至问题"区域并点击
-  // 从截图看，这是一个包含"投稿至问题"标签和"未选择"下拉框的区域
+  // 步骤1: 找到"投稿至问题"下拉框
+  // 根据调试分析，下拉框 ID 是 #Popover6-toggle，显示"未选择"
   // ============================================
   let submitToggle: HTMLElement | null = null;
   
-  // 方法1: 查找包含"投稿至问题"文本的区域，然后找到旁边的下拉框/按钮
-  logger.log('查找"投稿至问题"区域...', 'info');
+  // 方法1: 直接通过已知的 Popover ID 查找（最精确）
+  logger.log('查找"投稿至问题"下拉框...', 'info');
   
-  // 先找到"投稿至问题"文本元素
-  const allElements = document.querySelectorAll('*');
-  let submitLabelElement: HTMLElement | null = null;
-  
-  for (const el of allElements) {
-    const text = (el as HTMLElement).innerText?.trim();
-    // 精确匹配或包含"投稿至问题"
-    if (text === '投稿至问题' || (text?.startsWith('投稿至问题') && text.length < 20)) {
-      if (isElementVisible(el as HTMLElement)) {
-        submitLabelElement = el as HTMLElement;
-        logger.log(`找到"投稿至问题"标签: <${el.tagName.toLowerCase()}>`, 'info');
-        break;
-      }
-    }
-  }
-  
-  if (submitLabelElement) {
-    // 找到标签后，查找同一行/容器内的下拉框或可点击元素
-    const parent = submitLabelElement.parentElement;
-    const grandParent = parent?.parentElement;
-    
-    // 在父容器中查找可点击的元素（下拉框、按钮等）
-    const containers = [parent, grandParent, grandParent?.parentElement].filter(Boolean);
-    
-    for (const container of containers) {
-      if (!container) continue;
-      
-      // 查找 Popover toggle
-      const toggles = container.querySelectorAll('[id*="Popover"][id*="toggle"], [class*="toggle"], [class*="Select"], [class*="select"], [role="combobox"], [role="listbox"]');
-      for (const toggle of toggles) {
-        if (isElementVisible(toggle as HTMLElement)) {
-          submitToggle = toggle as HTMLElement;
-          logger.log(`在容器中找到下拉框: ${toggle.id || toggle.className}`, 'info');
-          break;
-        }
-      }
-      if (submitToggle) break;
-      
-      // 查找包含"未选择"文本的元素（这是下拉框的默认值）
-      const childElements = container.querySelectorAll('*');
-      for (const child of childElements) {
-        const childText = (child as HTMLElement).innerText?.trim();
-        if (childText === '未选择' && isElementVisible(child as HTMLElement)) {
-          // 找到"未选择"文本，它的父元素或自身可能是可点击的
-          submitToggle = child as HTMLElement;
-          // 尝试找到更合适的可点击父元素
-          let clickableParent = child.parentElement;
-          while (clickableParent && clickableParent !== container) {
-            const tagName = clickableParent.tagName.toLowerCase();
-            if (tagName === 'button' || clickableParent.getAttribute('role') === 'button' || 
-                clickableParent.id?.includes('Popover') || clickableParent.className?.includes('toggle')) {
-              submitToggle = clickableParent as HTMLElement;
-              break;
-            }
-            clickableParent = clickableParent.parentElement;
-          }
-          logger.log('找到"未选择"下拉框', 'info');
-          break;
-        }
-      }
-      if (submitToggle) break;
-    }
-  }
-  
-  // 方法2: 直接通过 Popover ID 查找
-  if (!submitToggle) {
-    logger.log('尝试通过 Popover ID 查找...', 'info');
-    for (let i = 1; i <= 20; i++) {
-      const toggle = document.querySelector(`#Popover${i}-toggle`) as HTMLElement;
-      if (toggle && isElementVisible(toggle)) {
-        // 检查这个 toggle 附近是否有"投稿"相关文字
-        const parent = toggle.parentElement?.parentElement;
-        if (parent && parent.innerText?.includes('投稿')) {
+  // 遍历可能的 Popover ID
+  for (let i = 1; i <= 20; i++) {
+    const toggle = document.querySelector(`#Popover${i}-toggle`) as HTMLElement;
+    if (toggle && isElementVisible(toggle)) {
+      const text = toggle.innerText?.trim();
+      // 检查是否是"未选择"或已选择的问题（投稿至问题的下拉框）
+      if (text === '未选择' || text?.includes('未选择')) {
+        // 进一步确认：检查附近是否有"投稿至问题"文字
+        const parent = toggle.closest('[class*="FormItem"], [class*="form-item"]') || 
+                       toggle.parentElement?.parentElement?.parentElement;
+        if (parent && (parent as HTMLElement).innerText?.includes('投稿至问题')) {
           submitToggle = toggle;
-          logger.log(`找到投稿按钮: #Popover${i}-toggle`, 'info');
+          logger.log(`找到投稿至问题下拉框: #Popover${i}-toggle`, 'success');
           break;
         }
       }
     }
   }
   
-  // 方法3: 查找所有包含"未选择"的可点击元素
+  // 方法2: 查找包含"未选择"文本且在"投稿至问题"区域的按钮
   if (!submitToggle) {
-    logger.log('尝试查找"未选择"元素...', 'info');
-    const buttons = document.querySelectorAll('button, [role="button"], [id*="Popover"]');
-    for (const btn of buttons) {
+    logger.log('尝试通过文本查找...', 'info');
+    const allButtons = document.querySelectorAll('button[role="combobox"], button[id*="Popover"]');
+    for (const btn of allButtons) {
       const text = (btn as HTMLElement).innerText?.trim();
-      if (text?.includes('未选择') && isElementVisible(btn as HTMLElement)) {
-        submitToggle = btn as HTMLElement;
-        logger.log('找到包含"未选择"的按钮', 'info');
-        break;
+      if (text === '未选择' && isElementVisible(btn as HTMLElement)) {
+        // 检查是否在"投稿至问题"区域
+        const parent = (btn as HTMLElement).closest('[class*="FormItem"]') || 
+                       btn.parentElement?.parentElement?.parentElement;
+        if (parent && (parent as HTMLElement).innerText?.includes('投稿')) {
+          submitToggle = btn as HTMLElement;
+          logger.log('通过文本找到投稿至问题下拉框', 'success');
+          break;
+        }
+      }
+    }
+  }
+  
+  // 方法3: 查找"投稿至问题"标签旁边的下拉框
+  if (!submitToggle) {
+    const allElements = document.querySelectorAll('*');
+    for (const el of allElements) {
+      const text = (el as HTMLElement).innerText?.trim();
+      if (text === '投稿至问题' && isElementVisible(el as HTMLElement)) {
+        // 找到标签后，在其父容器中查找下拉框
+        const container = el.parentElement?.parentElement;
+        if (container) {
+          const toggle = container.querySelector('button[role="combobox"], [id*="Popover"][id*="toggle"]') as HTMLElement;
+          if (toggle && isElementVisible(toggle)) {
+            submitToggle = toggle;
+            logger.log('在投稿至问题区域找到下拉框', 'success');
+            break;
+          }
+        }
       }
     }
   }
   
   if (!submitToggle) {
     logger.log('未找到投稿至问题的下拉框', 'error');
-    // 调试：打印页面上的相关元素
-    logger.log('调试: 查找包含"投稿"的元素...', 'info');
-    const debugElements = document.querySelectorAll('*');
-    let count = 0;
-    debugElements.forEach(el => {
-      const text = (el as HTMLElement).innerText?.trim();
-      if (text && text.includes('投稿') && text.length < 30 && isElementVisible(el as HTMLElement) && count < 5) {
-        logger.log(`  <${el.tagName.toLowerCase()}>: "${text}"`, 'info');
-        count++;
-      }
-    });
     return false;
   }
   
   // 点击下拉框打开问题选择面板
   logger.log('点击投稿至问题下拉框', 'action');
   simulateClick(submitToggle);
-  await new Promise(r => setTimeout(r, 1500));
+  await new Promise(r => setTimeout(r, 2000));
   
   // ============================================
   // 步骤2: 等待问题列表加载，然后点击"选择"按钮
+  // 根据调试分析，"选择"按钮在 .css-1335jw2 容器内
   // ============================================
   logger.log('等待问题列表加载...', 'info');
-  
-  // 增加等待时间，确保弹窗完全加载
-  await new Promise(r => setTimeout(r, 1500));
   
   let selectBtn: HTMLElement | null = null;
   const maxSelectAttempts = 10;
   
   for (let attempt = 1; attempt <= maxSelectAttempts; attempt++) {
-    // 查找"选择"按钮 - 需要在弹窗内查找
-    const modal = document.querySelector('[role="dialog"], [class*="Modal"], [class*="modal"]');
-    const searchScope = modal || document;
+    // 方法1: 使用精确的 CSS 选择器（根据调试分析）
+    selectBtn = document.querySelector('.css-1335jw2 button') as HTMLElement;
+    if (selectBtn && isElementVisible(selectBtn)) {
+      logger.log(`通过 .css-1335jw2 找到"选择"按钮 [尝试 ${attempt}/${maxSelectAttempts}]`, 'success');
+      break;
+    }
     
-    const buttons = searchScope.querySelectorAll('button');
-    for (const btn of buttons) {
-      const text = (btn as HTMLElement).innerText?.trim();
-      if (text === '选择' && isElementVisible(btn as HTMLElement)) {
-        selectBtn = btn as HTMLElement;
-        logger.log(`找到"选择"按钮 [尝试 ${attempt}/${maxSelectAttempts}]`, 'success');
-        break;
+    // 方法2: 在 Modal 内查找 Button--secondary.Button--blue
+    const modal = document.querySelector('.Modal, .QuestionSearchModal, [role="dialog"]');
+    if (modal) {
+      const btns = modal.querySelectorAll('.Button--secondary.Button--blue');
+      for (const btn of btns) {
+        const text = (btn as HTMLElement).innerText?.trim();
+        if (text === '选择' && isElementVisible(btn as HTMLElement)) {
+          selectBtn = btn as HTMLElement;
+          logger.log(`在 Modal 中找到"选择"按钮 [尝试 ${attempt}/${maxSelectAttempts}]`, 'success');
+          break;
+        }
+      }
+    }
+    
+    if (selectBtn) break;
+    
+    // 方法3: 全局查找文本为"选择"的按钮
+    if (!selectBtn) {
+      const allBtns = document.querySelectorAll('button');
+      for (const btn of allBtns) {
+        const text = (btn as HTMLElement).innerText?.trim();
+        if (text === '选择' && isElementVisible(btn as HTMLElement)) {
+          // 确保是在 Modal 内的按钮
+          const inModal = btn.closest('.Modal, .QuestionSearchModal, [role="dialog"]');
+          if (inModal) {
+            selectBtn = btn as HTMLElement;
+            logger.log(`找到"选择"按钮 [尝试 ${attempt}/${maxSelectAttempts}]`, 'success');
+            break;
+          }
+        }
       }
     }
     
@@ -1177,134 +1153,105 @@ const submitToQuestion = async (): Promise<boolean> => {
   if (!selectBtn) {
     logger.log('未找到"选择"按钮，可能没有推荐问题', 'warn');
     // 尝试关闭弹窗
-    const closeButtons = document.querySelectorAll('button');
-    for (const btn of closeButtons) {
-      const text = (btn as HTMLElement).innerText?.trim();
-      if (text === '关闭' && isElementVisible(btn as HTMLElement)) {
-        simulateClick(btn as HTMLElement);
-        break;
-      }
+    const closeBtn = document.querySelector('.Modal-closeButton, [aria-label="关闭"]') as HTMLElement;
+    if (closeBtn) {
+      simulateClick(closeBtn);
+    } else {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
     }
     return false;
   }
   
-  // 点击"选择"按钮选择第一个问题
-  // 使用更强的点击方式
+  // 点击"选择"按钮
   logger.log('点击"选择"按钮选择第一个问题', 'action');
   selectBtn.scrollIntoView({ behavior: 'instant', block: 'center' });
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise(r => setTimeout(r, 300));
   
-  // 使用多种点击方式确保点击成功
-  const rect = selectBtn.getBoundingClientRect();
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  
-  // 先 focus
-  selectBtn.focus();
-  await new Promise(r => setTimeout(r, 100));
-  
-  // 方式1: 完整的鼠标事件序列
-  selectBtn.dispatchEvent(new MouseEvent('mouseover', {
-    bubbles: true, cancelable: true, view: window,
-    clientX: centerX, clientY: centerY
-  }));
-  await new Promise(r => setTimeout(r, 50));
-  
-  selectBtn.dispatchEvent(new MouseEvent('mouseenter', {
-    bubbles: true, cancelable: true, view: window,
-    clientX: centerX, clientY: centerY
-  }));
-  await new Promise(r => setTimeout(r, 50));
-  
-  selectBtn.dispatchEvent(new MouseEvent('mousedown', {
-    bubbles: true, cancelable: true, view: window,
-    clientX: centerX, clientY: centerY, button: 0, buttons: 1
-  }));
-  await new Promise(r => setTimeout(r, 100));
-  
-  selectBtn.dispatchEvent(new MouseEvent('mouseup', {
-    bubbles: true, cancelable: true, view: window,
-    clientX: centerX, clientY: centerY, button: 0
-  }));
-  await new Promise(r => setTimeout(r, 50));
-  
-  selectBtn.dispatchEvent(new MouseEvent('click', {
-    bubbles: true, cancelable: true, view: window,
-    clientX: centerX, clientY: centerY, button: 0
-  }));
-  
-  // 方式2: 直接调用 click()
+  // 使用简单直接的点击方式
   selectBtn.click();
   
   logger.log('已点击"选择"按钮', 'info');
-  await new Promise(r => setTimeout(r, 2000)); // 增加等待时间
+  await new Promise(r => setTimeout(r, 1500));
+  
+  // 验证选择是否成功（检查"已选择"状态）
+  const statusText = document.querySelector('.css-1tnqzyy');
+  if (statusText) {
+    const status = (statusText as HTMLElement).innerText;
+    logger.log(`选择状态: ${status}`, 'info');
+  }
   
   // ============================================
   // 步骤3: 点击"确定"按钮确认选择
+  // 根据调试分析，确定按钮是 .Modal .Button--primary.Button--blue
   // ============================================
   logger.log('查找"确定"按钮...', 'info');
   let confirmBtn: HTMLElement | null = null;
   
-  const maxConfirmAttempts = 5;
-  for (let attempt = 1; attempt <= maxConfirmAttempts; attempt++) {
-    const buttons = document.querySelectorAll('button');
-    for (const btn of buttons) {
-      const text = (btn as HTMLElement).innerText?.trim();
-      if (text === '确定' && isElementVisible(btn as HTMLElement)) {
-        confirmBtn = btn as HTMLElement;
-        logger.log('找到"确定"按钮', 'success');
-        break;
-      }
+  // 方法1: 使用精确的 CSS 选择器
+  confirmBtn = document.querySelector('.Modal .Button--primary.Button--blue') as HTMLElement;
+  if (confirmBtn && isElementVisible(confirmBtn)) {
+    const text = (confirmBtn as HTMLElement).innerText?.trim();
+    if (text === '确定') {
+      logger.log('通过 CSS 选择器找到"确定"按钮', 'success');
+    } else {
+      confirmBtn = null;
     }
-    
-    if (confirmBtn) break;
-    
-    if (attempt < maxConfirmAttempts) {
-      await new Promise(r => setTimeout(r, 300));
+  }
+  
+  // 方法2: 在 Modal 内查找文本为"确定"的按钮
+  if (!confirmBtn) {
+    const modal = document.querySelector('.Modal, .QuestionSearchModal, [role="dialog"]');
+    if (modal) {
+      const btns = modal.querySelectorAll('button');
+      for (const btn of btns) {
+        const text = (btn as HTMLElement).innerText?.trim();
+        if (text === '确定' && isElementVisible(btn as HTMLElement)) {
+          confirmBtn = btn as HTMLElement;
+          logger.log('在 Modal 中找到"确定"按钮', 'success');
+          break;
+        }
+      }
     }
   }
   
   if (confirmBtn) {
     logger.log('点击"确定"按钮', 'action');
-    simulateClick(confirmBtn);
-    await new Promise(r => setTimeout(r, 1000));
+    confirmBtn.click();
+    await new Promise(r => setTimeout(r, 1500));
+    logger.log('已点击"确定"按钮', 'info');
   } else {
     logger.log('未找到"确定"按钮', 'warn');
   }
   
   // ============================================
-  // 步骤4: 关闭弹窗（根据 Playwright 录制，需要再次点击然后关闭）
+  // 步骤4: 验证并关闭弹窗
   // ============================================
-  // 再次点击投稿区域
-  logger.log('再次点击投稿区域', 'action');
-  simulateClick(submitToggle);
-  await new Promise(r => setTimeout(r, 800));
+  await new Promise(r => setTimeout(r, 500));
   
-  // 点击"关闭"按钮
-  logger.log('查找"关闭"按钮...', 'info');
-  let closeBtn: HTMLElement | null = null;
-  
-  const buttons = document.querySelectorAll('button');
-  for (const btn of buttons) {
-    const text = (btn as HTMLElement).innerText?.trim();
-    if (text === '关闭' && isElementVisible(btn as HTMLElement)) {
-      closeBtn = btn as HTMLElement;
-      logger.log('找到"关闭"按钮', 'info');
-      break;
+  // 检查下拉框是否已更新（不再显示"未选择"）
+  const updatedToggle = submitToggle;
+  if (updatedToggle) {
+    const newText = updatedToggle.innerText?.trim();
+    if (newText && newText !== '未选择') {
+      logger.log(`✅ 投稿至问题完成！已选择: ${newText.substring(0, 30)}...`, 'success');
+    } else {
+      logger.log('⚠️ 投稿至问题可能未成功，下拉框仍显示"未选择"', 'warn');
     }
   }
   
-  if (closeBtn) {
-    logger.log('点击"关闭"按钮', 'action');
-    simulateClick(closeBtn);
-    await new Promise(r => setTimeout(r, 500));
-  } else {
-    logger.log('未找到"关闭"按钮，尝试按 ESC 关闭', 'info');
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+  // 如果 Modal 还在，尝试关闭
+  const remainingModal = document.querySelector('.Modal, .QuestionSearchModal, [role="dialog"]');
+  if (remainingModal && isElementVisible(remainingModal as HTMLElement)) {
+    logger.log('关闭弹窗...', 'info');
+    const closeBtn = remainingModal.querySelector('.Modal-closeButton, [aria-label="关闭"]') as HTMLElement;
+    if (closeBtn && isElementVisible(closeBtn)) {
+      closeBtn.click();
+    } else {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+    }
     await new Promise(r => setTimeout(r, 300));
   }
   
-  logger.log('✅ 投稿至问题完成！', 'success');
   return true;
 };
 
@@ -1422,6 +1369,42 @@ const deleteTextInEditor = async (searchText: string): Promise<boolean> => {
   // 最后检查
   const finalContent = editor.innerText || '';
   return !finalContent.includes(searchText);
+};
+
+/**
+ * 选中编辑器中的指定文本（不删除）
+ * 用于在占位符位置插入图片
+ */
+const selectTextInEditor = async (searchText: string): Promise<boolean> => {
+  const editor = findElement(SELECTORS.editor);
+  if (!editor) return false;
+
+  // 确保编辑器获得焦点
+  editor.focus();
+  await new Promise(r => setTimeout(r, 100));
+
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
+  let node: Node | null;
+  
+  while ((node = walker.nextNode())) {
+    if (node.textContent && node.textContent.includes(searchText)) {
+      const range = document.createRange();
+      const startIndex = node.textContent.indexOf(searchText);
+      range.setStart(node, startIndex);
+      range.setEnd(node, startIndex + searchText.length);
+      
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      
+      logger.log(`已选中文本: "${searchText}"`, 'info');
+      await new Promise(r => setTimeout(r, 200));
+      return true;
+    }
+  }
+  
+  logger.log(`未找到文本: "${searchText}"`, 'warn');
+  return false;
 };
 
 
@@ -1572,47 +1555,44 @@ const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
       
       let successCount = 0;
       
-      // 先删除所有占位符，再逐个插入图片
-      // 这样可以避免位置偏移问题
-      logger.log('先删除所有占位符...', 'info');
-      for (const placeholder of placeholders) {
-        const deleted = await deleteTextInEditor(placeholder.text);
-        if (deleted) {
-          logger.log(`已删除: ${placeholder.text}`, 'success');
-        } else {
-          logger.log(`删除失败: ${placeholder.text}`, 'warn');
-        }
-        await new Promise(r => setTimeout(r, 300));
-      }
-      
-      // 然后逐个插入图片（在编辑器末尾插入）
-      for (let i = 0; i < placeholders.length; i++) {
+      // 逐个处理占位符：选中占位符 -> 插入图片（图片会替换选中的文本）
+      // 从后往前处理，避免位置偏移问题
+      for (let i = placeholders.length - 1; i >= 0; i--) {
         if (isFlowCancelled) {
           logger.log('用户取消操作', 'warn');
           break;
         }
         
         const placeholder = placeholders[i];
-        logger.log(`\n📷 插入第 ${i + 1}/${placeholders.length} 张图片: ${placeholder.keyword}`, 'info');
+        logger.log(`\n📷 处理第 ${placeholders.length - i}/${placeholders.length} 个占位符: ${placeholder.keyword}`, 'info');
         
-        // 移动光标到编辑器末尾
-        if (editor) {
-          editor.focus();
-          const sel = window.getSelection();
-          const range = document.createRange();
-          range.selectNodeContents(editor);
-          range.collapse(false);
-          sel?.removeAllRanges();
-          sel?.addRange(range);
+        // 步骤1: 选中占位符文本
+        const selected = await selectTextInEditor(placeholder.text);
+        if (!selected) {
+          logger.log(`无法选中占位符: ${placeholder.text}，尝试删除后在末尾插入`, 'warn');
+          // 如果无法选中，尝试删除占位符并在末尾插入
+          await deleteTextInEditor(placeholder.text);
+          if (editor) {
+            editor.focus();
+            const sel = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+          }
         }
         
-        // 插入图片
+        // 步骤2: 插入图片（会替换选中的文本）
         const success = await insertImageOnly(placeholder.keyword);
         
         if (success) {
           successCount++;
+          logger.log(`占位符 "${placeholder.text}" 已替换为图片`, 'success');
         } else {
-          logger.log(`第 ${i + 1} 张图片插入失败`, 'error');
+          logger.log(`第 ${placeholders.length - i} 张图片插入失败`, 'error');
+          // 如果图片插入失败，确保删除占位符
+          await deleteTextInEditor(placeholder.text);
         }
         
         // 等待图片加载完成后再继续下一个

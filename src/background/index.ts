@@ -21,6 +21,119 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log('Extension installed');
 });
 
+// ========== Cookie 自动更新监听器 ==========
+// 当用户登录/退出平台时，自动更新设置中的 cookie
+
+// 防抖定时器，避免频繁更新
+let cookieUpdateTimers: { [key: string]: NodeJS.Timeout } = {};
+
+// 监听 cookie 变化
+chrome.cookies.onChanged.addListener(async (changeInfo) => {
+  const { cookie } = changeInfo;
+  const domain = cookie.domain;
+  
+  // 判断是哪个平台的 cookie 变化
+  let platform: 'toutiao' | 'zhihu' | 'weixin' | null = null;
+  
+  if (domain.includes('toutiao.com')) {
+    platform = 'toutiao';
+  } else if (domain.includes('zhihu.com')) {
+    platform = 'zhihu';
+  } else if (domain.includes('qq.com')) {
+    platform = 'weixin';
+  }
+  
+  if (!platform) return;
+  
+  // 使用防抖，避免短时间内多次 cookie 变化导致频繁更新
+  // 等待 2 秒后再更新，确保所有 cookie 都已设置完成
+  if (cookieUpdateTimers[platform]) {
+    clearTimeout(cookieUpdateTimers[platform]);
+  }
+  
+  cookieUpdateTimers[platform] = setTimeout(async () => {
+    console.log(`[Cookie Monitor] Detected ${platform} cookie change, auto-updating...`);
+    await updatePlatformCookie(platform!);
+    delete cookieUpdateTimers[platform!];
+  }, 2000);
+});
+
+// 更新指定平台的 cookie
+async function updatePlatformCookie(platform: 'toutiao' | 'zhihu' | 'weixin') {
+  try {
+    const settings = await getSettings();
+    const now = Date.now() / 1000;
+    
+    let url: string;
+    let settingsKey: 'toutiao' | 'zhihu' | 'weixin';
+    
+    switch (platform) {
+      case 'toutiao':
+        url = 'https://mp.toutiao.com/';
+        settingsKey = 'toutiao';
+        break;
+      case 'zhihu':
+        url = 'https://zhuanlan.zhihu.com/';
+        settingsKey = 'zhihu';
+        break;
+      case 'weixin':
+        url = 'https://mp.weixin.qq.com/';
+        settingsKey = 'weixin';
+        break;
+    }
+    
+    // 使用 URL 方式获取该平台所有有效的 cookie
+    const cookies = await chrome.cookies.getAll({ url });
+    
+    // 过滤：只保留未过期且有值的 cookie
+    const validCookies = cookies.filter(c => {
+      if (c.expirationDate && c.expirationDate < now) return false;
+      if (!c.value || c.value.trim() === '') return false;
+      return true;
+    });
+    
+    if (validCookies.length > 0) {
+      const cookieStr = validCookies.map(c => `${c.name}=${c.value}`).join('; ');
+      
+      // 检查 cookie 是否有变化，避免无意义的更新
+      const currentCookie = settings[settingsKey]?.cookie || '';
+      if (cookieStr !== currentCookie) {
+        console.log(`[Cookie Monitor] Updating ${platform} cookie (${validCookies.length} cookies)`);
+        
+        const newSettings = {
+          ...settings,
+          [settingsKey]: {
+            ...settings[settingsKey],
+            cookie: cookieStr
+          }
+        };
+        
+        await saveSettings(newSettings);
+        console.log(`[Cookie Monitor] ${platform} cookie updated successfully`);
+      }
+    } else {
+      // 没有有效 cookie，可能是用户退出登录了
+      // 清空设置中的 cookie
+      const currentCookie = settings[settingsKey]?.cookie || '';
+      if (currentCookie) {
+        console.log(`[Cookie Monitor] ${platform} cookies cleared (user logged out?)`);
+        
+        const newSettings = {
+          ...settings,
+          [settingsKey]: {
+            ...settings[settingsKey],
+            cookie: ''
+          }
+        };
+        
+        await saveSettings(newSettings);
+      }
+    }
+  } catch (error) {
+    console.error(`[Cookie Monitor] Failed to update ${platform} cookie:`, error);
+  }
+}
+
 // Listen for messages from Popup
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'START_LOGIN') {
