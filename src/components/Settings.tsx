@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AppSettings, DEFAULT_SETTINGS, getSettings, saveSettings, syncSettings, restoreSettings, ArticleStyleSettings } from '../utils/storage';
 import { SYSTEM_PROMPTS, TOUTIAO_DEFAULT_PROMPT, ZHIHU_DEFAULT_PROMPT, WEIXIN_DEFAULT_PROMPT } from '../utils/prompts';
 import { getTranslation } from '../utils/i18n';
-import { Eye, EyeOff, Github, Loader2, CheckCircle, XCircle, Newspaper, RefreshCw, Cloud, Lock, Key, Bug, Palette, Send, BookOpen, RotateCcw, FileText, MessageCircle } from 'lucide-react';
+import { Eye, EyeOff, Github, Loader2, CheckCircle, XCircle, Newspaper, RefreshCw, Cloud, Lock, Key, Bug, Palette, Send, BookOpen, RotateCcw, FileText, MessageCircle, Image } from 'lucide-react';
 import { validateGitHubConnection } from '../utils/github';
 import { generateRandomString } from '../utils/crypto';
 
@@ -1576,6 +1576,30 @@ const Settings: React.FC = () => {
                  )}
             </div>
         )}
+      </div>
+
+      {/* ========== AI 图片文字识别 ========== */}
+      <div className="border-t pt-4">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+          <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                  <Image className={`w-5 h-5 ${settings.enableImageOcr ? 'text-purple-500' : 'text-gray-400'}`} />
+                  <div>
+                      <span className="font-medium text-gray-800">{t.imageOcrTitle}</span>
+                      <p className="text-xs text-gray-500">{t.imageOcrHint}</p>
+                  </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                      type="checkbox" 
+                      className="sr-only peer"
+                      checked={settings.enableImageOcr || false}
+                      onChange={(e) => setSettings({ ...settings, enableImageOcr: e.target.checked })}
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+              </label>
+          </div>
+        </div>
       </div>
 
       {/* ========== 调试模式 ========== */}

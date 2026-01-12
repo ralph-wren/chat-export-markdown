@@ -301,21 +301,35 @@ async function fetchLinkContent(url: string, timeout: number = 5000): Promise<st
   }
 }
 
-import Tesseract from 'tesseract.js';
-
 /**
- * 使用 Tesseract.js 识别图片中的文字（OCR）
- * 不需要调用大模型 API，完全本地运行
+ * 图片文字识别（OCR）功能
+ * 使用 apiyi 的 GPT-4o-mini 模型进行图片文字识别
+ * 
  * @param imageUrl 图片的 URL 或 base64 data URL
  */
 async function handleOcrImage(imageUrl: string): Promise<string> {
-  console.log(`[Background] OCR image with Tesseract: ${imageUrl.substring(0, 100)}...`);
+  console.log(`[Background] OCR image: ${imageUrl.substring(0, 100)}...`);
+  
+  // 检查是否启用了图片 OCR 功能
+  const settings = await getSettings();
+  if (!settings.enableImageOcr) {
+    console.log('[Background] Image OCR is disabled in settings');
+    return '（图片文字识别功能未启用）';
+  }
+  
+  // 检查是否配置了 apiyi 的 API Key
+  const apiyiApiKey = settings.apiKeys?.['apiyi'];
+  if (!apiyiApiKey) {
+    console.warn('[Background] apiyi API key not configured for OCR');
+    return '（未配置 apiyi API Key，无法进行图片识别）';
+  }
   
   try {
     // 如果是普通 URL，先获取图片并转换为 base64
     let finalImageUrl = imageUrl;
     if (!imageUrl.startsWith('data:')) {
       try {
+        console.log('[Background] Fetching image to convert to base64...');
         const response = await fetch(imageUrl, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -327,6 +341,7 @@ async function handleOcrImage(imageUrl: string): Promise<string> {
           const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
           const mimeType = blob.type || 'image/jpeg';
           finalImageUrl = `data:${mimeType};base64,${base64}`;
+          console.log('[Background] Image converted to base64 successfully');
         }
       } catch (e) {
         console.warn('[Background] Failed to fetch image, using original URL:', e);
@@ -334,23 +349,39 @@ async function handleOcrImage(imageUrl: string): Promise<string> {
       }
     }
 
-    console.log('[Background] Starting Tesseract OCR...');
+    console.log('[Background] Calling GPT-4o-mini for OCR...');
     
-    // 使用 Tesseract.js 进行 OCR
-    // 支持中文(chi_sim)和英文(eng)
-    const result = await Tesseract.recognize(
-      finalImageUrl,
-      'chi_sim+eng', // 同时识别简体中文和英文
-      {
-        logger: (m) => {
-          if (m.status === 'recognizing text') {
-            console.log(`[Background] OCR progress: ${Math.round(m.progress * 100)}%`);
-          }
-        }
-      }
-    );
+    // 使用 apiyi 的 GPT-4o-mini 模型
+    const openai = new OpenAI({
+      apiKey: apiyiApiKey,
+      baseURL: 'https://api.apiyi.com/v1',
+    });
 
-    const text = result.data.text.trim();
+    // 使用视觉模型识别图片中的文字
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { 
+              type: 'text', 
+              text: '请识别这张图片中的所有文字内容，直接输出文字，不要添加任何解释或描述。如果图片中没有文字，请回复"无文字内容"。' 
+            },
+            { 
+              type: 'image_url', 
+              image_url: { 
+                url: finalImageUrl,
+                detail: 'high' // 使用高清晰度以获得更好的 OCR 效果
+              } 
+            }
+          ]
+        } as any
+      ],
+      max_tokens: 2000
+    });
+
+    const text = response.choices[0]?.message?.content?.trim() || '';
     console.log(`[Background] OCR result: ${text.substring(0, 100)}...`);
     
     if (!text || text.length === 0) {
@@ -360,8 +391,9 @@ async function handleOcrImage(imageUrl: string): Promise<string> {
     return text;
     
   } catch (error: any) {
-    console.error('[Background] Tesseract OCR failed:', error);
-    throw new Error(`OCR 识别失败: ${error.message}`);
+    console.error('[Background] OCR failed:', error);
+    // 返回错误信息但不抛出异常，避免阻塞整个抓取流程
+    return `（图片识别失败: ${error.message || '未知错误'}）`;
   }
 }
 

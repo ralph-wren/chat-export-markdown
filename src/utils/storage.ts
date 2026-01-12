@@ -53,6 +53,7 @@ export interface AppSettings {
   };
   debugMode?: boolean;
   articleStyle?: ArticleStyleSettings; // 文章风格设置
+  enableImageOcr?: boolean; // 是否启用 AI 图片文字识别（使用 GPT-4o-mini）
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -98,7 +99,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     politeness: 60,    // 略微礼貌
     formality: 30,     // 偏口语化
     humor: 40          // 略微轻松
-  }
+  },
+  enableImageOcr: false // 默认关闭图片文字识别
 };
 
 export const getSettings = async (): Promise<AppSettings> => {

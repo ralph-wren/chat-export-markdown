@@ -923,11 +923,20 @@ async function extractGenericPage(): Promise<ExtractionResult> {
   }
 
   // 5.5 OCR 识别图片中的文字（最多识别5张主要图片）
+  // 根据设置决定是否启用，需要配置 apiyi API Key
   let ocrTexts: string[] = [];
   const mainImages = getMainImages(validImages as HTMLImageElement[], 5);
   if (mainImages.length > 0 && !isExtractionCancelled) {
     panel.log(`正在识别 ${mainImages.length} 张图片中的文字...`, 'action');
     ocrTexts = await ocrImagesWithProgress(mainImages, panel);
+    // 过滤掉未启用或失败的提示信息
+    ocrTexts = ocrTexts.filter(text => 
+      text && 
+      !text.includes('功能未启用') && 
+      !text.includes('未配置') &&
+      !text.includes('识别失败') &&
+      text !== '无文字内容'
+    );
     if (ocrTexts.length > 0) {
       panel.log(`成功识别 ${ocrTexts.length} 张图片的文字`, 'success');
     }
@@ -1633,9 +1642,6 @@ function getMainImages(images: HTMLImageElement[], maxCount: number = 5): HTMLIm
       continue;
     }
     
-    // 5. 不再强制要求在正文区域内，因为很多网站结构不同
-    // 只是优先选择正文区域内的图片
-    
     console.log(`[Memoraid] 选中图片 ${mainImages.length + 1}: ${width}x${height} - ${src.substring(0, 80)}`);
     mainImages.push(img);
   }
@@ -1646,6 +1652,7 @@ function getMainImages(images: HTMLImageElement[], maxCount: number = 5): HTMLIm
 
 /**
  * OCR 识别多张图片（带进度显示）
+ * 通过 background script 调用 GPT-4o-mini 进行识别
  */
 async function ocrImagesWithProgress(
   images: HTMLImageElement[], 
@@ -1671,14 +1678,22 @@ async function ocrImagesWithProgress(
         const text = response.text.trim();
         results.push(text);
         
-        if (text && text !== '无文字内容') {
+        // 检查是否是有效的识别结果
+        if (text && 
+            !text.includes('功能未启用') && 
+            !text.includes('未配置') &&
+            !text.includes('识别失败') &&
+            text !== '无文字内容') {
           // 显示识别结果预览（显示更多内容，最多150字符）
           const preview = text.substring(0, 150).replace(/\s+/g, ' ');
           const suffix = text.length > 150 ? `... (共${text.length}字)` : '';
           panel.log(`✅ 图片 ${i + 1} 识别成功 (${text.length}字)`, 'success');
           panel.logDetail(`🔤 识别文字`, preview + suffix);
-          // 同时在控制台打印完整内容
           console.log(`[Memoraid] 图片 ${i + 1} OCR 结果:\n${text}`);
+        } else if (text.includes('功能未启用') || text.includes('未配置')) {
+          panel.log(`ℹ️ 图片识别功能未启用或未配置 API Key`, 'info');
+          // 如果功能未启用，跳过后续图片
+          break;
         } else {
           panel.log(`ℹ️ 图片 ${i + 1} 无文字内容`, 'info');
         }

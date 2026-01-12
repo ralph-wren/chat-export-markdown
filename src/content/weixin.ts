@@ -739,97 +739,94 @@ const generateAIImage = async (prompt: string, setRatio: boolean = true): Promis
   logger.log('点击创作按钮', 'action');
   simulateClick(createBtn);
   
-  // 等待 AI 生成图片（需要较长时间，30-60秒）
-  logger.log('⏳ 等待 AI 生成图片（约30-60秒）...', 'info');
+  // 等待 AI 生成图片
+  logger.log('⏳ 等待 AI 生成图片...', 'info');
   
-  // 等待生成完成的策略：
-  // 1. 检测是否有新的 ai-image-list 出现（新生成的图片会在新列表中）
-  // 2. 检测生成进度（百分比）是否消失
-  // 3. 检测新图片是否加载完成（没有加载中的状态）
+  // 优化后的等待策略：
+  // 1. 更频繁地检查（每500ms）
+  // 2. 多种检测方式并行：检测图片加载完成、操作按钮出现、进度消失
+  // 3. 一旦检测到任何完成信号，立即继续
   
   const maxWaitTime = 90000; // 最长等待90秒
   const startTime = Date.now();
   let generationComplete = false;
   
-  // 先等待一小段时间让生成开始
-  await new Promise(r => setTimeout(r, 3000));
+  // 先等待一小段时间让生成开始（减少到1.5秒）
+  await new Promise(r => setTimeout(r, 1500));
   
   while (Date.now() - startTime < maxWaitTime) {
-    // 检查1: 是否有新的 ai-image-list 出现
-    const currentListCount = document.querySelectorAll('.ai-image-list').length;
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
     
-    // 检查2: 检测是否有正在生成的进度指示器（百分比文字如 "18%"）
-    const hasLoadingProgress = Array.from(document.querySelectorAll('.ai-image-item, [class*="ai-image"]')).some(el => {
+    // 检查1: 检测是否有正在生成的进度指示器（百分比文字如 "18%"）
+    const loadingItems = Array.from(document.querySelectorAll('.ai-image-item, [class*="ai-image"]')).filter(el => {
       const text = (el as HTMLElement).innerText || '';
-      // 检测是否包含百分比（如 "18%", "25%" 等）
+      // 检测是否包含百分比（如 "18%", "25%" 等，但不包括 100%）
       return /\d+%/.test(text) && !text.includes('100%');
     });
+    const hasLoadingProgress = loadingItems.length > 0;
     
-    // 检查3: 检测是否有加载中的动画或 loading 状态
-    const hasLoadingSpinner = document.querySelector('.ai-image-item .loading, .ai-image-item [class*="loading"], .ai-image-generating');
+    // 检查2: 检测是否有加载中的动画或 loading 状态
+    const hasLoadingSpinner = document.querySelector('.ai-image-item .loading, .ai-image-item [class*="loading"], .ai-image-generating, .ai-image-item .ai-image-loading');
     
-    // 如果有新列表出现，且没有正在加载的进度，说明生成完成
-    if (currentListCount > initialListCount && !hasLoadingProgress && !hasLoadingSpinner) {
-      logger.log(`检测到新的 ai-image-list（${initialListCount} -> ${currentListCount}），生成完成`, 'success');
+    // 检查3: 检测是否有已完成的图片（有操作按钮 operation-group 且图片已加载）
+    const allImageLists = document.querySelectorAll('.ai-image-list');
+    let hasCompletedImages = false;
+    let completedCount = 0;
+    
+    if (allImageLists.length > 0) {
+      const lastList = allImageLists[allImageLists.length - 1];
+      const items = lastList.querySelectorAll('.ai-image-item');
+      
+      for (const item of items) {
+        const img = item.querySelector('img');
+        const hasOpGroup = item.querySelector('.ai-image-operation-group');
+        const itemText = (item as HTMLElement).innerText || '';
+        const isNotLoading = !/\d+%/.test(itemText) || itemText.includes('100%');
+        
+        // 图片完成的条件：有图片且已加载，或者有操作按钮，且没有加载进度
+        if (isNotLoading && (hasOpGroup || (img && img.complete && img.naturalWidth > 0))) {
+          completedCount++;
+        }
+      }
+      
+      // 只要有1张图片完成就可以继续（不需要等待全部4张）
+      hasCompletedImages = completedCount >= 1;
+    }
+    
+    // 检查4: 检测"换风格"或"插入"按钮是否出现（这是图片生成完成的明确信号）
+    const hasInsertButton = document.querySelector('.ai-image-operation-group') !== null;
+    
+    // 完成条件：没有加载中的进度 且 (有完成的图片 或 有插入按钮)
+    if (!hasLoadingProgress && !hasLoadingSpinner && (hasCompletedImages || hasInsertButton)) {
+      logger.log(`✅ 图片生成完成！(${completedCount} 张已完成，耗时 ${elapsed} 秒)`, 'success');
       generationComplete = true;
       break;
     }
     
-    // 如果列表数量没变，但检测到新图片（通过检查最后一个列表中的图片是否都加载完成）
-    if (!hasLoadingProgress && !hasLoadingSpinner) {
-      const lastList = document.querySelectorAll('.ai-image-list')[currentListCount - 1];
-      if (lastList) {
-        const items = lastList.querySelectorAll('.ai-image-item');
-        // 检查是否有新生成的图片（有 operation-group 且图片已加载）
-        const hasNewImages = Array.from(items).some(item => {
-          const hasOpGroup = item.querySelector('.ai-image-operation-group');
-          const img = item.querySelector('img');
-          const hasLoadedImg = img && img.complete && img.naturalWidth > 0;
-          const itemText = (item as HTMLElement).innerText || '';
-          const isNotLoading = !/\d+%/.test(itemText);
-          return hasOpGroup && hasLoadedImg && isNotLoading;
-        });
-        
-        if (hasNewImages && items.length >= 4) {
-          // 额外等待确保所有图片都加载完成
-          await new Promise(r => setTimeout(r, 2000));
-          
-          // 再次检查是否还有加载中的
-          const stillLoading = Array.from(document.querySelectorAll('.ai-image-item')).some(el => {
-            const text = (el as HTMLElement).innerText || '';
-            return /\d+%/.test(text) && !text.includes('100%');
-          });
-          
-          if (!stillLoading) {
-            logger.log('所有图片生成完成', 'success');
-            generationComplete = true;
-            break;
-          }
-        }
-      }
+    // 备用完成条件：如果已经等待超过10秒，且有插入按钮出现，直接认为完成
+    if (elapsed > 10 && hasInsertButton) {
+      logger.log(`✅ 检测到插入按钮，图片已生成完成 (耗时 ${elapsed} 秒)`, 'success');
+      generationComplete = true;
+      break;
     }
     
-    // 每2秒检查一次
-    await new Promise(r => setTimeout(r, 2000));
+    // 每500ms检查一次（更频繁）
+    await new Promise(r => setTimeout(r, 500));
     
-    // 显示等待进度
-    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-    if (elapsed % 10 === 0) {
-      const loadingItems = Array.from(document.querySelectorAll('.ai-image-item')).filter(el => {
-        const text = (el as HTMLElement).innerText || '';
-        return /\d+%/.test(text);
-      });
-      logger.log(`⏳ 已等待 ${elapsed} 秒... (${loadingItems.length} 张图片生成中)`, 'info');
+    // 每5秒显示一次等待进度
+    if (elapsed > 0 && elapsed % 5 === 0) {
+      const progressInfo = hasLoadingProgress ? `${loadingItems.length} 张生成中` : '等待中';
+      logger.log(`⏳ 已等待 ${elapsed} 秒... (${progressInfo}, ${completedCount} 张已完成)`, 'info');
     }
   }
   
   if (!generationComplete) {
-    logger.log('AI 图片生成超时，尝试继续...', 'warn');
+    logger.log('⚠️ AI 图片生成超时，尝试继续...', 'warn');
     // 即使超时也尝试继续，可能图片已经生成了
   }
   
-  // 额外等待确保 UI 完全更新
-  await new Promise(r => setTimeout(r, 2000));
+  // 减少额外等待时间（从2秒减少到500ms）
+  await new Promise(r => setTimeout(r, 500));
   
   logger.log('AI 图片生成流程完成', 'success');
   return true;
@@ -851,36 +848,116 @@ const insertAIImage = async (): Promise<boolean> => {
   logger.log('查找 AI 生成的图片...', 'info');
   
   // 等待一下确保 UI 更新
-  await new Promise(r => setTimeout(r, 1000));
+  await new Promise(r => setTimeout(r, 500));
   
-  // 关键：查找所有 ai-image-list，选择最后一个（新生成的图片在最后）
-  const allImageLists = document.querySelectorAll('.ai-image-list');
-  logger.log(`找到 ${allImageLists.length} 个 ai-image-list`, 'info');
+  // 关键修复：首先找到当前打开的 AI 配图弹窗，然后在弹窗内查找图片
+  // 而不是在整个页面中查找（页面上可能有多个历史的 ai-image-list）
   
-  if (allImageLists.length === 0) {
+  let activeDialog: Element | null = null;
+  let imageList: Element | null = null;
+  
+  // 方法1：查找当前可见的 AI 配图弹窗
+  const allDialogs = document.querySelectorAll('.weui-desktop-dialog');
+  for (const dialog of allDialogs) {
+    const style = window.getComputedStyle(dialog as HTMLElement);
+    // 检查弹窗是否可见
+    if (style.display !== 'none' && style.visibility !== 'hidden') {
+      // 检查是否是 AI 配图弹窗（包含 ai-image-list 或 chat_textarea）
+      const hasAIContent = dialog.querySelector('.ai-image-list') || dialog.querySelector('.chat_textarea');
+      if (hasAIContent) {
+        activeDialog = dialog;
+        logger.log('找到当前打开的 AI 配图弹窗', 'info');
+        break;
+      }
+    }
+  }
+  
+  // 方法2：如果没找到弹窗，尝试查找 ai_image_dialog 类
+  if (!activeDialog) {
+    activeDialog = document.querySelector('.ai_image_dialog, .ai_image');
+    if (activeDialog) {
+      logger.log('通过 ai_image_dialog 类找到弹窗', 'info');
+    }
+  }
+  
+  // 在弹窗内查找图片列表
+  if (activeDialog) {
+    // 在弹窗内查找所有 ai-image-list，选择最后一个（新生成的图片）
+    const listsInDialog = activeDialog.querySelectorAll('.ai-image-list');
+    logger.log(`弹窗内找到 ${listsInDialog.length} 个 ai-image-list`, 'info');
+    
+    if (listsInDialog.length > 0) {
+      imageList = listsInDialog[listsInDialog.length - 1];
+    }
+  }
+  
+  // 方法3：如果弹窗内没找到，尝试查找页面上最近生成的图片（有 operation-group 且可见）
+  if (!imageList) {
+    logger.log('在弹窗内未找到图片列表，尝试全局查找可见的图片...', 'info');
+    
+    // 查找所有包含可见 operation-group 的 ai-image-item
+    const allItems = document.querySelectorAll('.ai-image-item');
+    for (const item of allItems) {
+      const opGroup = item.querySelector('.ai-image-operation-group');
+      if (opGroup) {
+        const style = window.getComputedStyle(opGroup as HTMLElement);
+        // 检查 operation-group 是否可见（说明鼠标正悬浮在上面或刚生成）
+        if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+          // 找到这个 item 所属的 list
+          imageList = item.closest('.ai-image-list');
+          if (imageList) {
+            logger.log('通过可见的 operation-group 找到图片列表', 'info');
+            break;
+          }
+        }
+      }
+    }
+  }
+  
+  // 方法4：最后的备选方案 - 查找页面上所有 ai-image-list，选择最后一个
+  if (!imageList) {
+    const allImageLists = document.querySelectorAll('.ai-image-list');
+    logger.log(`页面上共有 ${allImageLists.length} 个 ai-image-list`, 'info');
+    
+    if (allImageLists.length > 0) {
+      imageList = allImageLists[allImageLists.length - 1];
+      logger.log('使用页面上最后一个 ai-image-list（备选方案）', 'warn');
+    }
+  }
+  
+  if (!imageList) {
     logger.log('未找到 ai-image-list', 'error');
     return false;
   }
   
-  // 选择最后一个 ai-image-list（新生成的图片）
-  const lastImageList = allImageLists[allImageLists.length - 1];
-  logger.log('选择最后一个 ai-image-list（新生成的图片）', 'info');
-  
-  // 查找最后一个列表中的图片项
-  const items = lastImageList.querySelectorAll('.ai-image-item, [class*="ai-image-item"]');
-  logger.log(`最后一个列表中有 ${items.length} 个图片项`, 'info');
+  // 查找图片列表中的图片项
+  const items = imageList.querySelectorAll('.ai-image-item');
+  logger.log(`图片列表中有 ${items.length} 个图片项`, 'info');
   
   if (items.length === 0) {
     logger.log('未找到图片项', 'error');
     return false;
   }
   
-  // 选择第一个图片项（通常是最好的一张）
-  const targetItem = items[0] as HTMLElement;
+  // 优先选择已经有 operation-group 的图片项（说明已经生成完成）
+  let targetItem: HTMLElement | null = null;
   
+  for (const item of items) {
+    const opGroup = item.querySelector('.ai-image-operation-group');
+    const itemText = (item as HTMLElement).innerText || '';
+    const isNotLoading = !/\d+%/.test(itemText) || itemText.includes('100%');
+    
+    if (opGroup && isNotLoading) {
+      targetItem = item as HTMLElement;
+      logger.log('找到已完成的图片项（有 operation-group）', 'info');
+      break;
+    }
+  }
+  
+  // 如果没找到有 operation-group 的，选择第一个
   if (!targetItem) {
-    logger.log('未找到目标图片项', 'error');
-    return false;
+    targetItem = items[0] as HTMLElement;
+    logger.log('选择第一个图片项', 'info');
   }
   
   // 关键步骤：模拟鼠标悬浮在图片上，让"插入"按钮显示出来
@@ -890,28 +967,36 @@ const insertAIImage = async (): Promise<boolean> => {
   targetItem.scrollIntoView({ behavior: 'instant', block: 'center' });
   await new Promise(r => setTimeout(r, 300));
   
-  // 模拟鼠标悬浮事件
-  const rect = targetItem.getBoundingClientRect();
-  const hoverOptions = {
-    bubbles: true,
-    cancelable: true,
-    view: window,
-    clientX: rect.left + rect.width / 2,
-    clientY: rect.top + rect.height / 2
+  // 模拟鼠标悬浮事件（多次触发确保生效）
+  const triggerHover = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const hoverOptions = {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2
+    };
+    
+    element.dispatchEvent(new MouseEvent('mouseenter', hoverOptions));
+    element.dispatchEvent(new MouseEvent('mouseover', hoverOptions));
+    element.dispatchEvent(new MouseEvent('mousemove', hoverOptions));
   };
   
-  targetItem.dispatchEvent(new MouseEvent('mouseenter', hoverOptions));
-  targetItem.dispatchEvent(new MouseEvent('mouseover', hoverOptions));
-  targetItem.dispatchEvent(new MouseEvent('mousemove', hoverOptions));
+  // 多次触发悬浮事件
+  for (let i = 0; i < 3; i++) {
+    triggerHover(targetItem);
+    await new Promise(r => setTimeout(r, 200));
+  }
   
   // 等待操作按钮显示
-  await new Promise(r => setTimeout(r, 800));
+  await new Promise(r => setTimeout(r, 500));
   
   // 现在查找插入按钮
   let insertBtn: HTMLElement | null = null;
   
   // 方法1：在当前图片项中查找 operation-group 的第二个子元素
-  const operationGroup = targetItem.querySelector('.ai-image-operation-group');
+  let operationGroup = targetItem.querySelector('.ai-image-operation-group');
   if (operationGroup) {
     logger.log('找到 operation-group', 'info');
     const secondChild = operationGroup.children[1] as HTMLElement;
@@ -934,54 +1019,63 @@ const insertAIImage = async (): Promise<boolean> => {
     }
   }
   
-  // 方法3：在整个最后一个列表中查找可见的插入按钮
-  if (!insertBtn) {
-    const allBtns = lastImageList.querySelectorAll('.ai-image-operation-group div, .ai-image-finetuning-btn');
-    for (const btn of allBtns) {
-      const text = (btn as HTMLElement).innerText?.trim();
-      const style = window.getComputedStyle(btn as HTMLElement);
-      if (text === '插入' && style.display !== 'none' && style.visibility !== 'hidden') {
-        insertBtn = btn as HTMLElement;
-        logger.log('在列表中找到可见的插入按钮', 'success');
-        break;
-      }
-    }
-  }
-  
-  // 方法4：如果还没找到，尝试悬浮在其他图片上
+  // 方法3：如果还没找到，尝试悬浮在其他图片上
   if (!insertBtn) {
     logger.log('尝试悬浮在其他图片上...', 'info');
     
-    for (let i = 0; i < items.length; i++) {
+    // 只尝试前4个图片（新生成的通常是前4个）
+    const maxTry = Math.min(items.length, 4);
+    for (let i = 0; i < maxTry; i++) {
       const item = items[i] as HTMLElement;
       
       // 悬浮
-      item.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-      item.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-      await new Promise(r => setTimeout(r, 500));
+      triggerHover(item);
+      await new Promise(r => setTimeout(r, 300));
       
       // 查找插入按钮
-      const opGroup = item.querySelector('.ai-image-operation-group');
-      if (opGroup) {
-        const btn = opGroup.children[1] as HTMLElement;
+      operationGroup = item.querySelector('.ai-image-operation-group');
+      if (operationGroup) {
+        const btn = operationGroup.children[1] as HTMLElement;
         if (btn) {
           insertBtn = btn;
           logger.log(`在第 ${i + 1} 张图片上找到插入按钮`, 'success');
           break;
         }
-      }
-      
-      // 通过文本查找
-      const textBtns = item.querySelectorAll('div, span');
-      for (const btn of textBtns) {
-        if ((btn as HTMLElement).innerText?.trim() === '插入') {
-          insertBtn = btn as HTMLElement;
-          logger.log(`在第 ${i + 1} 张图片上通过文本找到插入按钮`, 'success');
-          break;
+        
+        // 通过文本查找
+        const textBtns = operationGroup.querySelectorAll('div, span');
+        for (const textBtn of textBtns) {
+          if ((textBtn as HTMLElement).innerText?.trim() === '插入') {
+            insertBtn = textBtn as HTMLElement;
+            logger.log(`在第 ${i + 1} 张图片上通过文本找到插入按钮`, 'success');
+            break;
+          }
         }
       }
       
       if (insertBtn) break;
+    }
+  }
+  
+  // 方法4：在整个弹窗或图片列表中查找任何可见的"插入"按钮
+  if (!insertBtn) {
+    logger.log('在弹窗中查找任何可见的插入按钮...', 'info');
+    
+    const searchArea = activeDialog || imageList;
+    if (searchArea) {
+      const allBtns = searchArea.querySelectorAll('.ai-image-operation-group div, [class*="operation"] div');
+      for (const btn of allBtns) {
+        const text = (btn as HTMLElement).innerText?.trim();
+        if (text === '插入') {
+          // 检查按钮是否可见
+          const btnRect = (btn as HTMLElement).getBoundingClientRect();
+          if (btnRect.width > 0 && btnRect.height > 0) {
+            insertBtn = btn as HTMLElement;
+            logger.log('在弹窗中找到可见的插入按钮', 'success');
+            break;
+          }
+        }
+      }
     }
   }
   
@@ -990,17 +1084,17 @@ const insertAIImage = async (): Promise<boolean> => {
     return false;
   }
   
-  logger.log('点击插入图片（仅一次）', 'action');
+  logger.log('点击插入图片', 'action');
   
   // 确保按钮可见
   insertBtn.scrollIntoView({ behavior: 'instant', block: 'center' });
   await new Promise(r => setTimeout(r, 200));
   
-  // 只点击一次插入按钮
+  // 点击插入按钮
   simulateClick(insertBtn);
   
   // 等待图片插入完成
-  await new Promise(r => setTimeout(r, 1500));
+  await new Promise(r => setTimeout(r, 1000));
   
   logger.log('AI 图片已插入', 'success');
   return true;

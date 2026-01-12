@@ -147,6 +147,10 @@ export interface Translation {
   debugModeTitle: string;
   debugModeHint: string;
   
+  // Image OCR
+  imageOcrTitle: string;
+  imageOcrHint: string;
+  
   // Misc
   downloadMarkdown: string;
   
@@ -312,6 +316,10 @@ export const TRANSLATIONS: Record<string, Translation> = {
     debugModeTitle: 'Debug Mode',
     debugModeHint: 'Automatically upload error logs to server for analysis',
     
+    // Image OCR
+    imageOcrTitle: 'AI Image Text Recognition',
+    imageOcrHint: 'Use GPT-4o-mini to recognize text in images (requires apiyi API Key)',
+    
     // Misc
     downloadMarkdown: 'Download',
     
@@ -474,6 +482,10 @@ export const TRANSLATIONS: Record<string, Translation> = {
     // Debug mode
     debugModeTitle: '调试模式',
     debugModeHint: '自动上传错误日志到服务器进行分析',
+    
+    // Image OCR
+    imageOcrTitle: 'AI 图片文字识别',
+    imageOcrHint: '使用 GPT-4o-mini 识别图片中的文字（需配置 apiyi API Key）',
     
     // Misc
     downloadMarkdown: '下载',
@@ -638,6 +650,10 @@ export const TRANSLATIONS: Record<string, Translation> = {
     debugModeTitle: 'デバッグモード',
     debugModeHint: 'エラーログを自動的にサーバーにアップロードして分析します',
     
+    // Image OCR
+    imageOcrTitle: 'AI画像テキスト認識',
+    imageOcrHint: 'GPT-4o-miniを使用して画像内のテキストを認識します（apiyi APIキーが必要）',
+    
     // Misc
     downloadMarkdown: 'ダウンロード',
     
@@ -800,6 +816,10 @@ export const TRANSLATIONS: Record<string, Translation> = {
     // Debug mode
     debugModeTitle: '디버그 모드',
     debugModeHint: '분석을 위해 오류 로그를 서버에 자동 업로드합니다',
+    
+    // Image OCR
+    imageOcrTitle: 'AI 이미지 텍스트 인식',
+    imageOcrHint: 'GPT-4o-mini를 사용하여 이미지의 텍스트를 인식합니다 (apiyi API 키 필요)',
     
     // Misc
     downloadMarkdown: '다운로드',
@@ -964,6 +984,10 @@ export const TRANSLATIONS: Record<string, Translation> = {
     debugModeTitle: 'Debug-Modus',
     debugModeHint: 'Fehlerprotokolle automatisch zur Analyse auf den Server hochladen',
     
+    // Image OCR
+    imageOcrTitle: 'KI-Bildtexterkennung',
+    imageOcrHint: 'GPT-4o-mini zur Texterkennung in Bildern verwenden (apiyi API-Schlüssel erforderlich)',
+    
     // Misc
     downloadMarkdown: 'Herunterladen',
     
@@ -1127,6 +1151,10 @@ export const TRANSLATIONS: Record<string, Translation> = {
     debugModeTitle: 'Mode débogage',
     debugModeHint: 'Télécharger automatiquement les journaux d\'erreurs sur le serveur pour analyse',
     
+    // Image OCR
+    imageOcrTitle: 'Reconnaissance de texte IA',
+    imageOcrHint: 'Utiliser GPT-4o-mini pour reconnaître le texte dans les images (clé API apiyi requise)',
+    
     // Misc
     downloadMarkdown: 'Télécharger',
     
@@ -1289,6 +1317,10 @@ export const TRANSLATIONS: Record<string, Translation> = {
     // Debug mode
     debugModeTitle: 'Modo de depuración',
     debugModeHint: 'Cargar automáticamente registros de errores al servidor para análisis',
+    
+    // Image OCR
+    imageOcrTitle: 'Reconocimiento de texto IA',
+    imageOcrHint: 'Usar GPT-4o-mini para reconocer texto en imágenes (requiere clave API apiyi)',
     
     // Misc
     downloadMarkdown: 'Descargar',
