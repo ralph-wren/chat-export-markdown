@@ -617,11 +617,13 @@ window.addEventListener('memoraid-debug-request', async (event: Event) => {
 });
 
 // 监听调试相关消息（来自 popup 或 background）
+// 合并所有消息监听器为一个，避免多个监听器导致的通道关闭问题
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  // 调试面板相关
   if (message.type === 'SHOW_DEBUG_PANEL') {
     showDebugPanel();
     sendResponse({ success: true });
-    return false; // 同步响应，不需要保持通道开放
+    return false; // 同步响应
   }
   
   if (message.type === 'START_DEBUG_SESSION') {
@@ -633,7 +635,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ success: false, error: err?.message || '未知错误' });
       }
     })();
-    return true; // 异步响应，保持通道开放
+    return true; // 异步响应
   }
   
   if (message.type === 'STOP_DEBUG_SESSION') {
@@ -645,17 +647,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ success: false, error: err?.message || '未知错误' });
       }
     })();
-    return true; // 异步响应，保持通道开放
+    return true; // 异步响应
   }
   
-  // 不处理的消息返回 false
-  return false;
-});
-
-// 监听内容提取消息 - 使用更安全的异步处理方式
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  // 内容提取
   if (message.type === 'EXTRACT_CONTENT') {
-    // 使用 Promise 包装，确保正确处理异步响应
     (async () => {
       try {
         const data = await extractContent();
@@ -665,9 +661,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ type: 'ERROR', payload: err?.message || '未知错误' });
       }
     })();
-    return true; // 保持消息通道开放
+    return true; // 异步响应
   }
-  // 对于不处理的消息，不返回 true，避免通道关闭错误
+  
+  // 不处理的消息，不返回 true
   return false;
 });
 
