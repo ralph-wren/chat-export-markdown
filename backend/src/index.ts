@@ -590,6 +590,49 @@ export default {
             <div class="footer-copy">© 2026 Memoraid. All rights reserved.</div>
         </div>
     </footer>
+    
+    <script>
+        // 检查登录状态并更新导航栏
+        (function() {
+            const token = localStorage.getItem('memoraid_token');
+            const email = localStorage.getItem('memoraid_email');
+            
+            if (token) {
+                // 验证 token 是否有效
+                fetch('/api/auth/verify', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.authenticated) {
+                        // 已登录，更新导航栏
+                        const loginBtn = document.querySelector('.btn-login');
+                        if (loginBtn) {
+                            const userEmail = data.email || email || 'User';
+                            const initial = userEmail.charAt(0).toUpperCase();
+                            loginBtn.outerHTML = \`
+                                <div class="user-menu" style="display: flex; align-items: center; gap: 12px;">
+                                    <a href="/admin" style="display: flex; align-items: center; gap: 8px; color: var(--text); text-decoration: none; padding: 6px 12px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border);">
+                                        <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--gradient-2); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;">\${initial}</span>
+                                        <span style="font-size: 0.85rem; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">\${userEmail}</span>
+                                    </a>
+                                    <button onclick="logout()" style="padding: 8px 12px; border-radius: 8px; background: transparent; border: 1px solid var(--border); color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#ef4444';this.style.color='#ef4444'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">退出</button>
+                                </div>
+                            \`;
+                        }
+                    }
+                })
+                .catch(err => console.log('Auth check failed:', err));
+            }
+        })();
+        
+        // 退出登录
+        function logout() {
+            localStorage.removeItem('memoraid_token');
+            localStorage.removeItem('memoraid_email');
+            window.location.reload();
+        }
+    </script>
 </body>
 </html>`;
       return new Response(homepageHtml, { headers: { 'Content-Type': 'text/html; charset=UTF-8' } });
