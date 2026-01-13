@@ -536,11 +536,18 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       return;
     }
 
+    const statusText =
+      typeof task.status === 'string'
+        ? task.status
+        : task.status == null
+          ? ''
+          : String(task.status);
+
     // Determine if it's a main summarization task or refinement
-    const isRefinementTask = task.status.startsWith('Refin') || task.status === 'Refined!';
+    const isRefinementTask = statusText.startsWith('Refin') || statusText === 'Refined!';
     
     if (isRefinementTask) {
-      setIsRefining(task.status !== 'Refined!');
+      setIsRefining(statusText !== 'Refined!');
       // Restore conversation history if available
       if (task.conversationHistory) {
         setConversationHistory(task.conversationHistory);
@@ -548,14 +555,14 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     } else {
       // 保持 loading 状态，直到任务完成（Done!）或发布完成后跳转
       // Publishing... 状态也应该保持 loading
-      const isDone = task.status === 'Done!' || task.status === 'Refined!';
+      const isDone = statusText === 'Done!' || statusText === 'Refined!';
       setLoading(!isDone);
     }
 
-    setStatus(task.status);
+    setStatus(statusText || 'Ready');
     setErrorMessage(null);
     setProgress(task.progress);
-    setLogMessage(task.message || task.status);
+    setLogMessage(task.message || statusText);
     
     if (task.result) {
         setResult(task.result);

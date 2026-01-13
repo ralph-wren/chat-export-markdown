@@ -2878,8 +2878,18 @@ export default {
           } else {
             // 更新文章信息
             await env.DB.prepare(
-              'UPDATE articles SET title = ?, content_summary = ?, cover_image = ?, article_url = ?, updated_at = ? WHERE id = ?'
-            ).bind(art.title || '', art.summary || '', art.cover || '', art.url || '', Math.floor(Date.now() / 1000), articleRow.id).run();
+              'UPDATE articles SET title = ?, content_summary = ?, cover_image = ?, article_url = ?, publish_time = ?, status = ?, extra_info = ?, updated_at = ? WHERE id = ?'
+            ).bind(
+              art.title || '',
+              art.summary || '',
+              art.cover || '',
+              art.url || '',
+              art.publishTime || Math.floor(Date.now() / 1000),
+              art.status || 'published',
+              JSON.stringify(art.extra || {}),
+              Math.floor(Date.now() / 1000),
+              articleRow.id
+            ).run();
             updated++;
           }
           

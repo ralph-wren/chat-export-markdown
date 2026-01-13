@@ -1589,16 +1589,6 @@ const runSmartImageFlow = async (autoPublish = false) => {
       await new Promise(r => setTimeout(r, 1000)); // 等待页面稳定
       const published = await autoPublishArticle();
       if (published) {
-        const titleEl = findElement(SELECTORS.titleInput);
-        const title =
-          titleEl instanceof HTMLInputElement || titleEl instanceof HTMLTextAreaElement
-            ? titleEl.value
-            : (titleEl?.innerText || '');
-        reportArticlePublish({
-          platform: 'toutiao',
-          title: title || '未命名文章',
-          url: window.location.href
-        });
       }
     }
     
@@ -1796,6 +1786,102 @@ const fillContent = async () => {
   }
 };
 
+const installPublishReporting = () => {
+  let hasReported = false;
+  let armed = false;
+  let armAt = 0;
+
+  const getCurrentTitle = (): string => {
+    const titleEl = findElement(SELECTORS.titleInput);
+    if (!titleEl) return '';
+    return titleEl instanceof HTMLInputElement || titleEl instanceof HTMLTextAreaElement
+      ? (titleEl.value || '').trim()
+      : (titleEl.innerText || '').trim();
+  };
+
+  const normalizeUrl = (href: string): string => {
+    try {
+      return new URL(href, window.location.href).toString();
+    } catch {
+      return href;
+    }
+  };
+
+  const findPublishedUrl = (): string | null => {
+    const hrefCandidates: string[] = [];
+    const links = Array.from(document.querySelectorAll('a[href]')) as HTMLAnchorElement[];
+    for (const a of links) {
+      const href = a.getAttribute('href') || '';
+      if (href) hrefCandidates.push(normalizeUrl(href));
+    }
+
+    const text = document.body?.innerText || '';
+    const textMatch =
+      text.match(/https?:\/\/(?:www\.)?toutiao\.com\/article\/\d+\/?/i)?.[0] ||
+      text.match(/https?:\/\/mp\.toutiao\.com\/a\d+/i)?.[0];
+    if (textMatch) hrefCandidates.push(textMatch);
+
+    for (const url of hrefCandidates) {
+      const u = url.trim();
+      if (!u) continue;
+      if (u.includes('toutiao.com/article/')) return u;
+      if (u.includes('mp.toutiao.com/a')) return u;
+    }
+    return null;
+  };
+
+  const reportOnce = (trigger: string, publishedUrl: string) => {
+    if (hasReported) return;
+    hasReported = true;
+    reportArticlePublish({
+      platform: 'toutiao',
+      title: getCurrentTitle() || document.title || '未命名文章',
+      url: publishedUrl,
+      status: 'published',
+      extra: { trigger }
+    });
+  };
+
+  const maybeReport = (trigger: string) => {
+    if (!armed || hasReported) return;
+    const publishedUrl = findPublishedUrl();
+    if (publishedUrl) reportOnce(trigger, publishedUrl);
+  };
+
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement | null;
+    const btn = target?.closest?.('button') as HTMLElement | null;
+    if (!btn) return;
+    const text = (btn.innerText || '').trim();
+    if (!text) return;
+    if (text.includes('确认发布')) {
+      armed = true;
+      armAt = Date.now();
+      setTimeout(() => maybeReport('click:confirm_publish'), 1500);
+      return;
+    }
+  }, true);
+
+  const observer = new MutationObserver((mutations) => {
+    if (hasReported) return;
+    if (!armed) return;
+    if (armed && Date.now() - armAt > 2 * 60 * 1000) return;
+    for (const m of mutations) {
+      if (m.addedNodes.length) {
+        maybeReport('dom:mutation');
+        if (hasReported) return;
+      }
+    }
+  });
+
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+
+  setTimeout(() => {
+    if (hasReported) return;
+    maybeReport('page:initial_scan');
+  }, 1500);
+};
+
 // ============================================
 // 初始化和导出
 // ============================================
@@ -1805,6 +1891,8 @@ if (document.readyState === 'loading') {
 } else {
   fillContent();
 }
+
+installPublishReporting();
 
 // 导出供外部调用的函数
 (window as any).memoraidRunImageFlow = runSmartImageFlow;

@@ -1762,16 +1762,6 @@ const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
       await new Promise(r => setTimeout(r, 1000));
       const published = await clickPublish();
       if (published) {
-        const titleEl = findElement(SELECTORS.titleInput);
-        const title =
-          titleEl instanceof HTMLInputElement || titleEl instanceof HTMLTextAreaElement
-            ? titleEl.value
-            : (titleEl?.innerText || '');
-        reportArticlePublish({
-          platform: 'zhihu',
-          title: title || '未命名文章',
-          url: window.location.href
-        });
       }
     }
     
@@ -1793,6 +1783,93 @@ const extractKeywordFromTitle = (): string => {
     }
   }
   return '风景';
+};
+
+const installPublishReporting = () => {
+  let hasReported = false;
+  let armed = false;
+  let armAt = 0;
+
+  const getCurrentTitle = (): string => {
+    const titleEl = findElement(SELECTORS.titleInput);
+    if (!titleEl) return '';
+    return titleEl instanceof HTMLInputElement || titleEl instanceof HTMLTextAreaElement
+      ? (titleEl.value || '').trim()
+      : (titleEl.innerText || '').trim();
+  };
+
+  const findPublishedUrl = (): string | null => {
+    const href = window.location.href;
+    const editMatch = href.match(/https?:\/\/zhuanlan\.zhihu\.com\/p\/(\d+)\/edit/i);
+    if (editMatch?.[1]) return `https://zhuanlan.zhihu.com/p/${editMatch[1]}`;
+    const publishedMatch = href.match(/https?:\/\/zhuanlan\.zhihu\.com\/p\/(\d+)(?:$|[?#])/i);
+    if (publishedMatch?.[1] && !href.includes('/edit')) return `https://zhuanlan.zhihu.com/p/${publishedMatch[1]}`;
+
+    const links = Array.from(document.querySelectorAll('a[href]')) as HTMLAnchorElement[];
+    for (const a of links) {
+      const h = a.getAttribute('href') || '';
+      if (!h) continue;
+      let abs = '';
+      try {
+        abs = new URL(h, window.location.href).toString();
+      } catch {
+        abs = h;
+      }
+      const m = abs.match(/https?:\/\/zhuanlan\.zhihu\.com\/p\/(\d+)(?:$|[?#])/i);
+      if (m?.[1]) return `https://zhuanlan.zhihu.com/p/${m[1]}`;
+    }
+    return null;
+  };
+
+  const reportOnce = (trigger: string, publishedUrl: string) => {
+    if (hasReported) return;
+    hasReported = true;
+    reportArticlePublish({
+      platform: 'zhihu',
+      title: getCurrentTitle() || document.title || '未命名文章',
+      url: publishedUrl,
+      status: 'published',
+      extra: { trigger }
+    });
+  };
+
+  const maybeReport = (trigger: string) => {
+    if (!armed || hasReported) return;
+    const publishedUrl = findPublishedUrl();
+    if (publishedUrl) reportOnce(trigger, publishedUrl);
+  };
+
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement | null;
+    const btn = target?.closest?.('button') as HTMLElement | null;
+    if (!btn) return;
+    const text = (btn.innerText || '').trim();
+    if (!text) return;
+    if (text === '发布' || text.includes('发布')) {
+      armed = true;
+      armAt = Date.now();
+      setTimeout(() => maybeReport('click:publish'), 1500);
+    }
+  }, true);
+
+  const observer = new MutationObserver((mutations) => {
+    if (hasReported) return;
+    if (!armed) return;
+    if (armed && Date.now() - armAt > 2 * 60 * 1000) return;
+    for (const m of mutations) {
+      if (m.addedNodes.length) {
+        maybeReport('dom:mutation');
+        if (hasReported) return;
+      }
+    }
+  });
+
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+
+  setTimeout(() => {
+    if (hasReported) return;
+    maybeReport('page:initial_scan');
+  }, 1500);
 };
 
 // ============================================
@@ -2180,6 +2257,8 @@ if (document.readyState === 'loading') {
 } else {
   fillContent();
 }
+
+installPublishReporting();
 
 // 导出供外部调用
 (window as any).memoraidZhihuRunImageFlow = runSmartImageFlow;

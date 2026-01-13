@@ -3060,11 +3060,6 @@ const runPublishFlow = async (options: {
       logger.log('📤 步骤7: 自动发布文章', 'info');
       const published = await publishArticle();
       if (published) {
-        reportArticlePublish({
-          platform: 'weixin',
-          title: options.title || '未命名文章',
-          url: window.location.href
-        });
         logger.log('🎉 文章已发布！', 'success');
       } else {
         logger.log('自动发布失败：未检测到发布成功', 'error');
@@ -3386,6 +3381,104 @@ const autoFillContent = async () => {
   }
 };
 
+const installPublishReporting = () => {
+  if (detectPageState() !== 'editor') return;
+  let hasReported = false;
+  let armed = false;
+  let armAt = 0;
+
+  const getCurrentTitle = (): string => {
+    const titleEl = findElement(SELECTORS.titleInput);
+    if (!titleEl) return '';
+    return titleEl instanceof HTMLInputElement || titleEl instanceof HTMLTextAreaElement
+      ? (titleEl.value || '').trim()
+      : (titleEl.innerText || '').trim();
+  };
+
+  const reportOnce = (status: string, trigger: string, publishedUrl: string) => {
+    if (hasReported) return;
+    hasReported = true;
+    reportArticlePublish({
+      platform: 'weixin',
+      title: getCurrentTitle() || document.title || '未命名文章',
+      url: publishedUrl,
+      status,
+      extra: { trigger }
+    });
+  };
+
+  const normalizeUrl = (href: string): string => {
+    try {
+      return new URL(href, window.location.href).toString();
+    } catch {
+      return href;
+    }
+  };
+
+  const findPublishedUrl = (): string | null => {
+    const links = Array.from(document.querySelectorAll('a[href]')) as HTMLAnchorElement[];
+    for (const a of links) {
+      const href = a.getAttribute('href') || '';
+      if (!href) continue;
+      const abs = normalizeUrl(href);
+      if (abs.startsWith('https://mp.weixin.qq.com/s?') || abs.includes('mp.weixin.qq.com/s?')) {
+        return abs;
+      }
+    }
+
+    const anyText = document.body?.innerText || '';
+    const match = anyText.match(/https?:\/\/mp\.weixin\.qq\.com\/s\?[\w\W]{10,200}/);
+    if (match?.[0]) {
+      const url = match[0].split(/\s/)[0];
+      return url;
+    }
+    return null;
+  };
+
+  const maybeReport = (trigger: string) => {
+    if (!armed || hasReported) return;
+    const publishedUrl = findPublishedUrl();
+    if (publishedUrl) reportOnce('published', trigger, publishedUrl);
+  };
+
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement | null;
+    const btn = target?.closest?.('button') as HTMLElement | null;
+    if (!btn) return;
+    const text = (btn.innerText || '').trim();
+    if (!text) return;
+    if (text === '发表' || text.includes('发表')) {
+      armed = true;
+      armAt = Date.now();
+      setTimeout(() => maybeReport('click:publish'), 1500);
+      return;
+    }
+    if (text.includes('继续发表')) {
+      armed = true;
+      armAt = Date.now();
+      setTimeout(() => maybeReport('click:continue_publish'), 1500);
+    }
+  }, true);
+
+  const observer = new MutationObserver((mutations) => {
+    if (hasReported) return;
+    if (armed && Date.now() - armAt > 2 * 60 * 1000) return;
+    for (const m of mutations) {
+      if (m.addedNodes.length) {
+        maybeReport('dom:mutation');
+        if (hasReported) return;
+      }
+    }
+  });
+
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+
+  setTimeout(() => {
+    if (hasReported) return;
+    maybeReport('page:initial_scan');
+  }, 1500);
+};
+
 // ============================================
 // 初始化
 // ============================================
@@ -3395,6 +3488,8 @@ if (document.readyState === 'loading') {
 } else {
   autoFillContent();
 }
+
+installPublishReporting();
 
 // 导出供外部调用
 (window as any).memoraidWeixinRunFlow = runPublishFlow;
