@@ -3382,10 +3382,8 @@ const autoFillContent = async () => {
 };
 
 const installPublishReporting = () => {
-  if (detectPageState() !== 'editor') return;
   let hasReported = false;
-  let armed = false;
-  let armAt = 0;
+  const armKey = 'memoraid_weixin_publish_armed_v1';
 
   const getCurrentTitle = (): string => {
     const titleEl = findElement(SELECTORS.titleInput);
@@ -3395,12 +3393,12 @@ const installPublishReporting = () => {
       : (titleEl.innerText || '').trim();
   };
 
-  const reportOnce = (status: string, trigger: string, publishedUrl: string) => {
+  const reportOnce = (status: string, trigger: string, publishedUrl: string, titleText?: string) => {
     if (hasReported) return;
     hasReported = true;
     reportArticlePublish({
       platform: 'weixin',
-      title: getCurrentTitle() || document.title || '未命名文章',
+      title: (titleText || getCurrentTitle() || document.title || '未命名文章').trim(),
       url: publishedUrl,
       status,
       extra: { trigger }
@@ -3421,13 +3419,13 @@ const installPublishReporting = () => {
       const href = a.getAttribute('href') || '';
       if (!href) continue;
       const abs = normalizeUrl(href);
-      if (abs.startsWith('https://mp.weixin.qq.com/s?') || abs.includes('mp.weixin.qq.com/s?')) {
+      if (abs.includes('mp.weixin.qq.com/s?') || abs.includes('mp.weixin.qq.com/s/')) {
         return abs;
       }
     }
 
     const anyText = document.body?.innerText || '';
-    const match = anyText.match(/https?:\/\/mp\.weixin\.qq\.com\/s\?[\w\W]{10,200}/);
+    const match = anyText.match(/https?:\/\/mp\.weixin\.qq\.com\/s(?:\?|\/)[^\s"']+/);
     if (match?.[0]) {
       const url = match[0].split(/\s/)[0];
       return url;
@@ -3435,37 +3433,162 @@ const installPublishReporting = () => {
     return null;
   };
 
-  const maybeReport = (trigger: string) => {
-    if (!armed || hasReported) return;
-    const publishedUrl = findPublishedUrl();
-    if (publishedUrl) reportOnce('published', trigger, publishedUrl);
+  const getArmedInfo = (): { ts: number; trigger?: string; title?: string } | null => {
+    try {
+      const raw = sessionStorage.getItem(armKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { ts?: number; trigger?: string; title?: string } | null;
+      if (!parsed?.ts) return null;
+      return { ts: parsed.ts, trigger: parsed.trigger, title: parsed.title };
+    } catch {
+      return null;
+    }
   };
 
-  document.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement | null;
-    const btn = target?.closest?.('button') as HTMLElement | null;
-    if (!btn) return;
-    const text = (btn.innerText || '').trim();
-    if (!text) return;
-    if (text === '发表' || text.includes('发表')) {
-      armed = true;
-      armAt = Date.now();
-      setTimeout(() => maybeReport('click:publish'), 1500);
-      return;
+  const isArmed = (): boolean => {
+    const info = getArmedInfo();
+    if (!info) return false;
+    return Date.now() - info.ts < 10 * 60 * 1000;
+  };
+
+  const arm = (trigger: string) => {
+    try {
+      sessionStorage.setItem(armKey, JSON.stringify({ ts: Date.now(), trigger, title: getCurrentTitle() }));
+    } catch {
     }
-    if (text.includes('继续发表')) {
-      armed = true;
-      armAt = Date.now();
-      setTimeout(() => maybeReport('click:continue_publish'), 1500);
+  };
+
+  const disarm = () => {
+    try {
+      sessionStorage.removeItem(armKey);
+    } catch {
     }
-  }, true);
+  };
+
+  const maybeReport = (trigger: string) => {
+    if (!isArmed() || hasReported) return;
+    const publishedUrl = findPublishedUrl();
+    if (publishedUrl) {
+      reportOnce('published', trigger, publishedUrl);
+      disarm();
+    }
+  };
+
+  const pageUrl = normalizeUrl(window.location.href);
+  const isPublishedArticlePage =
+    pageUrl.includes('mp.weixin.qq.com/s?') || pageUrl.includes('mp.weixin.qq.com/s/');
+  if (isPublishedArticlePage) {
+    if (isArmed()) {
+      reportOnce('published', 'page:published_url', pageUrl);
+      disarm();
+    }
+    return;
+  }
+
+  const findRecentPublishedInfo = (): { url: string; title: string } | null => {
+    const armed = getArmedInfo();
+    const expectedTitle = (armed?.title || '').trim();
+
+    const links = Array.from(document.querySelectorAll('a[href]')) as HTMLAnchorElement[];
+    const candidates: HTMLAnchorElement[] = [];
+    for (const a of links) {
+      const href = a.getAttribute('href') || '';
+      if (!href) continue;
+      const abs = normalizeUrl(href);
+      if (!abs.includes('mp.weixin.qq.com/s?') && !abs.includes('mp.weixin.qq.com/s/')) continue;
+      if (!(a as any).offsetParent && !(a.getClientRects?.().length)) continue;
+      let cur: HTMLElement | null = a;
+      let withinRecent = false;
+      for (let i = 0; i < 6 && cur; i++) {
+        const text = (cur.innerText || cur.textContent || '').trim();
+        if (text.includes('近期发表')) {
+          withinRecent = true;
+          break;
+        }
+        cur = cur.parentElement;
+      }
+      if (withinRecent) candidates.push(a);
+    }
+
+    const pickTitle = (a: HTMLAnchorElement): string => {
+      const t1 = (a.getAttribute('title') || '').trim();
+      if (t1) return t1;
+      const t2 = (a.innerText || '').trim();
+      if (t2) return t2;
+      const item = a.closest('li, [class*="list"], [class*="item"], [class*="card"], [class*="publish"], [class*="recent"]') as HTMLElement | null;
+      if (item) {
+        const titleEl = item.querySelector('[class*="title"], [data-title], h1, h2, h3') as HTMLElement | null;
+        const t3 = (titleEl?.innerText || '').trim();
+        if (t3) return t3;
+        const t4 = (item.innerText || '').trim();
+        if (t4) return t4.split('\n')[0].trim();
+      }
+      return '';
+    };
+
+    const isGood = (t: string) => t && t.length >= 2 && !t.includes('已发表') && !t.includes('今日');
+
+    if (expectedTitle) {
+      const hit = candidates.find((a) => {
+        const t = pickTitle(a);
+        return t.includes(expectedTitle) || expectedTitle.includes(t);
+      });
+      if (hit) {
+        const abs = normalizeUrl(hit.getAttribute('href') || '');
+        const title = pickTitle(hit) || expectedTitle;
+        return { url: abs, title };
+      }
+    }
+
+    if (candidates.length) {
+      const first = candidates[0];
+      const abs = normalizeUrl(first.getAttribute('href') || '');
+      const title = pickTitle(first);
+      if (abs && isGood(title)) return { url: abs, title };
+      if (abs) return { url: abs, title: title || expectedTitle || document.title || '未命名文章' };
+    }
+
+    return null;
+  };
+
+  const maybeReportFromHome = (trigger: string) => {
+    if (!isArmed() || hasReported) return;
+    const info = findRecentPublishedInfo();
+    if (!info?.url) return;
+    reportOnce('published', trigger, info.url, info.title);
+    disarm();
+  };
+
+  if (detectPageState() === 'home' && isArmed()) {
+    setTimeout(() => maybeReportFromHome('home:recent_initial'), 1200);
+  }
+
+  if (detectPageState() === 'editor') {
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement | null;
+      const btn = target?.closest?.('button') as HTMLElement | null;
+      if (!btn) return;
+      const text = (btn.innerText || '').trim();
+      if (!text) return;
+      if (text === '发表' || text.includes('发表')) {
+        arm('click:publish');
+        setTimeout(() => maybeReport('click:publish'), 1500);
+        return;
+      }
+      if (text.includes('继续发表')) {
+        arm('click:continue_publish');
+        setTimeout(() => maybeReport('click:continue_publish'), 1500);
+      }
+    }, true);
+  }
 
   const observer = new MutationObserver((mutations) => {
     if (hasReported) return;
-    if (armed && Date.now() - armAt > 2 * 60 * 1000) return;
+    if (!isArmed()) return;
     for (const m of mutations) {
       if (m.addedNodes.length) {
         maybeReport('dom:mutation');
+        maybeReportFromHome('home:dom_mutation');
         if (hasReported) return;
       }
     }
