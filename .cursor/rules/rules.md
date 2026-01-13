@@ -20,3 +20,4 @@ Insert overview text here. The agent will only see this should they choose to ap
 13. 需要时参考docs\REMOTE_DEBUG.md的调试步骤进行远程调试，需要我在浏览器生成验证码发给你进行调试
 14. 生成所有临时文件、测试文件、调试文件都统一放在根目录的test目录下，用完视情况删除
 15. 每次执行npm run release前，更新一下版本信息，版本信息在package.json里
+16. 使用.cursor/rules/AGENTS.md里面的skills

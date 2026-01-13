@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, FileText, Settings as SettingsIcon, Loader2, Copy, Eye, Code, Send, History, Trash2, ArrowLeft, X, Square, Github, Folder, UploadCloud, Check, Newspaper, BookOpen, MessageCircle, Bug } from 'lucide-react';
+import { Download, FileText, Settings as SettingsIcon, Loader2, Copy, Eye, Code, Send, History, Trash2, ArrowLeft, X, Square, Github, Folder, UploadCloud, Check, Newspaper, BookOpen, MessageCircle } from 'lucide-react';
 import { getHistory, deleteHistoryItem, HistoryItem, clearHistory, getSettings } from '../utils/storage';
 import { getDirectories, pushToGitHub } from '../utils/github';
 import { ExtractionResult } from '../utils/types';
@@ -813,24 +813,6 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
           <p className="text-[10px] text-gray-400 ml-10">{t.slogan}</p>
         </div>
         <div className="flex gap-1">
-          <a 
-            href="https://github.com/ralph-wren/memoraid" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="p-2 hover:bg-gray-100 rounded-full transition"
-            title="View on GitHub"
-          >
-            <Github className="w-5 h-5 text-gray-600" />
-          </a>
-          <a 
-            href="https://github.com/ralph-wren/memoraid/issues" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="p-2 hover:bg-gray-100 rounded-full transition"
-            title="Report Bug / Feedback"
-          >
-            <Bug className="w-5 h-5 text-gray-600" />
-          </a>
           <button onClick={onOpenSettings} className="p-2 hover:bg-gray-100 rounded-full" title="Settings">
             <SettingsIcon className="w-5 h-5 text-gray-600" />
           </button>

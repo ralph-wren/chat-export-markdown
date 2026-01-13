@@ -142,3 +142,5 @@ vite.config.ts.timestamp-*
 /dist.zip
 /release/
 !/release/memoraid-release.zip
+
+.wrangler

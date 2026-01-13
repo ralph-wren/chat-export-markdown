@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AppSettings, DEFAULT_SETTINGS, getSettings, saveSettings, syncSettings, restoreSettings, ArticleStyleSettings } from '../utils/storage';
 import { SYSTEM_PROMPTS, TOUTIAO_DEFAULT_PROMPT, ZHIHU_DEFAULT_PROMPT, WEIXIN_DEFAULT_PROMPT } from '../utils/prompts';
 import { getTranslation } from '../utils/i18n';
-import { Eye, EyeOff, Github, Loader2, CheckCircle, XCircle, Newspaper, RefreshCw, Cloud, Lock, Key, Bug, Palette, Send, BookOpen, RotateCcw, FileText, MessageCircle, Image } from 'lucide-react';
+import { Eye, EyeOff, Loader2, CheckCircle, XCircle, Newspaper, RefreshCw, Cloud, Lock, Key, Palette, Send, BookOpen, RotateCcw, FileText, MessageCircle, Image, BarChart3, Github } from 'lucide-react';
 import { validateGitHubConnection } from '../utils/github';
 import { generateRandomString } from '../utils/crypto';
 
@@ -24,7 +24,7 @@ interface ProviderConfig {
 }
 
 // 后端 API 地址
-const BACKEND_URL = 'https://memoraid-backend.iuyuger.workers.dev';
+const BACKEND_URL = 'http://memoraid.dpdns.org';
 
 const PROVIDERS: Record<string, ProviderConfig> = {
   'nvidia': {
@@ -398,23 +398,23 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleGithubChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setSettings(prev => ({
-      ...prev,
-      github: {
-        ...prev.github || { token: '', owner: '', repo: '', branch: 'main' },
-        [name]: value
-      }
-    }));
-  };
-
   const handleToutiaoChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setSettings(prev => ({
       ...prev,
       toutiao: {
         ...prev.toutiao || { cookie: '' },
+        [name]: value
+      }
+    }));
+  };
+
+  const handleGithubChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setSettings(prev => ({
+      ...prev,
+      github: {
+        ...prev.github || { token: '', owner: '', repo: '', branch: 'main' },
         [name]: value
       }
     }));
@@ -1364,6 +1364,26 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
+      {/* ========== 文章管理后台 ========== */}
+      <div className="border-t pt-4">
+        <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
+          <BarChart3 className="w-4 h-4 text-indigo-500" />
+          文章数据统计
+        </h3>
+        <div className="space-y-3">
+          <p className="text-xs text-gray-500">
+            查看所有平台发布的文章数据，包括阅读量、点赞、评论、转发等统计信息。
+          </p>
+          <button
+            onClick={() => window.open('http://memoraid.dpdns.org/admin', '_blank')}
+            className="w-full py-2.5 px-4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg flex items-center justify-center gap-2 hover:from-indigo-600 hover:to-purple-600 transition font-medium text-sm shadow-sm"
+          >
+            <BarChart3 className="w-4 h-4" />
+            打开文章管理后台
+          </button>
+        </div>
+      </div>
+
       {/* ========== GitHub 集成 ========== */}
       <div className="border-t pt-4">
         <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
@@ -1478,7 +1498,7 @@ const Settings: React.FC = () => {
                         onClick={() => handleLogin('github')}
                         className="flex-1 py-2 px-3 border rounded flex items-center justify-center gap-2 hover:bg-gray-50 text-sm font-medium transition"
                     >
-                        <Github className="w-4 h-4" />
+                        <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="currentColor" d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
                         {t.githubLogin}
                     </button>
                 </div>
@@ -1597,30 +1617,6 @@ const Settings: React.FC = () => {
                       onChange={(e) => setSettings({ ...settings, enableImageOcr: e.target.checked })}
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
-              </label>
-          </div>
-        </div>
-      </div>
-
-      {/* ========== 调试模式 ========== */}
-      <div className="border-t pt-4">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
-          <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                  <Bug className={`w-5 h-5 ${settings.debugMode ? 'text-orange-500' : 'text-gray-400'}`} />
-                  <div>
-                      <span className="font-medium text-gray-800">{t.debugModeTitle}</span>
-                      <p className="text-xs text-gray-500">{t.debugModeHint}</p>
-                  </div>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                      type="checkbox" 
-                      className="sr-only peer"
-                      checked={settings.debugMode || false}
-                      onChange={(e) => setSettings({ ...settings, debugMode: e.target.checked })}
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
               </label>
           </div>
         </div>

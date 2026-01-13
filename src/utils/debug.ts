@@ -18,7 +18,7 @@ export const reportError = async (error: Error | string, context?: any) => {
     };
 
     // Use the configured backend URL or default
-    const backendUrl = settings.sync?.backendUrl || 'https://memoraid-backend.iuyuger.workers.dev';
+    const backendUrl = settings.sync?.backendUrl || 'http://memoraid.dpdns.org';
     
     // Fire and forget - don't await result to avoid blocking
     fetch(`${backendUrl}/logs`, {

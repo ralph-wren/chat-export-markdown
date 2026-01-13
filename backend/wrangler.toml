@@ -8,3 +8,8 @@ database_name = "memoraid-db"
 database_id = "71207763-85f4-4ebf-92b7-e2da33dd1f21"
 
 
+
+# R2 对象存储绑定
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "pothos-images"

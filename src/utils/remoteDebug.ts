@@ -40,9 +40,9 @@ let currentSession: DebugSession | null = null;
 const getBackendUrl = async (): Promise<string> => {
   try {
     const settings = await getSettings();
-    return settings.sync?.backendUrl || 'https://memoraid-backend.iuyuger.workers.dev';
+    return settings.sync?.backendUrl || 'http://memoraid.dpdns.org';
   } catch {
-    return 'https://memoraid-backend.iuyuger.workers.dev';
+    return 'http://memoraid.dpdns.org';
   }
 };
 

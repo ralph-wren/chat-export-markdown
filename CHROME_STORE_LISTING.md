@@ -178,7 +178,7 @@ AI API 调用（如 OpenAI、DeepSeek 等）是数据请求，不是代码加载
 
 ### 隐私政策 URL
 ```
-https://memoraid-backend.iuyuger.workers.dev/privacy
+http://memoraid.dpdns.org/privacy
 ```
 
 ### 隐私政策要点
