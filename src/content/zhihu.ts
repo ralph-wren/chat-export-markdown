@@ -1,4 +1,4 @@
-import { reportError } from '../utils/debug';
+import { reportArticlePublish, reportError } from '../utils/debug';
 
 // Zhihu Publish Content Script - 基于 Playwright 录制
 // 知乎专栏发布页面自动化
@@ -1760,7 +1760,19 @@ const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
     if (autoPublish && !isFlowCancelled) {
       logger.log('📤 自动发布文章...', 'info');
       await new Promise(r => setTimeout(r, 1000));
-      await clickPublish();
+      const published = await clickPublish();
+      if (published) {
+        const titleEl = findElement(SELECTORS.titleInput);
+        const title =
+          titleEl instanceof HTMLInputElement || titleEl instanceof HTMLTextAreaElement
+            ? titleEl.value
+            : (titleEl?.innerText || '');
+        reportArticlePublish({
+          platform: 'zhihu',
+          title: title || '未命名文章',
+          url: window.location.href
+        });
+      }
     }
     
   } catch (e: unknown) {

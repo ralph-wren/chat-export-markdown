@@ -1,4 +1,4 @@
-import { reportError } from '../utils/debug';
+import { reportArticlePublish, reportError } from '../utils/debug';
 
 // WeChat Official Account Publish Content Script
 // 微信公众号发布页面自动化 - 基于 Playwright 录制
@@ -3058,8 +3058,17 @@ const runPublishFlow = async (options: {
     // Playwright: await page1.locator('#vue_app').getByRole('button', { name: '发表' }).click();
     if (options.autoPublish) {
       logger.log('📤 步骤7: 自动发布文章', 'info');
-      await publishArticle();
-      logger.log('🎉 文章已发布！', 'success');
+      const published = await publishArticle();
+      if (published) {
+        reportArticlePublish({
+          platform: 'weixin',
+          title: options.title || '未命名文章',
+          url: window.location.href
+        });
+        logger.log('🎉 文章已发布！', 'success');
+      } else {
+        logger.log('自动发布失败：未检测到发布成功', 'error');
+      }
     } else {
       logger.log('✅ 公众号文章准备完成！请检查后手动发布', 'success');
     }

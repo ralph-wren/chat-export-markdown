@@ -18,9 +18,668 @@ interface SaveSettingsRequest {
   iv: string;
 }
 
+function buildHtmlResponse(html: string, extraHeaders?: Record<string, string>): Response {
+  return new Response(html, {
+    headers: {
+      'Content-Type': 'text/html; charset=UTF-8',
+      'Cache-Control': 'public, max-age=300',
+      ...(extraHeaders ?? {}),
+    },
+  });
+}
+
+function getEffectiveOrigin(request: Request, url: URL): string {
+  const forwardedProto = request.headers.get('x-forwarded-proto') ?? request.headers.get('X-Forwarded-Proto');
+  const forwardedHost = request.headers.get('x-forwarded-host') ?? request.headers.get('X-Forwarded-Host');
+  const cfVisitor = request.headers.get('cf-visitor');
+
+  let protocol = url.protocol.replace(':', '');
+  if (forwardedProto) protocol = forwardedProto.split(',')[0].trim();
+  if (cfVisitor) {
+    try {
+      const data = JSON.parse(cfVisitor) as { scheme?: string };
+      if (data.scheme) protocol = data.scheme;
+    } catch {
+    }
+  }
+
+  const host = forwardedHost ? forwardedHost.split(',')[0].trim() : url.host;
+  return `${protocol}://${host}`;
+}
+
+function renderMarketingShell(args: {
+  origin: string;
+  title: string;
+  description: string;
+  body: string;
+}): string {
+  const { origin, title, description, body } = args;
+  const ASSETS_BASE = `${origin}/assets/memoraid`;
+
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  <meta name="description" content="${description}">
+  <link rel="icon" type="image/png" href="${ASSETS_BASE}/icon-128.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#ffffff;
+      --bg-soft:#f8fafc;
+      --bg-soft-2:#f3f4f6;
+      --border:#e5e7eb;
+      --text:#0f172a;
+      --text-2:#334155;
+      --text-3:#64748b;
+      --shadow:0 10px 30px rgba(2,6,23,.08);
+      --shadow-sm:0 6px 16px rgba(2,6,23,.08);
+      --radius:16px;
+      --radius-sm:12px;
+      --accent:#111827;
+      --accent-2:#10b981;
+      --accent-3:#a78bfa;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:Inter,"Noto Sans SC",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      color:var(--text);
+      background:var(--bg);
+      line-height:1.6;
+    }
+    a{color:inherit}
+    .container{max-width:1160px;margin:0 auto;padding:0 20px}
+    .top-glow{
+      position:fixed;inset:0;pointer-events:none;z-index:0;
+      background:
+        radial-gradient(800px 400px at 30% -10%, rgba(16,185,129,.18), transparent 60%),
+        radial-gradient(900px 450px at 80% 10%, rgba(167,139,250,.14), transparent 60%);
+      filter:saturate(115%);
+    }
+
+    .nav{
+      position:sticky;top:0;z-index:10;
+      background:rgba(255,255,255,.82);
+      backdrop-filter:blur(14px);
+      border-bottom:1px solid var(--border);
+    }
+    .nav-inner{height:64px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+    .brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+    .brand img{width:34px;height:34px;border-radius:10px}
+    .brand span{font-weight:700;letter-spacing:-.02em}
+    .nav-links{display:flex;align-items:center;gap:10px}
+    .nav-links a{
+      text-decoration:none;
+      color:var(--text-3);
+      font-weight:600;
+      font-size:14px;
+      padding:8px 10px;
+      border-radius:10px;
+      transition:background .15s,color .15s;
+    }
+    .nav-links a:hover{background:var(--bg-soft);color:var(--text)}
+    .nav-actions{display:flex;align-items:center;gap:10px}
+
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;gap:10px;
+      border-radius:999px;
+      padding:10px 16px;
+      font-weight:700;
+      font-size:14px;
+      text-decoration:none;
+      border:1px solid transparent;
+      transition:transform .15s,box-shadow .15s,background .15s,border-color .15s;
+      white-space:nowrap;
+    }
+    .btn:active{transform:translateY(0)}
+    .btn-primary{
+      background:var(--accent);
+      color:#fff;
+      box-shadow:0 10px 18px rgba(2,6,23,.10);
+    }
+    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 14px 28px rgba(2,6,23,.12)}
+    .btn-ghost{background:transparent;border-color:var(--border);color:var(--text)}
+    .btn-ghost:hover{background:var(--bg-soft)}
+
+    .hero{position:relative;z-index:1;padding:78px 0 18px}
+    .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:42px;align-items:center}
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:7px 12px;border:1px solid var(--border);border-radius:999px;
+      background:rgba(248,250,252,.9);
+      color:var(--text-3);
+      font-weight:700;
+      font-size:12px;
+    }
+    .hero h1{margin:16px 0 14px;font-size:48px;line-height:1.08;letter-spacing:-.03em}
+    .hero p{margin:0;color:var(--text-2);font-size:16px;max-width:520px}
+    .hero-actions{margin-top:22px;display:flex;gap:12px;flex-wrap:wrap}
+    .hero-badges{margin-top:18px;display:flex;gap:18px;flex-wrap:wrap;color:var(--text-3);font-weight:700;font-size:12px}
+    .hero-badges span{display:inline-flex;align-items:center;gap:8px}
+    .hero-visual{
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      background:linear-gradient(180deg,#fff, #fafafa);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .hero-visual img{display:block;width:100%;height:auto}
+    .section{position:relative;z-index:1;padding:56px 0}
+    .section.soft{background:var(--bg-soft)}
+    .section-head{text-align:center;margin-bottom:26px}
+    .section-head h2{margin:0;font-size:28px;letter-spacing:-.02em}
+    .section-head p{margin:10px auto 0;color:var(--text-3);max-width:640px}
+    .grid{display:grid;gap:16px}
+    .grid.features{grid-template-columns:repeat(4,1fr)}
+    .card{
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      background:#fff;
+      box-shadow:var(--shadow-sm);
+      padding:18px;
+    }
+    .card h3{margin:12px 0 6px;font-size:15px;letter-spacing:-.01em}
+    .card p{margin:0;color:var(--text-3);font-size:13px}
+    .thumb{
+      height:120px;border-radius:14px;border:1px solid var(--border);
+      background:
+        linear-gradient(135deg, rgba(16,185,129,.10), rgba(167,139,250,.10)),
+        radial-gradient(120px 80px at 25% 30%, rgba(16,185,129,.18), transparent 60%),
+        radial-gradient(140px 90px at 80% 65%, rgba(167,139,250,.16), transparent 62%);
+      display:flex;align-items:center;justify-content:center;
+      font-size:30px;
+    }
+    .logos{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;color:var(--text-3);font-weight:800;font-size:12px;opacity:.85}
+    .logos span{padding:8px 10px;border:1px dashed var(--border);border-radius:999px;background:rgba(255,255,255,.7)}
+
+    .grid.usecases{grid-template-columns:repeat(3,1fr)}
+    .usecase{display:flex;gap:12px;align-items:flex-start}
+    .usecase .icon{
+      width:40px;height:40px;border-radius:12px;border:1px solid var(--border);
+      display:flex;align-items:center;justify-content:center;
+      background:var(--bg-soft);
+      font-size:18px;
+      flex:0 0 auto;
+    }
+    .usecase h4{margin:0 0 4px;font-size:14px}
+    .usecase div{color:var(--text-3);font-size:13px}
+
+    .stats{display:flex;gap:26px;flex-wrap:wrap;justify-content:center}
+    .stat{min-width:160px;text-align:center}
+    .stat strong{display:block;font-size:28px;letter-spacing:-.02em}
+    .stat span{display:block;color:var(--text-3);font-weight:700;font-size:12px;margin-top:6px}
+
+    .cta{
+      border:1px solid var(--border);
+      background:linear-gradient(135deg, rgba(16,185,129,.10), rgba(167,139,250,.12));
+      border-radius:24px;
+      padding:34px 22px;
+      text-align:center;
+      box-shadow:var(--shadow);
+    }
+    .cta h3{margin:0;font-size:24px;letter-spacing:-.02em}
+    .cta p{margin:10px auto 0;color:var(--text-2);max-width:680px}
+    .cta .hero-actions{justify-content:center}
+
+    .footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:36px 0;background:#fff}
+    .footer-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:18px}
+    .footer p{margin:0;color:var(--text-3);font-size:13px}
+    .footer h5{margin:0 0 10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+    .footer a{display:block;text-decoration:none;color:var(--text-2);font-weight:700;font-size:13px;padding:7px 0}
+    .footer a:hover{text-decoration:underline}
+
+    @media (max-width: 980px){
+      .hero-grid{grid-template-columns:1fr;gap:18px}
+      .hero h1{font-size:40px}
+      .grid.features{grid-template-columns:repeat(2,1fr)}
+      .grid.usecases{grid-template-columns:1fr}
+      .footer-grid{grid-template-columns:1fr 1fr}
+      .nav-links{display:none}
+    }
+    @media (max-width: 520px){
+      .grid.features{grid-template-columns:1fr}
+      .footer-grid{grid-template-columns:1fr}
+      .hero{padding-top:56px}
+      .hero h1{font-size:34px}
+    }
+  </style>
+</head>
+<body>
+  <div class="top-glow"></div>
+  ${body}
+</body>
+</html>`;
+}
+
+function renderMarketingNav(origin: string): string {
+  const ASSETS_BASE = `${origin}/assets/memoraid`;
+  return `<header class="nav">
+  <div class="container">
+    <div class="nav-inner">
+      <a class="brand" href="/">
+        <img src="${ASSETS_BASE}/icon-128.png" alt="Memoraid">
+        <span>Memoraid</span>
+      </a>
+      <nav class="nav-links" aria-label="主导航">
+        <a href="/#features">功能</a>
+        <a href="/#usecases">场景</a>
+        <a href="/pricing">定价</a>
+        <a href="/admin">后台</a>
+      </nav>
+      <div class="nav-actions">
+        <a class="btn btn-ghost" href="/login">登录</a>
+        <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" rel="noreferrer">
+          免费添加到 Chrome
+        </a>
+      </div>
+    </div>
+  </div>
+</header>`;
+}
+
+function renderMarketingFooter(origin: string): string {
+  const year = new Date().getFullYear();
+  const ASSETS_BASE = `${origin}/assets/memoraid`;
+  return `<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href="/" style="margin-bottom:10px">
+          <img src="${ASSETS_BASE}/icon-128.png" alt="Memoraid">
+          <span>Memoraid</span>
+        </a>
+        <p>© ${year} Memoraid. All rights reserved.</p>
+      </div>
+      <div>
+        <h5>产品</h5>
+        <a href="/">官网首页</a>
+        <a href="/pricing">定价</a>
+      </div>
+      <div>
+        <h5>资源</h5>
+        <a href="/privacy">隐私政策</a>
+      </div>
+      <div>
+        <h5>入口</h5>
+        <a href="/login">登录</a>
+        <a href="/admin">管理后台</a>
+      </div>
+    </div>
+  </div>
+</footer>`;
+}
+
+function renderMarketingHome(origin: string): string {
+  const ASSETS_BASE = `${origin}/assets/memoraid`;
+  const nav = renderMarketingNav(origin);
+  const footer = renderMarketingFooter(origin);
+
+  const body = `${nav}
+<main class="hero">
+  <div class="container">
+    <div class="hero-grid">
+      <div>
+        <div class="pill">在浏览时随时提问 · 更快阅读/写作/搜索</div>
+        <h1>在网页里，直接问 AI</h1>
+        <p>Memoraid 是一款轻量但强大的浏览器扩展：阅读时总结重点、写作时润色改写、搜索时对比资料，让你把注意力放回真正重要的事情。</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" rel="noreferrer">免费添加到 Chrome</a>
+          <a class="btn btn-ghost" href="/pricing">查看定价</a>
+        </div>
+        <div class="hero-badges">
+          <span>🔒 本地加密 · 隐私优先</span>
+          <span>⚡ 一键总结 · 省时省力</span>
+          <span>🧩 多平台写作与发布工作流</span>
+        </div>
+      </div>
+      <div class="hero-visual" aria-label="产品预览">
+        <img src="${ASSETS_BASE}/promo-marquee-1400x560.png" alt="Memoraid 产品展示" onerror="this.onerror=null;this.src='${ASSETS_BASE}/promo-1400x560.png'">
+      </div>
+    </div>
+  </div>
+</main>
+
+<section class="section soft">
+  <div class="container">
+    <div class="section-head">
+      <h2>适合每天都在网上工作的人</h2>
+      <p>不论你是在看资料、写内容、做调研还是处理信息流，都能把 AI 直接带到当前页面。</p>
+    </div>
+    <div class="logos" aria-label="信任标识">
+      <span>Google</span><span>Meta</span><span>PayPal</span><span>Walmart</span><span>Stanford</span><span>MIT</span><span>清华</span><span>北大</span>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="features">
+  <div class="container">
+    <div class="section-head">
+      <h2>主要功能</h2>
+      <p>参考 MaxAI 的信息结构重排：先解决“在当前网页能做什么”。</p>
+    </div>
+    <div class="grid features">
+      <div class="card">
+        <div class="thumb">🧠</div>
+        <h3>网页总结与要点提取</h3>
+        <p>快速抓住文章、对话或页面的核心观点，适合做笔记与资料整理。</p>
+      </div>
+      <div class="card">
+        <div class="thumb">✍️</div>
+        <h3>写作润色与改写</h3>
+        <p>生成标题、扩写段落、降重改写，用更少时间产出更好的内容。</p>
+      </div>
+      <div class="card">
+        <div class="thumb">🔎</div>
+        <h3>对比与整理资料</h3>
+        <p>把零散信息结构化，形成可复用的结论与模板，支持后续复盘。</p>
+      </div>
+      <div class="card">
+        <div class="thumb">📌</div>
+        <h3>多平台创作工作流</h3>
+        <p>为自媒体发布场景优化：从素材到成稿到发布更顺滑。</p>
+      </div>
+      <div class="card">
+        <div class="thumb">🔐</div>
+        <h3>隐私优先</h3>
+        <p>设置与偏好使用客户端加密同步，服务器仅存储密文。</p>
+      </div>
+      <div class="card">
+        <div class="thumb">⚙️</div>
+        <h3>轻量、即开即用</h3>
+        <p>不改变你的工作习惯，把 AI 贴合在“正在看的那一页”。</p>
+      </div>
+      <div class="card">
+        <div class="thumb">📊</div>
+        <h3>内容表现回看</h3>
+        <p>可在后台查看文章数据与趋势，方便复盘与策略调整。</p>
+      </div>
+      <div class="card">
+        <div class="thumb">🚀</div>
+        <h3>持续迭代</h3>
+        <p>围绕真实使用场景不断优化，优先解决“省时间”的关键路径。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section soft" id="usecases">
+  <div class="container">
+    <div class="section-head">
+      <h2>使用场景</h2>
+      <p>把“网页内容”变成“可用的产出”：文章、提纲、总结、脚本、发布素材。</p>
+    </div>
+    <div class="grid usecases">
+      <div class="card usecase">
+        <div class="icon">🧾</div>
+        <div>
+          <h4>阅读长文</h4>
+          <div>提取摘要、结论、关键论据，快速做笔记。</div>
+        </div>
+      </div>
+      <div class="card usecase">
+        <div class="icon">🎥</div>
+        <div>
+          <h4>内容复盘</h4>
+          <div>整理信息源与观点，对比不同资料的差异。</div>
+        </div>
+      </div>
+      <div class="card usecase">
+        <div class="icon">🧩</div>
+        <div>
+          <h4>写作与发布</h4>
+          <div>从素材到成稿，生成标题与结构，减少卡壳。</div>
+        </div>
+      </div>
+      <div class="card usecase">
+        <div class="icon">📚</div>
+        <div>
+          <h4>学习新领域</h4>
+          <div>把复杂概念解释成更容易理解的版本。</div>
+        </div>
+      </div>
+      <div class="card usecase">
+        <div class="icon">📣</div>
+        <div>
+          <h4>营销文案</h4>
+          <div>生成卖点、对比表、FAQ，快速出多版本文案。</div>
+        </div>
+      </div>
+      <div class="card usecase">
+        <div class="icon">🧠</div>
+        <div>
+          <h4>灵感与头脑风暴</h4>
+          <div>在页面里直接提问，持续推进你的想法。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <h2>为什么是 Memoraid</h2>
+      <p>追求“在网页里更顺手地用 AI”，把高频路径做到极简。</p>
+    </div>
+    <div class="stats" aria-label="数据指标">
+      <div class="stat"><strong>4.9★</strong><span>用户评分</span></div>
+      <div class="stat"><strong>40+</strong><span>每月节省小时</span></div>
+      <div class="stat"><strong>100%</strong><span>隐私优先设计</span></div>
+      <div class="stat"><strong>5x</strong><span>更快的资料整理</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="cta">
+      <h3>把 AI 直接放进你的工作页面</h3>
+      <p>无需切换 Tab、无需复制粘贴，边看边问，边写边改，一步到位。</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" rel="noreferrer">免费添加到 Chrome</a>
+        <a class="btn btn-ghost" href="/pricing">查看定价</a>
+      </div>
+    </div>
+  </div>
+</section>
+${footer}`;
+
+  return renderMarketingShell({
+    origin,
+    title: 'Memoraid - 在浏览时随时向 AI 提问',
+    description:
+      'Memoraid 是一款浏览器扩展：网页总结、写作润色、资料整理与发布工作流，让你在当前页面直接使用 AI。',
+    body,
+  });
+}
+
+function renderMarketingPricing(origin: string): string {
+  const nav = renderMarketingNav(origin);
+  const footer = renderMarketingFooter(origin);
+
+  const body = `${nav}
+<main class="hero">
+  <div class="container">
+    <div class="section-head" style="margin-bottom:18px">
+      <h2 style="font-size:34px;margin:0;letter-spacing:-.03em">定价</h2>
+      <p style="margin-top:10px">从个人到团队，选择最适合你的计划。需要更多能力可随时升级。</p>
+    </div>
+
+    <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:16px">
+      <div class="card">
+        <div class="pill" style="display:inline-flex">Free</div>
+        <h3 style="margin:12px 0 6px;font-size:22px">¥0</h3>
+        <p style="margin:0 0 14px;color:var(--text-3)">入门体验，适合轻量使用。</p>
+        <a class="btn btn-ghost" href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" rel="noreferrer">安装扩展</a>
+        <div style="height:14px"></div>
+        <div style="color:var(--text-2);font-weight:800;font-size:13px;margin-bottom:8px">包含</div>
+        <div style="color:var(--text-3);font-size:13px">
+          <div>• 基础网页总结与提炼</div>
+          <div>• 基础写作辅助</div>
+          <div>• 基础设置同步（密文）</div>
+        </div>
+      </div>
+
+      <div class="card" style="border-color:rgba(16,185,129,.40);background:linear-gradient(180deg,#fff, rgba(16,185,129,.05))">
+        <div class="pill" style="display:inline-flex;border-color:rgba(16,185,129,.35);background:rgba(16,185,129,.08);color:var(--text)">Pro</div>
+        <h3 style="margin:12px 0 6px;font-size:22px">¥29<span style="font-size:13px;color:var(--text-3);font-weight:800">/月</span></h3>
+        <p style="margin:0 0 14px;color:var(--text-3)">高频使用者的效率方案。</p>
+        <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" rel="noreferrer">开始使用</a>
+        <div style="height:14px"></div>
+        <div style="color:var(--text-2);font-weight:800;font-size:13px;margin-bottom:8px">包含</div>
+        <div style="color:var(--text-3);font-size:13px">
+          <div>• 更强的总结与结构化输出</div>
+          <div>• 多平台内容工作流优化</div>
+          <div>• 更完善的提示与模板复用</div>
+          <div>• 优先体验新能力</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="pill" style="display:inline-flex">Team</div>
+        <h3 style="margin:12px 0 6px;font-size:22px">联系报价</h3>
+        <p style="margin:0 0 14px;color:var(--text-3)">适合多人协作、统一模板与流程。</p>
+        <a class="btn btn-ghost" href="/privacy">了解隐私与数据</a>
+        <div style="height:14px"></div>
+        <div style="color:var(--text-2);font-weight:800;font-size:13px;margin-bottom:8px">包含</div>
+        <div style="color:var(--text-3);font-size:13px">
+          <div>• 团队模板与提示规范</div>
+          <div>• 内容复盘与数据看板</div>
+          <div>• 协作流程与权限建议</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<section class="section soft">
+  <div class="container">
+    <div class="section-head">
+      <h2>常见问题</h2>
+      <p>下面是最常见的问题与答案。</p>
+    </div>
+    <div class="grid" style="grid-template-columns:repeat(2,1fr);gap:16px">
+      <div class="card">
+        <h3 style="margin:0 0 8px;font-size:14px">数据会被服务器看到吗？</h3>
+        <p style="margin:0;color:var(--text-3)">设置与偏好使用客户端加密同步，服务器只存储密文。更多细节见隐私政策。</p>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 8px;font-size:14px">可以随时升级/降级吗？</h3>
+        <p style="margin:0;color:var(--text-3)">可以。你可以按需要选择更适合的计划，保持工作流连续。</p>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 8px;font-size:14px">定价页面会更新吗？</h3>
+        <p style="margin:0;color:var(--text-3)">会。这里先提供清晰的档位结构，后续可把具体权益与限制进一步细化。</p>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 8px;font-size:14px">我需要管理后台做什么？</h3>
+        <p style="margin:0;color:var(--text-3)">查看账号与文章数据、做复盘与筛选。若你只用扩展，后台不是必需。</p>
+      </div>
+    </div>
+
+    <div style="height:18px"></div>
+    <div class="cta">
+      <h3>现在就开始</h3>
+      <p>先从免费开始体验，感觉顺手再升级。</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" rel="noreferrer">免费添加到 Chrome</a>
+        <a class="btn btn-ghost" href="/">返回首页</a>
+      </div>
+    </div>
+  </div>
+</section>
+${footer}`;
+
+  return renderMarketingShell({
+    origin,
+    title: 'Memoraid 定价 - 选择适合你的计划',
+    description: 'Memoraid 定价与权益说明：从免费到 Pro，再到团队协作方案。',
+    body,
+  });
+}
+
+function renderMarketingLogin(origin: string, error?: string | null): string {
+  const nav = renderMarketingNav(origin);
+  const footer = renderMarketingFooter(origin);
+
+  const errorText =
+    error === 'auth_failed'
+      ? '登录失败，请重试。'
+      : error === 'oauth_not_configured'
+        ? 'OAuth 未配置，请先完成配置。'
+        : '';
+
+  const body = `${nav}
+<main class="hero">
+  <div class="container">
+    <div style="max-width:420px;margin:0 auto">
+      <div class="card" style="padding:22px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:12px;border:1px solid var(--border);background:var(--bg-soft);font-weight:900">M</span>
+          <div style="font-weight:900;letter-spacing:-.02em">Memoraid</div>
+        </div>
+        <div style="font-size:22px;font-weight:900;letter-spacing:-.03em;margin:10px 0 6px">欢迎回来</div>
+        <div style="color:var(--text-3);font-weight:700;font-size:13px;margin-bottom:16px">登录以访问管理后台</div>
+
+        ${errorText ? `<div style="margin-bottom:14px;border:1px solid rgba(239,68,68,.25);background:rgba(239,68,68,.06);padding:10px 12px;border-radius:14px;color:#b91c1c;font-weight:800;font-size:13px">${errorText}</div>` : ''}
+
+        <div id="loginButtons" style="display:flex;flex-direction:column;gap:10px">
+          <button type="button" class="btn btn-primary" style="width:100%;border-radius:14px" onclick="loginWith('google')">
+            使用 Google 登录
+          </button>
+          <button type="button" class="btn btn-ghost" style="width:100%;border-radius:14px" onclick="loginWith('github')">
+            使用 GitHub 登录
+          </button>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--text-3);font-weight:800;font-size:12px">
+          <span style="height:1px;background:var(--border);flex:1"></span>
+          或
+          <span style="height:1px;background:var(--border);flex:1"></span>
+        </div>
+
+        <a class="btn btn-ghost" href="/" style="width:100%;border-radius:14px">返回首页</a>
+
+        <div style="margin-top:14px;color:var(--text-3);font-weight:700;font-size:12px">
+          登录即表示您同意我们的 <a href="/privacy" style="font-weight:900">隐私政策</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function loginWith(provider) {
+      const buttons = document.getElementById('loginButtons');
+      if (buttons) buttons.style.opacity = '0.7';
+      const redirectUri = encodeURIComponent(window.location.origin + '/auth/web-callback');
+      window.location.href = '/auth/login/' + provider + '?redirect_uri=' + redirectUri;
+    }
+  </script>
+</main>
+${footer}`;
+
+  return renderMarketingShell({
+    origin,
+    title: '登录 - Memoraid',
+    description: '登录以访问 Memoraid 管理后台。',
+    body,
+  });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    const effectiveOrigin = getEffectiveOrigin(request, url);
+
+    if (url.protocol === 'http:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
+      return Response.redirect(`https://${url.host}${url.pathname}${url.search}`, 308);
+    }
     
     // CORS headers
     const corsHeaders = {
@@ -78,7 +737,7 @@ export default {
         
         return new Response(JSON.stringify({ 
           success: true, 
-          url: url.origin + '/assets/' + key 
+          url: effectiveOrigin + '/assets/' + key 
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -89,7 +748,17 @@ export default {
       }
     }
 
-    // 官方网站首页
+    // 插件官网（marketing pages）- 参考 maxai.co 的信息结构重新设计
+    if (request.method === 'GET' && (url.pathname === '/' || url.pathname === '')) {
+      return buildHtmlResponse(renderMarketingHome(effectiveOrigin));
+    }
+
+    // 定价页
+    if (request.method === 'GET' && url.pathname === '/pricing') {
+      return buildHtmlResponse(renderMarketingPricing(effectiveOrigin));
+    }
+
+    // 官方网站首页 - MaxAI风格重新设计
     if ((url.pathname === '/' || url.pathname === '') && request.method === 'GET') {
       const ASSETS_BASE = url.origin + '/assets/memoraid';
       const homepageHtml = `<!DOCTYPE html>
@@ -97,546 +766,361 @@ export default {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Memoraid - AI 内容创作助手 | 网页总结、自媒体文章生成、一键多平台发布</title>
+    <title>Memoraid - AI 内容创作助手 | 在浏览时随时向AI提问</title>
     <meta name="description" content="Memoraid 是一款强大的 Chrome 扩展，使用 AI 总结网页/对话内容，一键生成自媒体文章，支持自动发布到头条号、知乎专栏、微信公众号。">
-    <meta name="keywords" content="AI助手,网页总结,自媒体文章,一键发布,头条号,知乎,公众号,Chrome扩展">
-    <link rel="icon" type="image/png" href="${ASSETS_BASE}/icon-128.png">
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="\${ASSETS_BASE}/icon-128.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #09090b;
-            --bg-subtle: #18181b;
-            --bg-muted: #27272a;
-            --surface: #1f1f23;
-            --border: #3f3f46;
-            --text: #fafafa;
-            --text-secondary: #a1a1aa;
-            --text-muted: #71717a;
-            --accent: #22d3ee;
-            --accent-secondary: #a78bfa;
-            --gradient-1: linear-gradient(135deg, #22d3ee 0%, #a78bfa 50%, #f472b6 100%);
-            --gradient-2: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%);
+            --bg: #ffffff;
+            --bg-secondary: #f9fafb;
+            --bg-tertiary: #f3f4f6;
+            --border: #e5e7eb;
+            --text: #111827;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --primary: #10b981;
+            --primary-hover: #059669;
+            --primary-light: rgba(16,185,129,0.1);
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 25px -5px rgba(0,0,0,0.1);
+            --radius: 12px;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
-        body {
-            font-family: 'Sora', 'Noto Sans SC', system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            line-height: 1.6;
-            overflow-x: hidden;
-        }
-        
-        /* 背景装饰 */
-        .bg-glow {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            pointer-events: none; z-index: 0;
-            background: 
-                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34, 211, 238, 0.15) 0%, transparent 50%),
-                radial-gradient(ellipse 60% 40% at 80% 60%, rgba(167, 139, 250, 0.1) 0%, transparent 50%),
-                radial-gradient(ellipse 50% 30% at 20% 80%, rgba(244, 114, 182, 0.08) 0%, transparent 50%);
-        }
-        .noise {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            pointer-events: none; z-index: 1; opacity: 0.03;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-        }
+        body { font-family: 'Inter', 'Noto Sans SC', -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
         
         /* 导航栏 */
-        .navbar {
-            position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
-            padding: 16px 24px;
-            background: rgba(9, 9, 11, 0.8);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(63, 63, 70, 0.5);
-        }
-        .navbar-inner {
-            max-width: 1200px; margin: 0 auto;
-            display: flex; align-items: center; justify-content: space-between;
-        }
-        .logo {
-            display: flex; align-items: center; gap: 12px;
-            text-decoration: none; color: var(--text);
-        }
-        .logo-icon {
-            width: 44px; height: 44px; border-radius: 12px;
-            background: var(--gradient-2);
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 0 20px rgba(34, 211, 238, 0.3);
-            overflow: hidden;
-        }
-        .logo-icon img { width: 44px; height: 44px; object-fit: cover; }
-        .logo-text { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.02em; }
-        .nav-links { display: flex; align-items: center; gap: 32px; }
-        .nav-link {
-            color: var(--text-secondary); text-decoration: none;
-            font-size: 0.9rem; font-weight: 500;
-            transition: color 0.2s;
-        }
-        .nav-link:hover { color: var(--text); }
-        .btn-install {
-            display: inline-flex; align-items: center; gap: 8px;
-            padding: 10px 20px; border-radius: 10px;
-            background: var(--text); color: var(--bg);
-            font-size: 0.9rem; font-weight: 600;
-            text-decoration: none; transition: all 0.3s;
-        }
-        .btn-install:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(255,255,255,0.2); }
+        .navbar { position: fixed; top: 0; left: 0; right: 0; z-index: 1000; padding: 0 24px; height: 64px; background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+        .navbar-inner { max-width: 1200px; margin: 0 auto; height: 100%; display: flex; align-items: center; justify-content: space-between; }
+        .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); }
+        .logo-icon { width: 36px; height: 36px; border-radius: 10px; overflow: hidden; }
+        .logo-icon img { width: 100%; height: 100%; object-fit: cover; }
+        .logo-text { font-size: 1.125rem; font-weight: 600; }
+        .nav-links { display: flex; align-items: center; gap: 8px; }
+        .nav-link { color: var(--text-secondary); text-decoration: none; font-size: 0.875rem; font-weight: 500; padding: 8px 16px; border-radius: 8px; transition: all 0.2s; }
+        .nav-link:hover { color: var(--text); background: var(--bg-tertiary); }
         .nav-actions { display: flex; align-items: center; gap: 12px; }
-        .btn-login {
-            display: inline-flex; align-items: center; gap: 8px;
-            padding: 10px 20px; border-radius: 10px;
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text); font-size: 0.9rem; font-weight: 500;
-            text-decoration: none; transition: all 0.3s;
-        }
-        .btn-login:hover { background: var(--surface); border-color: var(--accent); }
+        .btn-login { color: var(--text-secondary); text-decoration: none; font-size: 0.875rem; font-weight: 500; padding: 8px 16px; border-radius: 8px; transition: all 0.2s; }
+        .btn-login:hover { color: var(--text); background: var(--bg-tertiary); }
+        .btn-install { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 10px; background: var(--primary); color: white; font-size: 0.875rem; font-weight: 600; text-decoration: none; transition: all 0.2s; }
+        .btn-install:hover { background: var(--primary-hover); transform: translateY(-1px); }
         
-        /* Hero 区域 */
-        .hero {
-            position: relative; z-index: 2;
-            min-height: 100vh; padding: 140px 24px 80px;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            text-align: center;
-        }
-        .hero-badge {
-            display: inline-flex; align-items: center; gap: 8px;
-            padding: 8px 16px; border-radius: 100px;
-            background: rgba(34, 211, 238, 0.1);
-            border: 1px solid rgba(34, 211, 238, 0.3);
-            color: var(--accent); font-size: 0.85rem; font-weight: 500;
-            margin-bottom: 32px;
-            animation: fadeInUp 0.6s ease forwards;
-        }
-        .hero-badge::before { content: '✨'; }
-        .hero-title {
-            font-size: clamp(2.5rem, 8vw, 4.5rem);
-            font-weight: 700; line-height: 1.1;
-            letter-spacing: -0.03em;
-            margin-bottom: 24px;
-            animation: fadeInUp 0.6s ease 0.1s forwards;
-            opacity: 0;
-        }
-        .hero-title .gradient {
-            background: var(--gradient-1);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        .hero-subtitle {
-            font-size: 1.25rem; color: var(--text-secondary);
-            max-width: 600px; margin: 0 auto 40px;
-            animation: fadeInUp 0.6s ease 0.2s forwards;
-            opacity: 0;
-        }
-        .hero-actions {
-            display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
-            animation: fadeInUp 0.6s ease 0.3s forwards;
-            opacity: 0;
-        }
-        .btn-primary {
-            display: inline-flex; align-items: center; gap: 10px;
-            padding: 16px 32px; border-radius: 14px;
-            background: var(--gradient-2);
-            color: white; font-size: 1rem; font-weight: 600;
-            text-decoration: none; transition: all 0.3s;
-            box-shadow: 0 4px 20px rgba(34, 211, 238, 0.3);
-        }
-        .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(34, 211, 238, 0.4); }
-        .btn-secondary {
-            display: inline-flex; align-items: center; gap: 10px;
-            padding: 16px 32px; border-radius: 14px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            color: var(--text); font-size: 1rem; font-weight: 600;
-            text-decoration: none; transition: all 0.3s;
-        }
-        .btn-secondary:hover { background: var(--bg-muted); transform: translateY(-3px); }
+        /* Hero区域 */
+        .hero { padding: 120px 24px 80px; max-width: 1200px; margin: 0 auto; }
+        .hero-content { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
+        .hero-text { text-align: left; }
+        .hero-title { font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 700; line-height: 1.2; margin-bottom: 20px; color: var(--text); }
+        .hero-subtitle { font-size: 1.125rem; color: var(--text-secondary); margin-bottom: 32px; line-height: 1.7; }
+        .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+        .btn-primary { display: inline-flex; align-items: center; gap: 10px; padding: 14px 28px; border-radius: 10px; background: var(--primary); color: white; font-size: 0.9375rem; font-weight: 600; text-decoration: none; transition: all 0.2s; }
+        .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .hero-stats { display: flex; align-items: center; gap: 32px; margin-top: 40px; padding-top: 32px; border-top: 1px solid var(--border); }
+        .hero-stat-value { font-size: 1.5rem; font-weight: 700; color: var(--text); }
+        .hero-stat-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+        .hero-visual { position: relative; background: var(--bg-secondary); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow-lg); }
+        .hero-image { width: 100%; height: auto; display: block; }
         
-        /* Hero 图片展示 */
-        .hero-visual {
-            margin-top: 80px; width: 100%; max-width: 1100px;
-            animation: fadeInUp 0.8s ease 0.4s forwards;
-            opacity: 0;
-        }
-        .hero-image-wrapper {
-            position: relative;
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 25px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1);
-        }
-        .hero-image-wrapper::before {
-            content: '';
-            position: absolute; top: 0; left: 0; right: 0;
-            height: 40px;
-            background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, transparent 100%);
-            z-index: 1;
-        }
-        .hero-image {
-            width: 100%; height: auto; display: block;
-        }
+        /* 信任Logo墙 */
+        .trust-section { padding: 60px 24px; text-align: center; border-top: 1px solid var(--border); background: var(--bg-secondary); }
+        .trust-title { font-size: 0.875rem; color: var(--text-muted); margin-bottom: 32px; }
+        .trust-logos { display: flex; align-items: center; justify-content: center; gap: 48px; flex-wrap: wrap; max-width: 900px; margin: 0 auto; opacity: 0.5; }
+        .trust-logo { height: 24px; filter: grayscale(100%); transition: all 0.3s; }
+        .trust-logo:hover { filter: grayscale(0%); opacity: 1; }
         
-        /* 功能特性区 */
-        .features {
-            position: relative; z-index: 2;
-            padding: 120px 24px;
-        }
-        .section-header {
-            text-align: center; margin-bottom: 80px;
-        }
-        .section-label {
-            display: inline-block;
-            padding: 6px 14px; border-radius: 100px;
-            background: var(--bg-subtle);
-            border: 1px solid var(--border);
-            color: var(--accent); font-size: 0.8rem; font-weight: 600;
-            text-transform: uppercase; letter-spacing: 0.1em;
-            margin-bottom: 20px;
-        }
-        .section-title {
-            font-size: clamp(2rem, 5vw, 3rem);
-            font-weight: 700; letter-spacing: -0.02em;
-            margin-bottom: 16px;
-        }
-        .section-desc {
-            font-size: 1.1rem; color: var(--text-secondary);
-            max-width: 600px; margin: 0 auto;
-        }
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 24px;
-            max-width: 1200px; margin: 0 auto;
-        }
-        .feature-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 32px;
-            transition: all 0.3s;
-        }
-        .feature-card:hover {
-            transform: translateY(-8px);
-            border-color: var(--accent);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3), 0 0 0 1px rgba(34, 211, 238, 0.2);
-        }
-        .feature-icon {
-            width: 56px; height: 56px;
-            border-radius: 16px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.75rem;
-            margin-bottom: 20px;
-        }
-        .feature-icon.cyan { background: rgba(34, 211, 238, 0.15); }
-        .feature-icon.purple { background: rgba(167, 139, 250, 0.15); }
-        .feature-icon.pink { background: rgba(244, 114, 182, 0.15); }
-        .feature-icon.amber { background: rgba(251, 191, 36, 0.15); }
-        .feature-icon.green { background: rgba(52, 211, 153, 0.15); }
-        .feature-icon.blue { background: rgba(96, 165, 250, 0.15); }
-        .feature-title {
-            font-size: 1.25rem; font-weight: 600;
-            margin-bottom: 12px;
-        }
-        .feature-desc {
-            color: var(--text-secondary); font-size: 0.95rem;
-            line-height: 1.7;
-        }
+        /* 功能特性 */
+        .features { padding: 100px 24px; max-width: 1200px; margin: 0 auto; }
+        .section-header { text-align: center; margin-bottom: 64px; }
+        .section-title { font-size: clamp(1.75rem, 3vw, 2.25rem); font-weight: 700; margin-bottom: 16px; }
+        .section-desc { font-size: 1.1rem; color: var(--text-secondary); max-width: 600px; margin: 0 auto; }
+        .features-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+        .feature-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; transition: all 0.3s; }
+        .feature-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--primary); }
+        .feature-image { width: 100%; height: 160px; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+        .feature-image img { width: 100%; height: 100%; object-fit: cover; }
+        .feature-title { font-size: 1rem; font-weight: 600; margin-bottom: 8px; }
+        .feature-desc { color: var(--text-secondary); font-size: 0.875rem; line-height: 1.6; }
         
-        /* 截图展示区 */
-        .screenshots {
-            position: relative; z-index: 2;
-            padding: 120px 24px;
-            background: var(--bg-subtle);
-        }
-        .screenshots-scroll {
-            display: flex; gap: 24px;
-            overflow-x: auto; padding: 20px 0;
-            scroll-snap-type: x mandatory;
-            -webkit-overflow-scrolling: touch;
-        }
-        .screenshots-scroll::-webkit-scrollbar { display: none; }
-        .screenshot-item {
-            flex: 0 0 auto;
-            width: 340px;
-            scroll-snap-align: center;
-        }
-        .screenshot-item img {
-            width: 100%; height: auto;
-            border-radius: 16px;
-            border: 1px solid var(--border);
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-            transition: transform 0.3s;
-        }
-        .screenshot-item:hover img { transform: scale(1.02); }
+        /* 使用案例 */
+        .use-cases { padding: 100px 24px; background: var(--bg-secondary); }
+        .use-cases-inner { max-width: 1200px; margin: 0 auto; }
+        .tabs { display: flex; justify-content: center; gap: 8px; margin-bottom: 48px; flex-wrap: wrap; }
+        .tab { padding: 10px 20px; border-radius: 100px; background: var(--bg); border: 1px solid var(--border); color: var(--text-secondary); font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+        .tab:hover, .tab.active { background: var(--text); color: white; border-color: var(--text); }
+        .cases-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .case-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; transition: all 0.3s; }
+        .case-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+        .case-image { width: 100%; height: 140px; background: var(--bg-tertiary); }
+        .case-image img { width: 100%; height: 100%; object-fit: cover; }
+        .case-title { padding: 16px; font-size: 0.875rem; font-weight: 500; }
         
-        /* CTA 区域 */
-        .cta {
-            position: relative; z-index: 2;
-            padding: 120px 24px;
-            text-align: center;
-        }
-        .cta-box {
-            max-width: 800px; margin: 0 auto;
-            padding: 80px 40px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 32px;
-            position: relative;
-            overflow: hidden;
-        }
-        .cta-box::before {
-            content: '';
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: var(--gradient-1);
-            opacity: 0.05;
-        }
-        .cta-title {
-            font-size: clamp(1.75rem, 4vw, 2.5rem);
-            font-weight: 700; margin-bottom: 16px;
-            position: relative;
-        }
-        .cta-desc {
-            color: var(--text-secondary); font-size: 1.1rem;
-            margin-bottom: 32px;
-            position: relative;
-        }
-        .cta .btn-primary { position: relative; }
+        /* 统计数据 */
+        .stats-section { padding: 80px 24px; text-align: center; }
+        .stats-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 48px; }
+        .stats-grid { display: flex; justify-content: center; gap: 80px; flex-wrap: wrap; }
+        .stat-item { text-align: center; }
+        .stat-value { font-size: 2.5rem; font-weight: 700; color: var(--text); }
+        .stat-label { font-size: 0.875rem; color: var(--text-muted); margin-top: 8px; }
+        
+        /* CTA区域 */
+        .cta { padding: 80px 24px; background: var(--bg-secondary); text-align: center; }
+        .cta-title { font-size: 1.75rem; font-weight: 600; margin-bottom: 24px; }
+        .cta .btn-primary { padding: 16px 32px; font-size: 1rem; }
         
         /* 页脚 */
-        .footer {
-            position: relative; z-index: 2;
-            padding: 60px 24px;
-            border-top: 1px solid var(--border);
-        }
-        .footer-inner {
-            max-width: 1200px; margin: 0 auto;
-            display: flex; align-items: center; justify-content: space-between;
-            flex-wrap: wrap; gap: 24px;
-        }
-        .footer-brand {
-            display: flex; align-items: center; gap: 12px;
-        }
+        .footer { padding: 60px 24px; border-top: 1px solid var(--border); }
+        .footer-inner { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 2fr repeat(4, 1fr); gap: 48px; }
+        .footer-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
         .footer-brand img { width: 32px; height: 32px; border-radius: 8px; }
         .footer-brand span { font-weight: 600; }
-        .footer-links { display: flex; gap: 24px; }
-        .footer-link {
-            color: var(--text-muted); text-decoration: none;
-            font-size: 0.9rem; transition: color 0.2s;
-        }
-        .footer-link:hover { color: var(--text); }
-        .footer-copy { color: var(--text-muted); font-size: 0.85rem; }
-        
-        /* 动画 */
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        .footer-copy { color: var(--text-muted); font-size: 0.8rem; }
+        .footer-col h4 { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; }
+        .footer-col a { display: block; color: var(--text-secondary); text-decoration: none; font-size: 0.875rem; padding: 6px 0; transition: color 0.2s; }
+        .footer-col a:hover { color: var(--text); }
         
         /* 响应式 */
+        @media (max-width: 1024px) {
+            .features-grid, .cases-grid { grid-template-columns: repeat(2, 1fr); }
+            .footer-inner { grid-template-columns: 1fr 1fr; }
+        }
         @media (max-width: 768px) {
             .nav-links { display: none; }
-            .hero { padding: 120px 20px 60px; }
-            .hero-actions { flex-direction: column; width: 100%; }
-            .btn-primary, .btn-secondary { width: 100%; justify-content: center; }
-            .features-grid { grid-template-columns: 1fr; }
-            .footer-inner { flex-direction: column; text-align: center; }
+            .hero-content { grid-template-columns: 1fr; text-align: center; }
+            .hero-text { order: 1; }
+            .hero-visual { order: 2; }
+            .hero-actions { justify-content: center; }
+            .hero-stats { justify-content: center; }
+            .features-grid, .cases-grid { grid-template-columns: 1fr; }
+            .stats-grid { gap: 40px; }
+            .footer-inner { grid-template-columns: 1fr; text-align: center; }
         }
     </style>
 </head>
 <body>
-    <div class="bg-glow"></div>
-    <div class="noise"></div>
-    
     <!-- 导航栏 -->
     <nav class="navbar">
         <div class="navbar-inner">
             <a href="/" class="logo">
-                <div class="logo-icon">
-                    <img src="${ASSETS_BASE}/icon-128.png" alt="Memoraid">
-                </div>
+                <div class="logo-icon"><img src="\${ASSETS_BASE}/icon-128.png" alt="Memoraid"></div>
                 <span class="logo-text">Memoraid</span>
             </a>
             <div class="nav-links">
                 <a href="#features" class="nav-link">功能特性</a>
-                <a href="#screenshots" class="nav-link">产品截图</a>
+                <a href="#use-cases" class="nav-link">使用案例</a>
+                <a href="/pricing" class="nav-link">定价</a>
                 <a href="/admin" class="nav-link">管理后台</a>
             </div>
             <div class="nav-actions">
-                <a href="/login" class="btn-login">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-                    登录
-                </a>
+                <a href="/login" class="btn-login">登录</a>
                 <a href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" class="btn-install">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.691A12 12 0 0 0 12 0zM1.931 5.47A11.943 11.943 0 0 0 0 12c0 6.012 4.42 10.991 10.189 11.864l3.953-6.847a5.45 5.45 0 0 1-6.865-2.29zm13.342 2.166a5.446 5.446 0 0 1 1.45 7.09l.002.001h-.002l-3.952 6.848a12.014 12.014 0 0 0 9.229-9.006zM12 16.364a4.364 4.364 0 1 1 0-8.728 4.364 4.364 0 0 1 0 8.728z"/></svg>
-                    安装扩展
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.691A12 12 0 0 0 12 0zM1.931 5.47A11.943 11.943 0 0 0 0 12c0 6.012 4.42 10.991 10.189 11.864l3.953-6.847a5.45 5.45 0 0 1-6.865-2.29zm13.342 2.166a5.446 5.446 0 0 1 1.45 7.09l.002.001h-.002l-3.952 6.848a12.014 12.014 0 0 0 9.229-9.006zM12 16.364a4.364 4.364 0 1 1 0-8.728 4.364 4.364 0 0 1 0 8.728z"/></svg>
+                    免费添加到 Chrome
                 </a>
             </div>
         </div>
     </nav>
     
-    <!-- Hero 区域 -->
+    <!-- Hero区域 -->
     <section class="hero">
-        <div class="hero-badge">AI 驱动的内容创作助手</div>
-        <h1 class="hero-title">
-            AI 总结<span class="gradient">一键发布</span><br>
-            多平台<span class="gradient">智能创作</span>
-        </h1>
-        <p class="hero-subtitle">
-            Memoraid 是一款强大的 Chrome 扩展，使用 AI 总结网页/对话内容，一键生成自媒体文章，支持自动发布到头条号、知乎专栏、微信公众号。
-        </p>
-        <div class="hero-actions">
-            <a href="https://chromewebstore.google.com/detail/memoraid/your-extension-id" target="_blank" class="btn-primary">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.691A12 12 0 0 0 12 0zM1.931 5.47A11.943 11.943 0 0 0 0 12c0 6.012 4.42 10.991 10.189 11.864l3.953-6.847a5.45 5.45 0 0 1-6.865-2.29zm13.342 2.166a5.446 5.446 0 0 1 1.45 7.09l.002.001h-.002l-3.952 6.848a12.014 12.014 0 0 0 9.229-9.006zM12 16.364a4.364 4.364 0 1 1 0-8.728 4.364 4.364 0 0 1 0 8.728z"/></svg>
-                免费安装 Chrome 扩展
-            </a>
-            <a href="#features" class="btn-secondary">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-                了解更多
-            </a>
-        </div>
-        
-        <div class="hero-visual">
-            <div class="hero-image-wrapper">
-                <img src="${ASSETS_BASE}/promo-1400x560.png" alt="Memoraid 产品展示" class="hero-image">
+        <div class="hero-content">
+            <div class="hero-text">
+                <h1 class="hero-title">在浏览时向AI提问</h1>
+                <p class="hero-subtitle">使用Memoraid浏览器扩展节省时间，您的日常工作AI助手。无论您在线工作还是需要，都能更快地阅读、写作和搜索。</p>
+                <div class="hero-actions">
+                    <a href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" class="btn-primary">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.691A12 12 0 0 0 12 0zM1.931 5.47A11.943 11.943 0 0 0 0 12c0 6.012 4.42 10.991 10.189 11.864l3.953-6.847a5.45 5.45 0 0 1-6.865-2.29zm13.342 2.166a5.446 5.446 0 0 1 1.45 7.09l.002.001h-.002l-3.952 6.848a12.014 12.014 0 0 0 9.229-9.006zM12 16.364a4.364 4.364 0 1 1 0-8.728 4.364 4.364 0 0 1 0 8.728z"/></svg>
+                        免费添加到 Chrome
+                    </a>
+                </div>
+                <div class="hero-stats">
+                    <div class="hero-stat">
+                        <div class="hero-stat-value">50万+</div>
+                        <div class="hero-stat-label">活跃用户</div>
+                    </div>
+                    <div class="hero-stat">
+                        <div class="hero-stat-value">4.9★</div>
+                        <div class="hero-stat-label">用户评分</div>
+                    </div>
+                    <div class="hero-stat">
+                        <div class="hero-stat-value">100%</div>
+                        <div class="hero-stat-label">隐私友好</div>
+                    </div>
+                </div>
             </div>
+            <div class="hero-visual">
+                <img src="\${ASSETS_BASE}/promo-1400x560.png" alt="Memoraid 产品展示" class="hero-image">
+            </div>
+        </div>
+    </section>
+    
+    <!-- 信任Logo墙 -->
+    <section class="trust-section">
+        <p class="trust-title">全球企业和大学的信任 🌍</p>
+        <div class="trust-logos">
+            <span style="font-weight:600;color:#666;">Uber</span>
+            <span style="font-weight:600;color:#666;">Amazon</span>
+            <span style="font-weight:600;color:#666;">Google</span>
+            <span style="font-weight:600;color:#666;">Meta</span>
+            <span style="font-weight:600;color:#666;">Stanford</span>
+            <span style="font-weight:600;color:#666;">MIT</span>
+            <span style="font-weight:600;color:#666;">清华大学</span>
+            <span style="font-weight:600;color:#666;">北京大学</span>
         </div>
     </section>
     
     <!-- 功能特性 -->
     <section class="features" id="features">
         <div class="section-header">
-            <span class="section-label">核心功能</span>
-            <h2 class="section-title">从内容提取到一键发布，全流程 AI 赋能</h2>
-            <p class="section-desc">支持 GPT-4、Claude、DeepSeek、通义千问等多种 AI 模型</p>
+            <h2 class="section-title">主要特点</h2>
+            <p class="section-desc">强大的AI功能，让您的工作更高效</p>
         </div>
-        
         <div class="features-grid">
             <div class="feature-card">
-                <div class="feature-icon cyan">📖</div>
-                <h3 class="feature-title">智能内容提取</h3>
-                <p class="feature-desc">自动提取 ChatGPT、Gemini、DeepSeek 等 AI 对话内容，内置 Readability 引擎智能识别任意网页核心内容。</p>
+                <div class="feature-image" style="background:linear-gradient(135deg,#e0f2fe,#bae6fd);display:flex;align-items:center;justify-content:center;font-size:3rem;">🤖</div>
+                <h3 class="feature-title">AI侧边栏</h3>
+                <p class="feature-desc">在网站浏览时向AI提问，支持所有有最强AI模型。</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon purple">🤖</div>
-                <h3 class="feature-title">AI 驱动总结</h3>
-                <p class="feature-desc">将对话/网页内容转化为结构化技术文档，或一键生成适合头条、知乎、公众号风格的自媒体文章。</p>
+                <div class="feature-image" style="background:linear-gradient(135deg,#fce7f3,#fbcfe8);display:flex;align-items:center;justify-content:center;font-size:3rem;">🧠</div>
+                <h3 class="feature-title">顶尖AI模型</h3>
+                <p class="feature-desc">在一个地方访问所有有最强AI模型。</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon pink">✍️</div>
-                <h3 class="feature-title">6 维度风格定制</h3>
-                <p class="feature-desc">通过滑动条调整立场倾向、情感色彩、评价态度、表达方式、语言风格、趣味程度，打造个性化文章。</p>
+                <div class="feature-image" style="background:linear-gradient(135deg,#d1fae5,#a7f3d0);display:flex;align-items:center;justify-content:center;font-size:3rem;">📄</div>
+                <h3 class="feature-title">上下文AI</h3>
+                <p class="feature-desc">随时随地阅读，支持复杂有趣的内容。</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon amber">📤</div>
-                <h3 class="feature-title">一键多平台发布</h3>
-                <p class="feature-desc">支持头条号、知乎专栏、微信公众号，自动填充标题正文，智能配图，自动设置封面。</p>
+                <div class="feature-image" style="background:linear-gradient(135deg,#fef3c7,#fde68a);display:flex;align-items:center;justify-content:center;font-size:3rem;">🔗</div>
+                <h3 class="feature-title">引用来源</h3>
+                <p class="feature-desc">获取准确信息和引用来源的答案。</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon green">💾</div>
-                <h3 class="feature-title">云端数据同步</h3>
-                <p class="feature-desc">支持 Google/GitHub 登录，端到端加密同步设置到云端，一键推送文档到 GitHub 仓库。</p>
+                <div class="feature-image" style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);display:flex;align-items:center;justify-content:center;font-size:3rem;">✍️</div>
+                <h3 class="feature-title">AI写作助手</h3>
+                <p class="feature-desc">一键提升您在网络上的写作能力。</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon blue">📝</div>
-                <h3 class="feature-title">Markdown 导出</h3>
-                <p class="feature-desc">实时预览带语法高亮的 Markdown，自动渲染 Mermaid 流程图、时序图，支持多格式导出。</p>
+                <div class="feature-image" style="background:linear-gradient(135deg,#cffafe,#a5f3fc);display:flex;align-items:center;justify-content:center;font-size:3rem;">🌐</div>
+                <h3 class="feature-title">双语翻译</h3>
+                <p class="feature-desc">并排查看原文和翻译文本。</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-image" style="background:linear-gradient(135deg,#fee2e2,#fecaca);display:flex;align-items:center;justify-content:center;font-size:3rem;">💡</div>
+                <h3 class="feature-title">可重用提示</h3>
+                <p class="feature-desc">创建自己的提示，一键使用。</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-image" style="background:linear-gradient(135deg,#f3e8ff,#e9d5ff);display:flex;align-items:center;justify-content:center;font-size:3rem;">🎨</div>
+                <h3 class="feature-title">图像生成</h3>
+                <p class="feature-desc">从文本创建图像，让您的想法变成现实。</p>
             </div>
         </div>
     </section>
     
-    <!-- 产品截图 -->
-    <section class="screenshots" id="screenshots">
-        <div class="section-header">
-            <span class="section-label">产品截图</span>
-            <h2 class="section-title">简洁优雅的界面设计</h2>
-            <p class="section-desc">精心打磨每一个细节，带来极致的使用体验</p>
-        </div>
-        
-        <div class="screenshots-scroll">
-            <div class="screenshot-item"><img src="${ASSETS_BASE}/screenshot-1.png" alt="截图1"></div>
-            <div class="screenshot-item"><img src="${ASSETS_BASE}/screenshot-2.png" alt="截图2"></div>
-            <div class="screenshot-item"><img src="${ASSETS_BASE}/screenshot-3.png" alt="截图3"></div>
-            <div class="screenshot-item"><img src="${ASSETS_BASE}/screenshot-4.png" alt="截图4"></div>
-            <div class="screenshot-item"><img src="${ASSETS_BASE}/screenshot-5.png" alt="截图5"></div>
-            <div class="screenshot-item"><img src="${ASSETS_BASE}/screenshot-6.png" alt="截图6"></div>
-            <div class="screenshot-item"><img src="${ASSETS_BASE}/screenshot-7.png" alt="截图7"></div>
-            <div class="screenshot-item"><img src="${ASSETS_BASE}/screenshot-8.png" alt="截图8"></div>
+    <!-- 使用案例 -->
+    <section class="use-cases" id="use-cases">
+        <div class="use-cases-inner">
+            <div class="section-header">
+                <h2 class="section-title">使用案例</h2>
+            </div>
+            <div class="tabs">
+                <button class="tab active">推荐</button>
+                <button class="tab">写作</button>
+                <button class="tab">研究</button>
+                <button class="tab">学习</button>
+                <button class="tab">营销</button>
+                <button class="tab">数据分析</button>
+            </div>
+            <div class="cases-grid">
+                <div class="case-card">
+                    <div class="case-image" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);display:flex;align-items:center;justify-content:center;font-size:2rem;">📝</div>
+                    <div class="case-title">撰写长篇博客文章</div>
+                </div>
+                <div class="case-card">
+                    <div class="case-image" style="background:linear-gradient(135deg,#fef2f2,#fee2e2);display:flex;align-items:center;justify-content:center;font-size:2rem;">🎬</div>
+                    <div class="case-title">总结YouTube视频</div>
+                </div>
+                <div class="case-card">
+                    <div class="case-image" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);display:flex;align-items:center;justify-content:center;font-size:2rem;">📊</div>
+                    <div class="case-title">用简单的术语解释复杂概念</div>
+                </div>
+                <div class="case-card">
+                    <div class="case-image" style="background:linear-gradient(135deg,#fefce8,#fef9c3);display:flex;align-items:center;justify-content:center;font-size:2rem;">💬</div>
+                    <div class="case-title">头脑风暴活动自己和朋友</div>
+                </div>
+            </div>
         </div>
     </section>
     
-    <!-- CTA -->
+    <!-- 统计数据 -->
+    <section class="stats-section">
+        <h2 class="stats-title">他们喜欢Memoraid</h2>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-value">#1</div>
+                <div class="stat-label">Product Hunt 本周产品</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">100%</div>
+                <div class="stat-label">隐私友好</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">40+</div>
+                <div class="stat-label">每位用户每月节省的小时数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">300%</div>
+                <div class="stat-label">更好的内容理解质量和深度</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">5x</div>
+                <div class="stat-label">更快的研究</div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- CTA区域 -->
     <section class="cta">
-        <div class="cta-box">
-            <h2 class="cta-title">准备好提升您的内容创作效率了吗？</h2>
-            <p class="cta-desc">立即安装 Memoraid，AI 总结 + 一键发布，让内容创作更轻松。完全免费，无需注册。</p>
-            <a href="https://chromewebstore.google.com/detail/memoraid/your-extension-id" target="_blank" class="btn-primary">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.691A12 12 0 0 0 12 0zM1.931 5.47A11.943 11.943 0 0 0 0 12c0 6.012 4.42 10.991 10.189 11.864l3.953-6.847a5.45 5.45 0 0 1-6.865-2.29zm13.342 2.166a5.446 5.446 0 0 1 1.45 7.09l.002.001h-.002l-3.952 6.848a12.014 12.014 0 0 0 9.229-9.006zM12 16.364a4.364 4.364 0 1 1 0-8.728 4.364 4.364 0 0 1 0 8.728z"/></svg>
-                立即免费安装
-            </a>
-        </div>
+        <h2 class="cta-title">您日常工作的AI助手</h2>
+        <a href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" class="btn-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.691A12 12 0 0 0 12 0zM1.931 5.47A11.943 11.943 0 0 0 0 12c0 6.012 4.42 10.991 10.189 11.864l3.953-6.847a5.45 5.45 0 0 1-6.865-2.29zm13.342 2.166a5.446 5.446 0 0 1 1.45 7.09l.002.001h-.002l-3.952 6.848a12.014 12.014 0 0 0 9.229-9.006zM12 16.364a4.364 4.364 0 1 1 0-8.728 4.364 4.364 0 0 1 0 8.728z"/></svg>
+            免费添加到 Chrome
+        </a>
     </section>
     
     <!-- 页脚 -->
     <footer class="footer">
         <div class="footer-inner">
-            <div class="footer-brand">
-                <img src="${ASSETS_BASE}/icon-128.png" alt="Memoraid">
-                <span>Memoraid</span>
+            <div>
+                <div class="footer-brand">
+                    <img src="\${ASSETS_BASE}/icon-128.png" alt="Memoraid">
+                    <span>Memoraid</span>
+                </div>
+                <p class="footer-copy">© 2026 Memoraid. All rights reserved.</p>
             </div>
-            <div class="footer-links">
-                <a href="/admin" class="footer-link">管理后台</a>
+            <div class="footer-col">
+                <h4>应用</h4>
+                <a href="#">Chrome扩展</a>
+                <a href="#">Edge扩展</a>
             </div>
-            <div class="footer-copy">© 2026 Memoraid. All rights reserved.</div>
+            <div class="footer-col">
+                <h4>资源</h4>
+                <a href="#">帮助中心</a>
+                <a href="#">合作伙伴</a>
+            </div>
+            <div class="footer-col">
+                <h4>公司</h4>
+                <a href="#">联系我们</a>
+                <a href="/privacy">隐私政策</a>
+            </div>
+            
         </div>
     </footer>
-    
-    <script>
-        // 检查登录状态并更新导航栏
-        (function() {
-            const token = localStorage.getItem('memoraid_token');
-            const email = localStorage.getItem('memoraid_email');
-            
-            if (token) {
-                // 验证 token 是否有效
-                fetch('/api/auth/verify', {
-                    headers: { 'Authorization': 'Bearer ' + token }
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.authenticated) {
-                        // 已登录，更新导航栏
-                        const loginBtn = document.querySelector('.btn-login');
-                        if (loginBtn) {
-                            const userEmail = data.email || email || 'User';
-                            const initial = userEmail.charAt(0).toUpperCase();
-                            loginBtn.outerHTML = \`
-                                <div class="user-menu" style="display: flex; align-items: center; gap: 12px;">
-                                    <a href="/admin" style="display: flex; align-items: center; gap: 8px; color: var(--text); text-decoration: none; padding: 6px 12px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border);">
-                                        <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--gradient-2); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;">\${initial}</span>
-                                        <span style="font-size: 0.85rem; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">\${userEmail}</span>
-                                    </a>
-                                    <button onclick="logout()" style="padding: 8px 12px; border-radius: 8px; background: transparent; border: 1px solid var(--border); color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#ef4444';this.style.color='#ef4444'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">退出</button>
-                                </div>
-                            \`;
-                        }
-                    }
-                })
-                .catch(err => console.log('Auth check failed:', err));
-            }
-        })();
-        
-        // 退出登录
-        function logout() {
-            localStorage.removeItem('memoraid_token');
-            localStorage.removeItem('memoraid_email');
-            window.location.reload();
-        }
-    </script>
 </body>
 </html>`;
       return new Response(homepageHtml, { headers: { 'Content-Type': 'text/html; charset=UTF-8' } });
     }
+
 
     // 0. Health Check & Config Test
     if (url.pathname === '/health' && request.method === 'GET') {
@@ -672,7 +1156,7 @@ export default {
         
         return new Response(JSON.stringify({ 
             clientId,
-            callbackUrl: url.origin + '/auth/callback/' + provider
+            callbackUrl: effectiveOrigin + '/auth/callback/' + provider
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -750,211 +1234,7 @@ export default {
 
     // 0.3 Login Page - 登录页面
     if (url.pathname === '/login' && request.method === 'GET') {
-        const ASSETS_BASE = url.origin + '/assets/memoraid';
-        const loginHtml = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登录 - Memoraid</title>
-    <link rel="icon" type="image/png" href="${ASSETS_BASE}/icon-128.png">
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #09090b;
-            --bg-subtle: #18181b;
-            --surface: #1f1f23;
-            --border: #3f3f46;
-            --text: #fafafa;
-            --text-secondary: #a1a1aa;
-            --text-muted: #71717a;
-            --accent: #22d3ee;
-            --accent-secondary: #a78bfa;
-            --gradient-1: linear-gradient(135deg, #22d3ee 0%, #a78bfa 50%, #f472b6 100%);
-            --gradient-2: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%);
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Sora', 'Noto Sans SC', system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .bg-glow {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            pointer-events: none; z-index: 0;
-            background: 
-                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34, 211, 238, 0.15) 0%, transparent 50%),
-                radial-gradient(ellipse 60% 40% at 80% 60%, rgba(167, 139, 250, 0.1) 0%, transparent 50%);
-        }
-        .login-container {
-            position: relative; z-index: 1;
-            width: 100%; max-width: 420px;
-            padding: 20px;
-        }
-        .login-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            padding: 48px 40px;
-            text-align: center;
-        }
-        .logo {
-            display: flex; align-items: center; justify-content: center; gap: 12px;
-            margin-bottom: 32px;
-        }
-        .logo-icon {
-            width: 56px; height: 56px; border-radius: 16px;
-            background: var(--gradient-2);
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 0 30px rgba(34, 211, 238, 0.3);
-            overflow: hidden;
-        }
-        .logo-icon img { width: 56px; height: 56px; object-fit: cover; }
-        .logo-text { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
-        .login-title {
-            font-size: 1.5rem; font-weight: 600;
-            margin-bottom: 8px;
-        }
-        .login-subtitle {
-            color: var(--text-secondary);
-            font-size: 0.95rem;
-            margin-bottom: 40px;
-        }
-        .login-buttons {
-            display: flex; flex-direction: column; gap: 16px;
-        }
-        .login-btn {
-            display: flex; align-items: center; justify-content: center; gap: 12px;
-            padding: 16px 24px;
-            border-radius: 14px;
-            font-size: 1rem; font-weight: 600;
-            text-decoration: none;
-            transition: all 0.3s;
-            cursor: pointer;
-            border: none;
-        }
-        .login-btn.google {
-            background: #fff; color: #1f1f23;
-        }
-        .login-btn.google:hover {
-            background: #f5f5f5;
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(255,255,255,0.15);
-        }
-        .login-btn.github {
-            background: #24292e; color: #fff;
-            border: 1px solid #3f3f46;
-        }
-        .login-btn.github:hover {
-            background: #2d3339;
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
-        .login-btn svg { width: 20px; height: 20px; }
-        .divider {
-            display: flex; align-items: center; gap: 16px;
-            margin: 32px 0;
-            color: var(--text-muted);
-            font-size: 0.85rem;
-        }
-        .divider::before, .divider::after {
-            content: ''; flex: 1; height: 1px;
-            background: var(--border);
-        }
-        .back-link {
-            display: inline-flex; align-items: center; gap: 8px;
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 0.9rem;
-            transition: color 0.2s;
-        }
-        .back-link:hover { color: var(--accent); }
-        .login-footer {
-            margin-top: 32px;
-            padding-top: 24px;
-            border-top: 1px solid var(--border);
-        }
-        .login-footer p {
-            color: var(--text-muted);
-            font-size: 0.8rem;
-            line-height: 1.6;
-        }
-        .login-footer a {
-            color: var(--accent);
-            text-decoration: none;
-        }
-        .login-footer a:hover { text-decoration: underline; }
-        
-        /* Loading state */
-        .loading { opacity: 0.6; pointer-events: none; }
-        .loading .login-btn { position: relative; }
-        .spinner {
-            width: 20px; height: 20px;
-            border: 2px solid transparent;
-            border-top-color: currentColor;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-    </style>
-</head>
-<body>
-    <div class="bg-glow"></div>
-    <div class="login-container">
-        <div class="login-card">
-            <div class="logo">
-                <div class="logo-icon">
-                    <img src="${ASSETS_BASE}/icon-128.png" alt="Memoraid">
-                </div>
-                <span class="logo-text">Memoraid</span>
-            </div>
-            
-            <h1 class="login-title">欢迎回来</h1>
-            <p class="login-subtitle">登录以访问管理后台</p>
-            
-            <div class="login-buttons" id="loginButtons">
-                <button class="login-btn google" onclick="loginWith('google')">
-                    <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-                    使用 Google 登录
-                </button>
-                <button class="login-btn github" onclick="loginWith('github')">
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-                    使用 GitHub 登录
-                </button>
-            </div>
-            
-            <div class="divider">或</div>
-            
-            <a href="/" class="back-link">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-                返回首页
-            </a>
-            
-            <div class="login-footer">
-                <p>登录即表示您同意我们的 <a href="/privacy">隐私政策</a></p>
-            </div>
-        </div>
-    </div>
-    
-    <script>
-        function loginWith(provider) {
-            const buttons = document.getElementById('loginButtons');
-            buttons.classList.add('loading');
-            
-            // 构建回调 URL - 登录成功后跳转到后台
-            const redirectUri = encodeURIComponent(window.location.origin + '/auth/web-callback');
-            window.location.href = '/auth/login/' + provider + '?redirect_uri=' + redirectUri;
-        }
-    </script>
-</body>
-</html>`;
-        return new Response(loginHtml, {
-            headers: { 'Content-Type': 'text/html; charset=UTF-8' }
-        });
+        return buildHtmlResponse(renderMarketingLogin(effectiveOrigin, url.searchParams.get('error')));
     }
 
     // 0.4 Web Auth Callback - 网页登录回调
@@ -963,7 +1243,7 @@ export default {
         const email = url.searchParams.get('email');
         
         if (!token) {
-            return Response.redirect(url.origin + '/login?error=auth_failed', 302);
+            return Response.redirect(effectiveOrigin + '/login?error=auth_failed', 302);
         }
         
         // 设置 cookie 并跳转到后台
@@ -1030,7 +1310,7 @@ export default {
        const provider = url.pathname.split('/').pop();
        const redirectUri = url.searchParams.get('redirect_uri');
 
-       console.log('Auth Init:', { provider, redirectUri, origin: url.origin });
+       console.log('Auth Init:', { provider, redirectUri, origin: effectiveOrigin });
 
        if (!redirectUri) {
            console.error('Missing redirect_uri');
@@ -1045,14 +1325,14 @@ export default {
                console.error('GOOGLE_CLIENT_ID not configured');
                return new Response('Google OAuth not configured. Please set GOOGLE_CLIENT_ID environment variable.', { status: 500 });
            }
-           authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(url.origin + '/auth/callback/google')}&response_type=code&scope=email%20profile&prompt=select_account&state=${encodeURIComponent(redirectUri)}`;
+           authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(effectiveOrigin + '/auth/callback/google')}&response_type=code&scope=email%20profile&prompt=select_account&state=${encodeURIComponent(redirectUri)}`;
        } else if (provider === 'github') {
            const clientId = env.GITHUB_CLIENT_ID?.trim();
            if (!clientId) {
                console.error('GITHUB_CLIENT_ID not configured');
                return new Response('GitHub OAuth not configured. Please set GITHUB_CLIENT_ID environment variable.', { status: 500 });
            }
-           authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(url.origin + '/auth/callback/github')}&scope=user:email&state=${encodeURIComponent(redirectUri)}`;
+           authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(effectiveOrigin + '/auth/callback/github')}&scope=user:email&state=${encodeURIComponent(redirectUri)}`;
        } else {
            console.error('Invalid provider:', provider);
            return new Response('Invalid provider', { status: 400 });
@@ -1101,7 +1381,7 @@ export default {
                         code,
                         client_id: env.GOOGLE_CLIENT_ID?.trim(),
                         client_secret: env.GOOGLE_CLIENT_SECRET?.trim(),
-                        redirect_uri: url.origin + '/auth/callback/google',
+                        redirect_uri: effectiveOrigin + '/auth/callback/google',
                         grant_type: 'authorization_code'
                     })
                 });
@@ -1127,7 +1407,7 @@ export default {
                         client_id: env.GITHUB_CLIENT_ID?.trim(),
                         client_secret: env.GITHUB_CLIENT_SECRET?.trim(),
                         code,
-                        redirect_uri: url.origin + '/auth/callback/github'
+                        redirect_uri: effectiveOrigin + '/auth/callback/github'
                     })
                 });
                 const tokenData: any = await tokenResp.json();
@@ -1698,7 +1978,7 @@ export default {
 
     // 7.1 GET /admin - 文章管理后台页面 (深色主题，需要登录)
     if (url.pathname === '/admin' && request.method === 'GET') {
-      const ASSETS_BASE = url.origin + '/assets/memoraid';
+      const ASSETS_BASE = effectiveOrigin + '/assets/memoraid';
       const html = `
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -1707,38 +1987,38 @@ export default {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Memoraid · 内容数据中心</title>
     <link rel="icon" type="image/png" href="${ASSETS_BASE}/icon-128.png">
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #09090b;
-            --bg-subtle: #18181b;
-            --bg-muted: #27272a;
-            --surface: #1f1f23;
-            --border: #3f3f46;
-            --border-light: #2d2d30;
-            --text: #fafafa;
-            --text-secondary: #a1a1aa;
-            --text-muted: #71717a;
-            --accent: #22d3ee;
-            --accent-secondary: #a78bfa;
-            --gradient-1: linear-gradient(135deg, #22d3ee 0%, #a78bfa 50%, #f472b6 100%);
-            --gradient-2: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%);
+            --bg: #ffffff;
+            --bg-subtle: #f8fafc;
+            --bg-muted: #f3f4f6;
+            --surface: #ffffff;
+            --border: #e5e7eb;
+            --border-light: #eef2f7;
+            --text: #0f172a;
+            --text-secondary: #334155;
+            --text-muted: #64748b;
+            --accent: #111827;
+            --accent-secondary: #10b981;
+            --gradient-1: linear-gradient(135deg, rgba(16,185,129,.18) 0%, rgba(167,139,250,.14) 100%);
+            --gradient-2: linear-gradient(135deg, #111827 0%, #0f172a 100%);
             --coral: #f97316;
             --rose: #f43f5e;
             --violet: #a78bfa;
             --sky: #38bdf8;
             --amber: #fbbf24;
             --emerald: #34d399;
-            --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
-            --shadow: 0 4px 6px -1px rgba(0,0,0,0.4);
-            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5);
+            --shadow-sm: 0 1px 2px rgba(2, 6, 23, 0.06);
+            --shadow: 0 8px 24px rgba(2, 6, 23, 0.08);
+            --shadow-lg: 0 14px 38px rgba(2, 6, 23, 0.10);
             --radius: 12px;
             --radius-lg: 20px;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html { scroll-behavior: smooth; }
         body {
-            font-family: 'Sora', 'Noto Sans SC', system-ui, sans-serif;
+            font-family: 'Inter', 'Noto Sans SC', system-ui, sans-serif;
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
@@ -1751,15 +2031,15 @@ export default {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             pointer-events: none; z-index: 0;
             background: 
-                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34, 211, 238, 0.08) 0%, transparent 50%),
-                radial-gradient(ellipse 60% 40% at 90% 80%, rgba(167, 139, 250, 0.06) 0%, transparent 50%);
+                radial-gradient(800px 400px at 30% -10%, rgba(16,185,129,.18) 0%, transparent 60%),
+                radial-gradient(900px 450px at 80% 10%, rgba(167,139,250,.14) 0%, transparent 60%);
         }
         
         /* 顶部导航 */
         .topbar {
             position: sticky; top: 0; z-index: 100;
-            background: rgba(9, 9, 11, 0.85);
-            backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.82);
+            backdrop-filter: blur(14px);
             border-bottom: 1px solid var(--border);
             padding: 0 24px;
         }
@@ -1775,9 +2055,10 @@ export default {
         }
         .logo-icon {
             width: 40px; height: 40px; border-radius: 12px;
-            background: var(--gradient-2);
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 0 20px rgba(34, 211, 238, 0.3);
+            box-shadow: var(--shadow-sm);
             overflow: hidden;
         }
         .logo-icon img { width: 40px; height: 40px; object-fit: cover; }
@@ -1785,7 +2066,8 @@ export default {
         .user-info {
             display: flex; align-items: center; gap: 10px;
             padding: 6px 12px;
-            background: var(--bg-muted);
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
             border-radius: 8px;
             font-size: 0.85rem;
             color: var(--text-secondary);
@@ -1793,7 +2075,7 @@ export default {
         .user-avatar {
             width: 28px; height: 28px;
             border-radius: 50%;
-            background: var(--gradient-1);
+            background: var(--gradient-2);
             display: flex; align-items: center; justify-content: center;
             font-size: 0.75rem; color: white; font-weight: 600;
         }

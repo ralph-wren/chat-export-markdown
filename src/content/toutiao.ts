@@ -1,4 +1,4 @@
-import { reportError } from '../utils/debug';
+import { reportArticlePublish, reportError } from '../utils/debug';
 
 // Toutiao Publish Content Script - 元素识别版
 // 完全通过 DOM 选择器操作，不依赖截图和 AI 对话
@@ -1587,7 +1587,19 @@ const runSmartImageFlow = async (autoPublish = false) => {
     if (autoPublish && !isFlowCancelled) {
       logger.log('📤 步骤3: 自动发布文章...', 'info');
       await new Promise(r => setTimeout(r, 1000)); // 等待页面稳定
-      await autoPublishArticle();
+      const published = await autoPublishArticle();
+      if (published) {
+        const titleEl = findElement(SELECTORS.titleInput);
+        const title =
+          titleEl instanceof HTMLInputElement || titleEl instanceof HTMLTextAreaElement
+            ? titleEl.value
+            : (titleEl?.innerText || '');
+        reportArticlePublish({
+          platform: 'toutiao',
+          title: title || '未命名文章',
+          url: window.location.href
+        });
+      }
     }
     
   } catch (e: unknown) {

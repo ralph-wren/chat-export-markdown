@@ -33,3 +33,55 @@ export const reportError = async (error: Error | string, context?: any) => {
     console.error('Error reporting failed:', e);
   }
 };
+
+export const reportArticlePublish = async (args: {
+  platform: string;
+  title: string;
+  url?: string;
+  summary?: string;
+  cover?: string;
+  publishTime?: number;
+  status?: string;
+  extra?: Record<string, unknown>;
+}) => {
+  try {
+    const settings = await getSettings();
+    let backendUrl = settings.sync?.backendUrl || 'https://memoraid.dpdns.org';
+    if (backendUrl.startsWith('http://') && !backendUrl.includes('localhost') && !backendUrl.includes('127.0.0.1')) {
+      backendUrl = backendUrl.replace(/^http:\/\//, 'https://');
+    }
+    const email = settings.sync?.email || 'unknown';
+
+    const payload = {
+      platform: args.platform,
+      account: {
+        id: email,
+        name: email,
+        avatar: '',
+        extra: { source: 'extension' }
+      },
+      articles: [
+        {
+          id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+          title: args.title,
+          summary: args.summary || '',
+          cover: args.cover || '',
+          url: args.url || '',
+          publishTime: args.publishTime || Math.floor(Date.now() / 1000),
+          status: args.status || 'published',
+          extra: args.extra || {}
+        }
+      ]
+    };
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (settings.sync?.token) headers.Authorization = `Bearer ${settings.sync.token}`;
+
+    fetch(`${backendUrl}/api/articles/report`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    }).catch(() => undefined);
+  } catch {
+  }
+};
