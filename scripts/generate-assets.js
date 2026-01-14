@@ -28,10 +28,20 @@ function createSvgBuffer(width, height, content) {
 
 async function generateAssets() {
   console.log('Generating Store Assets (Strict Mode - Updated UI)...');
+  const onlyArg = process.argv.find(arg => arg.startsWith('--only='));
+  const only = onlyArg ? onlyArg.split('=')[1] : '';
   
   const logoBuffer = fs.readFileSync(logoPath);
 
+  if (only && only !== 'marquee' && only !== 'features' && only !== 'all') {
+    throw new Error(`Unknown --only value: ${only}. Use --only=marquee, --only=features or omit.`);
+  }
+
   // 1. Store Icon (128x128) - Keep existing logic
+  if (only && only !== 'all') {
+    console.log(`Only generating ${only}...`);
+  }
+  if (!only || only === 'all') {
   const logoIcon = await sharp(logoBuffer).resize(96, 96).toBuffer();
   await sharp({
     create: {
@@ -45,8 +55,10 @@ async function generateAssets() {
     .png()
     .toFile(path.join(outputDir, 'icon-128.png'));
   console.log('Generated icon-128.png');
+  }
 
   // 2. Small Promo Tile (440x280) - Keep existing logic
+  if (!only || only === 'all') {
   const smallPromoSvg = `
     <rect width="100%" height="100%" fill="#ffffff" />
     <text x="220" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="48" fill="#1e293b">Memoraid</text>
@@ -59,23 +71,93 @@ async function generateAssets() {
     .removeAlpha()
     .toFile(path.join(outputDir, 'promo-small-440x280.png'));
   console.log('Generated promo-small-440x280.png');
+  }
 
   // 3. Marquee Promo Tile (1400x560) - Keep existing logic
+  if (!only || only === 'marquee' || only === 'all') {
   const marqueePromoSvg = `
-    <rect width="100%" height="100%" fill="#f8fafc" />
-    <text x="700" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="100" fill="#1e293b">Memoraid</text>
-    <text x="700" y="400" text-anchor="middle" font-family="Arial, sans-serif" font-size="40" fill="#475569">Export AI Chat to Markdown</text>
-    <text x="700" y="460" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" fill="#64748b">Support ChatGPT &amp; Gemini</text>
+    <defs>
+      <linearGradient id="promo-grad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#3b82f6" />
+        <stop offset="55%" stop-color="#6366f1" />
+        <stop offset="100%" stop-color="#a78bfa" />
+      </linearGradient>
+      <radialGradient id="promo-glow" cx="65%" cy="40%" r="80%">
+        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18" />
+        <stop offset="55%" stop-color="#ffffff" stop-opacity="0.07" />
+        <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+      </radialGradient>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#promo-grad)" />
+    <rect width="100%" height="100%" fill="url(#promo-glow)" />
+    <text x="470" y="330" font-family="Arial, sans-serif" font-weight="900" font-size="156" fill="#ffffff" letter-spacing="1">Memoraid</text>
+    <text x="470" y="410" font-family="Arial, sans-serif" font-weight="800" font-size="48" fill="rgba(255,255,255,0.95)">AI 内容创作 · 一键发布到多平台</text>
   `;
-  const logoMarquee = await sharp(logoBuffer).resize(200, 200).toBuffer();
+  const logoMarquee = await sharp(logoBuffer).resize(320, 320).toBuffer();
   await sharp(createSvgBuffer(1400, 560, marqueePromoSvg))
-    .composite([{ input: logoMarquee, top: 60, left: 600 }])
+    .composite([{ input: logoMarquee, top: 120, left: 110 }])
     .png()
     .removeAlpha()
     .toFile(path.join(outputDir, 'promo-marquee-1400x560.png'));
   console.log('Generated promo-marquee-1400x560.png');
+  }
+
+  if (!only || only === 'features' || only === 'all') {
+    const featureItems = [
+      { file: 'feature-extract.png', title: '要点提炼', subtitle: '网页 / 对话一键总结', a: '#10b981', b: '#3b82f6' },
+      { file: 'feature-rewrite.png', title: '写作改写', subtitle: '标题 · 扩写 · 降重 · 润色', a: '#6366f1', b: '#a78bfa' },
+      { file: 'feature-organize.png', title: '资料整理', subtitle: '对比归纳形成可复用模板', a: '#0ea5e9', b: '#22c55e' },
+      { file: 'feature-publish.png', title: '一键发布', subtitle: '头条 / 知乎 / 公众号自动化', a: '#f97316', b: '#ef4444' },
+      { file: 'feature-privacy.png', title: '隐私优先', subtitle: '客户端加密同步 · 服务器仅密文', a: '#0f172a', b: '#334155' },
+      { file: 'feature-instant.png', title: '即开即用', subtitle: 'AI 贴合在当前页面', a: '#14b8a6', b: '#06b6d4' },
+      { file: 'feature-analytics.png', title: '数据回看', subtitle: '表现趋势一眼掌握', a: '#8b5cf6', b: '#ec4899' },
+      { file: 'feature-assets.png', title: '智能配图', subtitle: '素材上传 R2 · 稳定复用', a: '#22c55e', b: '#a3e635' },
+    ];
+
+    for (const item of featureItems) {
+      const svg = `
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="${item.a}" />
+            <stop offset="100%" stop-color="${item.b}" />
+          </linearGradient>
+          <radialGradient id="glowA" cx="22%" cy="25%" r="70%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.24" />
+            <stop offset="60%" stop-color="#ffffff" stop-opacity="0.06" />
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+          </radialGradient>
+          <radialGradient id="glowB" cx="80%" cy="70%" r="75%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18" />
+            <stop offset="55%" stop-color="#ffffff" stop-opacity="0.06" />
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#bg)" />
+        <rect width="100%" height="100%" fill="url(#glowA)" />
+        <rect width="100%" height="100%" fill="url(#glowB)" />
+
+        <rect x="42" y="44" width="876" height="246" rx="28" fill="rgba(255,255,255,0.16)" stroke="rgba(255,255,255,0.22)" />
+        <rect x="72" y="78" width="520" height="18" rx="9" fill="rgba(255,255,255,0.55)" />
+        <rect x="72" y="112" width="640" height="12" rx="6" fill="rgba(255,255,255,0.34)" />
+        <rect x="72" y="136" width="600" height="12" rx="6" fill="rgba(255,255,255,0.30)" />
+        <rect x="72" y="160" width="520" height="12" rx="6" fill="rgba(255,255,255,0.28)" />
+        <rect x="72" y="192" width="210" height="36" rx="18" fill="rgba(255,255,255,0.55)" />
+        <rect x="292" y="192" width="180" height="36" rx="18" fill="rgba(255,255,255,0.28)" />
+
+        <text x="72" y="352" font-family="Arial, sans-serif" font-weight="900" font-size="72" fill="#ffffff" letter-spacing="0.5">${item.title}</text>
+        <text x="74" y="404" font-family="Arial, sans-serif" font-weight="700" font-size="30" fill="rgba(255,255,255,0.92)">${item.subtitle}</text>
+      `;
+
+      await sharp(createSvgBuffer(960, 480, svg))
+        .png()
+        .removeAlpha()
+        .toFile(path.join(outputDir, item.file));
+      console.log(`Generated ${item.file}`);
+    }
+  }
 
   // --- SCREENSHOTS GENERATION ---
+  if (only && only !== 'all') return;
   
   // Shared Background for Screenshots (Browser Window Style)
   const bgWidth = 1280;

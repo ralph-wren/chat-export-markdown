@@ -15,3 +15,4 @@
 14. 生成所有临时文件、测试文件都统一放在跟目录的test目录下，用完删除
 15. 每次执行npm run release前，更新一下版本信息
 16. 需要遵守.cursor目录下的规则
+17. 通过 bash -lc "CI=1 npx wrangler r2 object put pothos-images/memoraid/feature-extract.png --file ../store-assets/feature-extract.png --content-type image/png --remote" 的方式可以上传图片到r2

@@ -67,6 +67,14 @@ function renderMarketingShell(args: {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+  <script>
+    (function () {
+      try {
+        var token = localStorage.getItem('memoraid_token');
+        if (token) document.documentElement.classList.add('authed');
+      } catch (e) {}
+    })();
+  </script>
   <style>
     :root{
       --bg:#ffffff;
@@ -135,6 +143,9 @@ function renderMarketingShell(args: {
       transition:background .15s,color .15s;
     }
     .nav-login:hover{background:var(--bg-soft);color:var(--text)}
+    [data-auth-admin]{display:none}
+    .authed [data-auth-login]{display:none}
+    .authed [data-auth-admin]{display:inline-flex}
 
     .btn{
       display:inline-flex;align-items:center;justify-content:center;gap:10px;
@@ -183,7 +194,7 @@ function renderMarketingShell(args: {
     }
 
     .hero{position:relative;z-index:1;padding:78px 0 18px}
-    .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:42px;align-items:center}
+    .hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:42px;align-items:center}
     .pill{
       display:inline-flex;align-items:center;gap:8px;
       padding:7px 12px;border:1px solid var(--border);border-radius:999px;
@@ -192,7 +203,7 @@ function renderMarketingShell(args: {
       font-weight:700;
       font-size:12px;
     }
-    .hero h1{margin:16px 0 14px;font-size:48px;line-height:1.08;letter-spacing:-.03em}
+    .hero h1{margin:16px 0 14px;font-size:clamp(34px, 4.6vw, 48px);line-height:1.08;letter-spacing:-.03em;white-space:nowrap}
     .hero p{margin:0;color:var(--text-2);font-size:16px;max-width:520px}
     .hero-actions{margin-top:22px;display:flex;gap:12px;flex-wrap:wrap}
     .hero-badges{margin-top:18px;display:flex;gap:18px;flex-wrap:wrap;color:var(--text-3);font-weight:700;font-size:12px}
@@ -224,13 +235,13 @@ function renderMarketingShell(args: {
     .platform-mark img{width:22px;height:22px;display:block}
     .platform-hint{margin-top:10px;color:var(--text-3);font-weight:700;font-size:12px}
     .hero-visual{
-      border:1px solid var(--border);
       border-radius:var(--radius);
-      background:linear-gradient(180deg,#fff, #fafafa);
       box-shadow:var(--shadow);
       overflow:hidden;
+      aspect-ratio:2.5 / 1;
+      background:linear-gradient(135deg,#3b82f6 0%, #6366f1 55%, #a78bfa 100%);
     }
-    .hero-visual img{display:block;width:100%;height:auto}
+    .hero-visual img{display:block;width:100%;height:100%;object-fit:contain;object-position:center;transform:none}
     .showcase{
       border:1px solid var(--border);
       border-radius:24px;
@@ -372,14 +383,10 @@ function renderMarketingShell(args: {
     .card p{margin:0;color:var(--text-3);font-size:13px}
     .thumb{
       height:124px;border-radius:14px;border:1px solid var(--border);
-      background:
-        linear-gradient(135deg, rgba(16,185,129,.10), rgba(167,139,250,.10)),
-        radial-gradient(120px 80px at 25% 30%, rgba(16,185,129,.18), transparent 60%),
-        radial-gradient(140px 90px at 80% 65%, rgba(167,139,250,.16), transparent 62%);
-      display:flex;align-items:center;justify-content:center;
-      color:rgba(15,23,42,.82);
+      overflow:hidden;
+      background:#fff;
     }
-    .thumb svg{width:30px;height:30px}
+    .thumb img{width:100%;height:100%;object-fit:cover;display:block}
     .logos{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;color:var(--text-3);font-weight:800;font-size:12px;opacity:.85}
     .logos span{padding:8px 10px;border:1px dashed var(--border);border-radius:999px;background:rgba(255,255,255,.7)}
 
@@ -422,7 +429,7 @@ function renderMarketingShell(args: {
 
     @media (max-width: 980px){
       .hero-grid{grid-template-columns:1fr;gap:18px}
-      .hero h1{font-size:40px}
+      .hero h1{font-size:clamp(32px, 6vw, 40px);white-space:normal}
       .grid.features{grid-template-columns:repeat(2,1fr)}
       .grid.usecases{grid-template-columns:1fr}
       .flow{grid-template-columns:1fr}
@@ -445,15 +452,18 @@ function renderMarketingShell(args: {
     (function () {
       try {
         const token = localStorage.getItem('memoraid_token');
-        if (!token) return;
+        if (!token) {
+          document.documentElement.classList.remove('authed');
+          return;
+        }
         fetch('/api/auth/verify', { headers: { Authorization: 'Bearer ' + token } })
           .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
           .then(function (payload) {
-            if (!payload || !payload.ok || !payload.data || !payload.data.authenticated) return;
-            const login = document.querySelector('[data-auth-login]');
-            const admin = document.querySelector('[data-auth-admin]');
-            if (login) login.style.display = 'none';
-            if (admin) admin.style.display = 'inline-flex';
+            if (!payload || !payload.ok || !payload.data || !payload.data.authenticated) {
+              document.documentElement.classList.remove('authed');
+              return;
+            }
+            document.documentElement.classList.add('authed');
           })
           .catch(function () {});
       } catch (e) {}
@@ -479,11 +489,10 @@ function renderMarketingNav(origin: string): string {
         <a href="/#features">功能</a>
         <a href="/#usecases">场景</a>
         <a href="/pricing">定价</a>
-        <a href="/admin">后台</a>
       </nav>
       <div class="nav-actions">
         <a class="nav-login" href="/login" data-auth-login>登录</a>
-        <a class="nav-login" href="/admin" data-auth-admin style="display:none">进入后台</a>
+        <a class="nav-login" href="/admin" data-auth-admin>进入后台</a>
         <a class="btn btn-chrome" href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" rel="noreferrer" aria-label="免费添加到 Chrome（新标签页打开）">
           <span class="btn-icon">${chromeIcon}</span>
           <span>免费添加到 Chrome</span>
@@ -582,7 +591,7 @@ function renderMarketingHome(origin: string): string {
         </div>
       </div>
       <div class="hero-visual" aria-label="产品预览">
-        <img src="${ASSETS_BASE}/promo-marquee-1400x560.png" alt="Memoraid 产品展示" onerror="this.onerror=null;this.src='${ASSETS_BASE}/screenshot-10.png'">
+        <img src="${ASSETS_BASE}/promo-marquee-1400x560.png?v=20260114d" alt="Memoraid 产品展示" onerror="this.onerror=null;this.src='${ASSETS_BASE}/screenshot-10.png?v=20260114d'">
       </div>
     </div>
   </div>
@@ -719,86 +728,42 @@ function renderMarketingHome(origin: string): string {
     </div>
     <div class="grid features">
       <div class="card">
-        <div class="thumb" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M8.5 20c-2.2 0-4-1.8-4-4V9.5C4.5 6.5 7 4 10 4c1.4 0 2.8.6 3.8 1.6A4.8 4.8 0 0 1 16.5 5c2.2 0 4 1.8 4 4v6c0 2.8-2.2 5-5 5H8.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M8.5 14c.6.7 1.5 1.2 2.5 1.2 1 0 1.9-.5 2.5-1.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
+        <div class="thumb" aria-hidden="true"><img src="${ASSETS_BASE}/feature-extract.png?v=20260114f" alt="" loading="lazy" decoding="async"></div>
         <h3>网页总结与要点提取</h3>
         <p>快速抓住文章、对话或页面的核心观点，适合做笔记与资料整理。</p>
       </div>
       <div class="card">
-        <div class="thumb" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M12 20h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
+        <div class="thumb" aria-hidden="true"><img src="${ASSETS_BASE}/feature-rewrite.png?v=20260114f" alt="" loading="lazy" decoding="async"></div>
         <h3>写作润色与改写</h3>
         <p>生成标题、扩写段落、降重改写，用更少时间产出更好的内容。</p>
       </div>
       <div class="card">
-        <div class="thumb" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" stroke="currentColor" stroke-width="1.8"/>
-            <path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-          </svg>
-        </div>
+        <div class="thumb" aria-hidden="true"><img src="${ASSETS_BASE}/feature-organize.png?v=20260114f" alt="" loading="lazy" decoding="async"></div>
         <h3>对比与整理资料</h3>
         <p>把零散信息结构化，形成可复用的结论与模板，支持后续复盘。</p>
       </div>
       <div class="card">
-        <div class="thumb" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M3 11v2a2 2 0 0 0 2 2h2l5 4V5L7 9H5a2 2 0 0 0-2 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-            <path d="M16 8a4 4 0 0 1 0 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-          </svg>
-        </div>
+        <div class="thumb" aria-hidden="true"><img src="${ASSETS_BASE}/feature-publish.png?v=20260114f" alt="" loading="lazy" decoding="async"></div>
         <h3>自动发布到自媒体平台</h3>
         <p>支持头条号、知乎专栏、微信公众号：减少重复排版与来回切换。</p>
       </div>
       <div class="card">
-        <div class="thumb" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M7 11V8a5 5 0 0 1 10 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            <path d="M6 11h12v10H6V11z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-          </svg>
-        </div>
+        <div class="thumb" aria-hidden="true"><img src="${ASSETS_BASE}/feature-privacy.png?v=20260114f" alt="" loading="lazy" decoding="async"></div>
         <h3>隐私优先</h3>
         <p>设置与偏好使用客户端加密同步，服务器仅存储密文。</p>
       </div>
       <div class="card">
-        <div class="thumb" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" stroke="currentColor" stroke-width="1.8"/>
-            <path d="M19.4 15a8 8 0 0 0 .1-1l2-1.2-2-3.4-2.3.7a8.3 8.3 0 0 0-1.7-1l-.3-2.4H11l-.3 2.4a8.3 8.3 0 0 0-1.7 1l-2.3-.7-2 3.4 2 1.2a8 8 0 0 0 .1 1 8 8 0 0 0-.1 1l-2 1.2 2 3.4 2.3-.7c.5.4 1.1.7 1.7 1l.3 2.4h4l.3-2.4c.6-.3 1.2-.6 1.7-1l2.3.7 2-3.4-2-1.2a8 8 0 0 0 .1-1z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-          </svg>
-        </div>
+        <div class="thumb" aria-hidden="true"><img src="${ASSETS_BASE}/feature-instant.png?v=20260114f" alt="" loading="lazy" decoding="async"></div>
         <h3>轻量、即开即用</h3>
         <p>不改变你的工作习惯，把 AI 贴合在“正在看的那一页”。</p>
       </div>
       <div class="card">
-        <div class="thumb" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M4 19V5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            <path d="M4 19h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            <path d="M8 15v-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            <path d="M12 15V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            <path d="M16 15v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-          </svg>
-        </div>
+        <div class="thumb" aria-hidden="true"><img src="${ASSETS_BASE}/feature-analytics.png?v=20260114f" alt="" loading="lazy" decoding="async"></div>
         <h3>内容表现回看</h3>
         <p>可在后台查看文章数据与趋势，方便复盘与策略调整。</p>
       </div>
       <div class="card">
-        <div class="thumb" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5v-11z" stroke="currentColor" stroke-width="1.8"/>
-            <path d="M8.5 10a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2z" stroke="currentColor" stroke-width="1.8"/>
-            <path d="M20 15.2l-4.1-4.1a1.8 1.8 0 0 0-2.5 0L6 18.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-          </svg>
-        </div>
+        <div class="thumb" aria-hidden="true"><img src="${ASSETS_BASE}/feature-assets.png?v=20260114f" alt="" loading="lazy" decoding="async"></div>
         <h3>智能配图与素材复用</h3>
         <p>文章配图上传到 R2 统一管理，稳定链接、方便二次创作。</p>
       </div>
