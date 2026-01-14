@@ -170,6 +170,91 @@ function renderMarketingShell(args: {
       overflow:hidden;
     }
     .hero-visual img{display:block;width:100%;height:auto}
+    .showcase{
+      border:1px solid var(--border);
+      border-radius:24px;
+      background:#fff;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .carousel{position:relative}
+    .carousel:before{
+      content:"";
+      position:absolute;inset:0;
+      background:linear-gradient(90deg, rgba(255,255,255,.95), transparent 12%, transparent 88%, rgba(255,255,255,.95));
+      pointer-events:none;
+      z-index:2;
+    }
+    .carousel-track{
+      display:flex;
+      gap:14px;
+      padding:18px;
+      will-change:transform;
+      animation:carouselScroll 26s linear infinite;
+    }
+    .carousel:hover .carousel-track{animation-play-state:paused}
+    .shot{
+      flex:0 0 auto;
+      width:min(520px, 86vw);
+      border:1px solid var(--border);
+      border-radius:18px;
+      overflow:hidden;
+      background:var(--bg-soft);
+      box-shadow:0 10px 22px rgba(2,6,23,.08);
+      transform:translateZ(0);
+    }
+    .shot img{display:block;width:100%;height:auto}
+    .shot-label{
+      position:absolute;
+      left:14px;
+      bottom:14px;
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.24);
+      background:rgba(15,23,42,.65);
+      color:#fff;
+      font-weight:800;
+      font-size:12px;
+      backdrop-filter:blur(10px);
+    }
+    .shot-wrap{position:relative}
+    @keyframes carouselScroll{
+      0%{transform:translateX(0)}
+      100%{transform:translateX(-50%)}
+    }
+    .flow{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .flow-step{
+      border:1px solid var(--border);
+      border-radius:24px;
+      background:linear-gradient(180deg,#fff, rgba(248,250,252,.65));
+      box-shadow:var(--shadow-sm);
+      padding:20px;
+    }
+    .flow-step strong{display:block;font-size:14px;letter-spacing:-.01em}
+    .flow-step div{margin-top:8px;color:var(--text-3);font-size:13px}
+    .flow-chip{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:7px 12px;border-radius:999px;
+      border:1px solid var(--border);
+      background:rgba(248,250,252,.9);
+      color:var(--text-2);
+      font-weight:900;
+      font-size:12px;
+    }
+    .pulse{
+      width:8px;height:8px;border-radius:999px;background:var(--accent-2);
+      box-shadow:0 0 0 0 rgba(16,185,129,.35);
+      animation:pulse 1.8s ease-out infinite;
+    }
+    @keyframes pulse{
+      0%{box-shadow:0 0 0 0 rgba(16,185,129,.35)}
+      70%{box-shadow:0 0 0 10px rgba(16,185,129,0)}
+      100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}
+    }
+    @media (prefers-reduced-motion: reduce){
+      .carousel-track{animation:none}
+      .pulse{animation:none}
+    }
     .section{position:relative;z-index:1;padding:56px 0}
     .section.soft{background:var(--bg-soft)}
     .section-head{text-align:center;margin-bottom:26px}
@@ -239,6 +324,7 @@ function renderMarketingShell(args: {
       .hero h1{font-size:40px}
       .grid.features{grid-template-columns:repeat(2,1fr)}
       .grid.usecases{grid-template-columns:1fr}
+      .flow{grid-template-columns:1fr}
       .footer-grid{grid-template-columns:1fr 1fr}
       .nav-links{display:none}
     }
@@ -267,6 +353,8 @@ function renderMarketingNav(origin: string): string {
         <span>Memoraid</span>
       </a>
       <nav class="nav-links" aria-label="主导航">
+        <a href="/#showcase">展示</a>
+        <a href="/#flow">流程</a>
         <a href="/#features">功能</a>
         <a href="/#usecases">场景</a>
         <a href="/pricing">定价</a>
@@ -325,21 +413,21 @@ function renderMarketingHome(origin: string): string {
   <div class="container">
     <div class="hero-grid">
       <div>
-        <div class="pill">在浏览时随时提问 · 更快阅读/写作/搜索</div>
-        <h1>在网页里，直接问 AI</h1>
-        <p>Memoraid 是一款轻量但强大的浏览器扩展：阅读时总结重点、写作时润色改写、搜索时对比资料，让你把注意力放回真正重要的事情。</p>
+        <div class="pill">AI 自动化写作 · 一键发布到多平台</div>
+        <h1>把素材变成文章，把文章变成发布</h1>
+        <p>Memoraid 是一款为自媒体工作流优化的浏览器扩展：从网页/对话/资料里提炼要点，生成结构化成稿，并自动发布到头条号、知乎专栏、微信公众号。</p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" rel="noreferrer">免费添加到 Chrome</a>
           <a class="btn btn-ghost" href="/pricing">查看定价</a>
         </div>
         <div class="hero-badges">
-          <span>🔒 本地加密 · 隐私优先</span>
-          <span>⚡ 一键总结 · 省时省力</span>
-          <span>🧩 多平台写作与发布工作流</span>
+          <span>🪄 一键生成自媒体文章</span>
+          <span>📣 自动发布 · 头条/知乎/公众号</span>
+          <span>🖼️ 智能配图 · 图片存储在 R2</span>
         </div>
       </div>
       <div class="hero-visual" aria-label="产品预览">
-        <img src="${ASSETS_BASE}/promo-marquee-1400x560.png" alt="Memoraid 产品展示" onerror="this.onerror=null;this.src='${ASSETS_BASE}/promo-1400x560.png'">
+        <img src="${ASSETS_BASE}/promo-marquee-1400x560.png" alt="Memoraid 产品展示" onerror="this.onerror=null;this.src='${ASSETS_BASE}/screenshot-10.png'">
       </div>
     </div>
   </div>
@@ -357,11 +445,62 @@ function renderMarketingHome(origin: string): string {
   </div>
 </section>
 
+<section class="section" id="showcase">
+  <div class="container">
+    <div class="section-head">
+      <h2>产品展示</h2>
+      <p>用真实界面讲清楚“生成 + 发布 + 复盘”。</p>
+    </div>
+    <div class="showcase">
+      <div class="carousel" aria-label="产品截图轮播">
+        <div class="carousel-track">
+          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-10.png" alt="自动发布到自媒体平台"><div class="shot-label">自动发布</div></div></div>
+          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-6.png" alt="文章风格设置与模板"><div class="shot-label">风格模板</div></div></div>
+          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-1.png" alt="AI 总结与结构化输出"><div class="shot-label">结构化成稿</div></div></div>
+          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-8.png" alt="历史记录与复盘"><div class="shot-label">历史复盘</div></div></div>
+          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-7.png" alt="API 配置与账号登录"><div class="shot-label">配置与账号</div></div></div>
+          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-10.png" alt="自动发布到自媒体平台"><div class="shot-label">自动发布</div></div></div>
+          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-6.png" alt="文章风格设置与模板"><div class="shot-label">风格模板</div></div></div>
+          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-1.png" alt="AI 总结与结构化输出"><div class="shot-label">结构化成稿</div></div></div>
+          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-8.png" alt="历史记录与复盘"><div class="shot-label">历史复盘</div></div></div>
+          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-7.png" alt="API 配置与账号登录"><div class="shot-label">配置与账号</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section soft" id="flow">
+  <div class="container">
+    <div class="section-head">
+      <h2>三步完成自动化</h2>
+      <p>从信息获取到发布，尽量不打断你的节奏。</p>
+    </div>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-chip"><span class="pulse"></span>1. 抓取素材</div>
+        <strong style="margin-top:12px">网页/对话/链接一键整理</strong>
+        <div>自动提取关键内容、引用与结构，减少手动复制粘贴。</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-chip"><span class="pulse"></span>2. 生成成稿</div>
+        <strong style="margin-top:12px">可控的结构与风格</strong>
+        <div>标题、提纲、分段、降重、润色，适配不同平台的表达习惯。</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-chip"><span class="pulse"></span>3. 一键发布</div>
+        <strong style="margin-top:12px">头条/知乎/公众号自动化</strong>
+        <div>自动排版与发布；配图上传到 R2，稳定可复用。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="section" id="features">
   <div class="container">
     <div class="section-head">
       <h2>主要功能</h2>
-      <p>参考 MaxAI 的信息结构重排：先解决“在当前网页能做什么”。</p>
+      <p>围绕自媒体高频动作：提炼、生成、发布、复盘。</p>
     </div>
     <div class="grid features">
       <div class="card">
@@ -380,9 +519,9 @@ function renderMarketingHome(origin: string): string {
         <p>把零散信息结构化，形成可复用的结论与模板，支持后续复盘。</p>
       </div>
       <div class="card">
-        <div class="thumb">📌</div>
-        <h3>多平台创作工作流</h3>
-        <p>为自媒体发布场景优化：从素材到成稿到发布更顺滑。</p>
+        <div class="thumb">📣</div>
+        <h3>自动发布到自媒体平台</h3>
+        <p>支持头条号、知乎专栏、微信公众号：减少重复排版与来回切换。</p>
       </div>
       <div class="card">
         <div class="thumb">🔐</div>
@@ -400,9 +539,9 @@ function renderMarketingHome(origin: string): string {
         <p>可在后台查看文章数据与趋势，方便复盘与策略调整。</p>
       </div>
       <div class="card">
-        <div class="thumb">🚀</div>
-        <h3>持续迭代</h3>
-        <p>围绕真实使用场景不断优化，优先解决“省时间”的关键路径。</p>
+        <div class="thumb">🖼️</div>
+        <h3>智能配图与素材复用</h3>
+        <p>文章配图上传到 R2 统一管理，稳定链接、方便二次创作。</p>
       </div>
     </div>
   </div>
@@ -492,9 +631,9 @@ ${footer}`;
 
   return renderMarketingShell({
     origin,
-    title: 'Memoraid - 在浏览时随时向 AI 提问',
+    title: 'Memoraid - AI 自动化自媒体写作与一键发布',
     description:
-      'Memoraid 是一款浏览器扩展：网页总结、写作润色、资料整理与发布工作流，让你在当前页面直接使用 AI。',
+      'Memoraid 是一款浏览器扩展：提炼素材、生成自媒体文章，并自动发布到头条号、知乎专栏、微信公众号；配图可上传到 R2 统一管理。',
     body,
   });
 }
