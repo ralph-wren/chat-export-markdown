@@ -146,3 +146,4 @@ vite.config.ts.timestamp-*
 .wrangler
 
 test
+.shared/ui-ux-pro-max/scripts/__pycache__/core.cpython-314.pyc

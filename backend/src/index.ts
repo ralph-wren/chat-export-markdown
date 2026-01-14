@@ -125,6 +125,16 @@ function renderMarketingShell(args: {
     }
     .nav-links a:hover{background:var(--bg-soft);color:var(--text)}
     .nav-actions{display:flex;align-items:center;gap:10px}
+    .nav-login{
+      text-decoration:none;
+      color:var(--text-3);
+      font-weight:700;
+      font-size:14px;
+      padding:8px 10px;
+      border-radius:999px;
+      transition:background .15s,color .15s;
+    }
+    .nav-login:hover{background:var(--bg-soft);color:var(--text)}
 
     .btn{
       display:inline-flex;align-items:center;justify-content:center;gap:10px;
@@ -147,6 +157,31 @@ function renderMarketingShell(args: {
     .btn-ghost{background:transparent;border-color:var(--border);color:var(--text)}
     .btn-ghost:hover{background:var(--bg-soft)}
 
+    .btn-chrome{
+      background:linear-gradient(180deg, #0b1220 0%, #0a0f1a 100%);
+      border-color:rgba(255,255,255,.08);
+      color:#fff;
+      box-shadow:0 10px 18px rgba(2,6,23,.14);
+      padding:10px 18px 10px 12px;
+    }
+    .btn-chrome:hover{transform:translateY(-1px);box-shadow:0 16px 32px rgba(2,6,23,.16)}
+    .btn-icon{
+      width:28px;height:28px;border-radius:999px;
+      display:inline-flex;align-items:center;justify-content:center;
+      background:rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+    }
+    .btn-icon svg{width:18px;height:18px;display:block}
+    .btn-chrome:focus-visible,
+    .btn-ghost:focus-visible,
+    .btn-primary:focus-visible,
+    .nav-login:focus-visible,
+    .nav-links a:focus-visible{
+      outline:3px solid rgba(37,99,235,.35);
+      outline-offset:2px;
+    }
+
     .hero{position:relative;z-index:1;padding:78px 0 18px}
     .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:42px;align-items:center}
     .pill{
@@ -162,6 +197,32 @@ function renderMarketingShell(args: {
     .hero-actions{margin-top:22px;display:flex;gap:12px;flex-wrap:wrap}
     .hero-badges{margin-top:18px;display:flex;gap:18px;flex-wrap:wrap;color:var(--text-3);font-weight:700;font-size:12px}
     .hero-badges span{display:inline-flex;align-items:center;gap:8px}
+    .badge-dot{width:8px;height:8px;border-radius:999px;background:rgba(15,23,42,.18);border:1px solid rgba(15,23,42,.14)}
+    .platforms{margin-top:16px}
+    .platforms-title{color:var(--text-3);font-weight:900;font-size:12px;letter-spacing:.02em}
+    .platforms-list{margin-top:10px;display:flex;flex-wrap:wrap;gap:12px}
+    .platform-pill{
+      display:inline-flex;align-items:center;gap:10px;
+      padding:10px 14px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.72);
+      box-shadow:0 8px 18px rgba(2,6,23,.06);
+      color:var(--text-2);
+      font-weight:800;
+      font-size:13px;
+      line-height:1;
+    }
+    .platform-mark{
+      width:34px;height:34px;border-radius:999px;
+      display:inline-flex;align-items:center;justify-content:center;
+      border:1px solid var(--border);
+      background:var(--bg-soft);
+      overflow:hidden;
+      flex:0 0 auto;
+    }
+    .platform-mark img{width:22px;height:22px;display:block}
+    .platform-hint{margin-top:10px;color:var(--text-3);font-weight:700;font-size:12px}
     .hero-visual{
       border:1px solid var(--border);
       border-radius:var(--radius);
@@ -177,33 +238,54 @@ function renderMarketingShell(args: {
       box-shadow:var(--shadow);
       overflow:hidden;
     }
-    .carousel{position:relative}
-    .carousel:before{
-      content:"";
-      position:absolute;inset:0;
-      background:linear-gradient(90deg, rgba(255,255,255,.95), transparent 12%, transparent 88%, rgba(255,255,255,.95));
-      pointer-events:none;
-      z-index:2;
-    }
-    .carousel-track{
+    .showcase-steps{padding:16px}
+    .showcase-tabs{display:flex;flex-wrap:wrap;gap:10px}
+    .showcase-tab{
+      flex:1 1 210px;
       display:flex;
-      gap:14px;
-      padding:18px;
-      will-change:transform;
-      animation:carouselScroll 26s linear infinite;
-    }
-    .carousel:hover .carousel-track{animation-play-state:paused}
-    .shot{
-      flex:0 0 auto;
-      width:min(520px, 86vw);
+      align-items:flex-start;
+      gap:10px;
+      padding:12px 12px;
+      border-radius:16px;
       border:1px solid var(--border);
-      border-radius:18px;
-      overflow:hidden;
-      background:var(--bg-soft);
-      box-shadow:0 10px 22px rgba(2,6,23,.08);
-      transform:translateZ(0);
+      background:rgba(248,250,252,.75);
+      box-shadow:0 10px 22px rgba(2,6,23,.06);
+      cursor:pointer;
+      transition:transform .15s, box-shadow .15s, background .15s, border-color .15s;
+      text-align:left;
     }
-    .shot img{display:block;width:100%;height:auto}
+    .showcase-tab:hover{transform:translateY(-1px);box-shadow:0 16px 34px rgba(2,6,23,.10);background:#fff}
+    .showcase-tab[aria-selected="true"]{
+      border-color:rgba(15,23,42,.16);
+      background:linear-gradient(180deg, rgba(15,23,42,.06), rgba(255,255,255,.96));
+      box-shadow:0 18px 40px rgba(2,6,23,.12);
+    }
+    .showcase-tab-n{
+      width:28px;height:28px;border-radius:12px;
+      display:inline-flex;align-items:center;justify-content:center;
+      border:1px solid rgba(15,23,42,.10);
+      background:#fff;
+      color:rgba(15,23,42,.86);
+      font-weight:900;
+      font-size:12px;
+      flex:0 0 auto;
+    }
+    .showcase-tab-title{margin:1px 0 2px;font-weight:900;font-size:13px;letter-spacing:-.02em}
+    .showcase-tab-sub{margin:0;color:var(--text-3);font-weight:700;font-size:12px;line-height:1.45}
+    .showcase-stage{position:relative;margin-top:14px}
+    .showcase-frame{
+      position:relative;
+      border:1px solid rgba(15,23,42,.12);
+      border-radius:22px;
+      background:#fff;
+      overflow:hidden;
+      box-shadow:0 22px 55px rgba(2,6,23,.12);
+      aspect-ratio:16/10;
+    }
+    .showcase-frame img{width:100%;height:100%;display:block;object-fit:contain;background:#fff}
+    .showcase-copy{margin-top:14px;display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:0 4px}
+    .showcase-copy h3{margin:0;font-size:16px;letter-spacing:-.02em}
+    .showcase-copy p{margin:8px 0 0;color:var(--text-2);font-weight:600;font-size:13px;line-height:1.65;max-width:720px}
     .shot-label{
       position:absolute;
       left:14px;
@@ -217,11 +299,29 @@ function renderMarketingShell(args: {
       font-size:12px;
       backdrop-filter:blur(10px);
     }
-    .shot-wrap{position:relative}
-    @keyframes carouselScroll{
-      0%{transform:translateX(0)}
-      100%{transform:translateX(-50%)}
+    .showcase-frame .shot-label{left:16px;bottom:16px}
+    .carousel-btn{
+      position:absolute;
+      top:50%;
+      transform:translateY(-50%);
+      z-index:3;
+      width:44px;height:44px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.92);
+      box-shadow:0 10px 18px rgba(2,6,23,.10);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      transition:background .15s,box-shadow .15s,transform .15s;
     }
+    .carousel-btn:hover{background:#fff;box-shadow:0 14px 28px rgba(2,6,23,.12)}
+    .carousel-btn:active{transform:translateY(-50%)}
+    .carousel-btn[disabled]{opacity:.4;cursor:not-allowed;box-shadow:none}
+    .carousel-btn svg{width:18px;height:18px}
+    .carousel-btn.prev{left:14px}
+    .carousel-btn.next{right:14px}
     .flow{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
     .flow-step{
       border:1px solid var(--border);
@@ -252,7 +352,6 @@ function renderMarketingShell(args: {
       100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}
     }
     @media (prefers-reduced-motion: reduce){
-      .carousel-track{animation:none}
       .pulse{animation:none}
     }
     .section{position:relative;z-index:1;padding:56px 0}
@@ -272,14 +371,15 @@ function renderMarketingShell(args: {
     .card h3{margin:12px 0 6px;font-size:15px;letter-spacing:-.01em}
     .card p{margin:0;color:var(--text-3);font-size:13px}
     .thumb{
-      height:120px;border-radius:14px;border:1px solid var(--border);
+      height:124px;border-radius:14px;border:1px solid var(--border);
       background:
         linear-gradient(135deg, rgba(16,185,129,.10), rgba(167,139,250,.10)),
         radial-gradient(120px 80px at 25% 30%, rgba(16,185,129,.18), transparent 60%),
         radial-gradient(140px 90px at 80% 65%, rgba(167,139,250,.16), transparent 62%);
       display:flex;align-items:center;justify-content:center;
-      font-size:30px;
+      color:rgba(15,23,42,.82);
     }
+    .thumb svg{width:30px;height:30px}
     .logos{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;color:var(--text-3);font-weight:800;font-size:12px;opacity:.85}
     .logos span{padding:8px 10px;border:1px dashed var(--border);border-radius:999px;background:rgba(255,255,255,.7)}
 
@@ -289,9 +389,10 @@ function renderMarketingShell(args: {
       width:40px;height:40px;border-radius:12px;border:1px solid var(--border);
       display:flex;align-items:center;justify-content:center;
       background:var(--bg-soft);
-      font-size:18px;
       flex:0 0 auto;
+      color:rgba(15,23,42,.84);
     }
+    .usecase .icon svg{width:18px;height:18px}
     .usecase h4{margin:0 0 4px;font-size:14px}
     .usecase div{color:var(--text-3);font-size:13px}
 
@@ -327,6 +428,7 @@ function renderMarketingShell(args: {
       .flow{grid-template-columns:1fr}
       .footer-grid{grid-template-columns:1fr 1fr}
       .nav-links{display:none}
+      .showcase-copy{flex-direction:column}
     }
     @media (max-width: 520px){
       .grid.features{grid-template-columns:1fr}
@@ -339,12 +441,31 @@ function renderMarketingShell(args: {
 <body>
   <div class="top-glow"></div>
   ${body}
+  <script>
+    (function () {
+      try {
+        const token = localStorage.getItem('memoraid_token');
+        if (!token) return;
+        fetch('/api/auth/verify', { headers: { Authorization: 'Bearer ' + token } })
+          .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+          .then(function (payload) {
+            if (!payload || !payload.ok || !payload.data || !payload.data.authenticated) return;
+            const login = document.querySelector('[data-auth-login]');
+            const admin = document.querySelector('[data-auth-admin]');
+            if (login) login.style.display = 'none';
+            if (admin) admin.style.display = 'inline-flex';
+          })
+          .catch(function () {});
+      } catch (e) {}
+    })();
+  </script>
 </body>
 </html>`;
 }
 
 function renderMarketingNav(origin: string): string {
   const ASSETS_BASE = `${origin}/assets/memoraid`;
+  const chromeIcon = renderChromeIconSvg();
   return `<header class="nav">
   <div class="container">
     <div class="nav-inner">
@@ -361,14 +482,26 @@ function renderMarketingNav(origin: string): string {
         <a href="/admin">后台</a>
       </nav>
       <div class="nav-actions">
-        <a class="btn btn-ghost" href="/login">登录</a>
-        <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" rel="noreferrer">
-          免费添加到 Chrome
+        <a class="nav-login" href="/login" data-auth-login>登录</a>
+        <a class="nav-login" href="/admin" data-auth-admin style="display:none">进入后台</a>
+        <a class="btn btn-chrome" href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" rel="noreferrer" aria-label="免费添加到 Chrome（新标签页打开）">
+          <span class="btn-icon">${chromeIcon}</span>
+          <span>免费添加到 Chrome</span>
         </a>
       </div>
     </div>
   </div>
 </header>`;
+}
+
+function renderChromeIconSvg(): string {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">
+  <path fill="#EA4335" d="M12 2a10 10 0 0 1 8.66 5H12a5 5 0 0 0-4.33 2.5L4.2 4.2A10 10 0 0 1 12 2z"/>
+  <path fill="#FBBC05" d="M3.34 6.1A10 10 0 0 0 12 22c1.9 0 3.68-.53 5.2-1.44L12 14.5a5 5 0 0 1-4.33-2.5L3.34 6.1z"/>
+  <path fill="#34A853" d="M20.66 7A10 10 0 0 1 12 22l5.2-9.02A5 5 0 0 0 12 7h8.66z"/>
+  <circle cx="12" cy="12" r="3.6" fill="#4285F4"/>
+  <circle cx="12" cy="12" r="2" fill="#E8F0FE"/>
+</svg>`;
 }
 
 function renderMarketingFooter(origin: string): string {
@@ -407,6 +540,7 @@ function renderMarketingHome(origin: string): string {
   const ASSETS_BASE = `${origin}/assets/memoraid`;
   const nav = renderMarketingNav(origin);
   const footer = renderMarketingFooter(origin);
+  const chromeIcon = renderChromeIconSvg();
 
   const body = `${nav}
 <main class="hero">
@@ -417,13 +551,34 @@ function renderMarketingHome(origin: string): string {
         <h1>把素材变成文章，把文章变成发布</h1>
         <p>Memoraid 是一款为自媒体工作流优化的浏览器扩展：从网页/对话/资料里提炼要点，生成结构化成稿，并自动发布到头条号、知乎专栏、微信公众号。</p>
         <div class="hero-actions">
-          <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" rel="noreferrer">免费添加到 Chrome</a>
+          <a class="btn btn-chrome" href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" rel="noreferrer">
+            <span class="btn-icon">${chromeIcon}</span>
+            <span>免费添加到 Chrome</span>
+          </a>
           <a class="btn btn-ghost" href="/pricing">查看定价</a>
         </div>
         <div class="hero-badges">
-          <span>🪄 一键生成自媒体文章</span>
-          <span>📣 自动发布 · 头条/知乎/公众号</span>
-          <span>🖼️ 智能配图 · 图片存储在 R2</span>
+          <span><span class="badge-dot"></span>一键生成自媒体文章</span>
+          <span><span class="badge-dot"></span>自动发布 · 头条/知乎/公众号</span>
+          <span><span class="badge-dot"></span>智能配图 · 图片存储在 R2</span>
+        </div>
+        <div class="platforms" aria-label="支持发布平台">
+          <div class="platforms-title">支持发布平台</div>
+          <div class="platforms-list">
+            <div class="platform-pill"><span class="platform-mark"><img alt="微信公众号" src="https://cdn.simpleicons.org/wechat/07C160" loading="lazy" decoding="async"></span><span>公众号</span></div>
+            <div class="platform-pill"><span class="platform-mark"><img alt="今日头条" src="https://www.toutiao.com/favicon.ico" referrerpolicy="no-referrer" loading="lazy" decoding="async"></span><span>头条</span></div>
+            <div class="platform-pill"><span class="platform-mark"><img alt="知乎" src="https://cdn.simpleicons.org/zhihu/0084FF" loading="lazy" decoding="async"></span><span>知乎</span></div>
+            <div class="platform-pill"><span class="platform-mark"><img alt="虎扑" src="https://bbs.hupu.com/favicon.ico" referrerpolicy="no-referrer" loading="lazy" decoding="async"></span><span>虎扑</span></div>
+            <div class="platform-pill"><span class="platform-mark"><img alt="百度贴吧" src="https://tieba.baidu.com/favicon.ico" referrerpolicy="no-referrer" loading="lazy" decoding="async"></span><span>贴吧</span></div>
+            <div class="platform-pill"><span class="platform-mark"><img alt="哔哩哔哩" src="https://cdn.simpleicons.org/bilibili/00A1D6" loading="lazy" decoding="async"></span><span>B 站</span></div>
+            <div class="platform-pill"><span class="platform-mark"><img alt="掘金" src="https://cdn.simpleicons.org/juejin/1E80FF" loading="lazy" decoding="async"></span><span>掘金</span></div>
+            <div class="platform-pill"><span class="platform-mark"><img alt="CSDN" src="https://cdn.simpleicons.org/csdn/FC5531" loading="lazy" decoding="async"></span><span>CSDN</span></div>
+            <div class="platform-pill"><span class="platform-mark"><img alt="小红书" src="https://cdn.simpleicons.org/xiaohongshu/FF2442" loading="lazy" decoding="async"></span><span>小红书</span></div>
+            <div class="platform-pill"><span class="platform-mark"><img alt="快手" src="https://cdn.simpleicons.org/kuaishou/FF4906" loading="lazy" decoding="async"></span><span>快手</span></div>
+            <div class="platform-pill"><span class="platform-mark"><img alt="抖音" src="https://cdn.simpleicons.org/tiktok/000000" loading="lazy" decoding="async"></span><span>抖音</span></div>
+            <div class="platform-pill"><span class="platform-mark"><img alt="微博" src="https://cdn.simpleicons.org/sinaweibo/E6162D" loading="lazy" decoding="async"></span><span>微博</span></div>
+          </div>
+          <div class="platform-hint">更多平台持续接入中</div>
         </div>
       </div>
       <div class="hero-visual" aria-label="产品预览">
@@ -448,22 +603,82 @@ function renderMarketingHome(origin: string): string {
 <section class="section" id="showcase">
   <div class="container">
     <div class="section-head">
-      <h2>产品展示</h2>
-      <p>用真实界面讲清楚“生成 + 发布 + 复盘”。</p>
+      <h2>页面里完成一整套工作</h2>
+      <p>提炼 → 成稿 → 发布 → 复盘，每一步都有对应界面。</p>
     </div>
-    <div class="showcase">
-      <div class="carousel" aria-label="产品截图轮播">
-        <div class="carousel-track">
-          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-10.png" alt="自动发布到自媒体平台"><div class="shot-label">自动发布</div></div></div>
-          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-6.png" alt="文章风格设置与模板"><div class="shot-label">风格模板</div></div></div>
-          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-1.png" alt="AI 总结与结构化输出"><div class="shot-label">结构化成稿</div></div></div>
-          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-8.png" alt="历史记录与复盘"><div class="shot-label">历史复盘</div></div></div>
-          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-7.png" alt="API 配置与账号登录"><div class="shot-label">配置与账号</div></div></div>
-          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-10.png" alt="自动发布到自媒体平台"><div class="shot-label">自动发布</div></div></div>
-          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-6.png" alt="文章风格设置与模板"><div class="shot-label">风格模板</div></div></div>
-          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-1.png" alt="AI 总结与结构化输出"><div class="shot-label">结构化成稿</div></div></div>
-          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-8.png" alt="历史记录与复盘"><div class="shot-label">历史复盘</div></div></div>
-          <div class="shot"><div class="shot-wrap"><img src="${ASSETS_BASE}/screenshot-7.png" alt="API 配置与账号登录"><div class="shot-label">配置与账号</div></div></div>
+    <div class="showcase showcase-steps" data-showcase>
+      <div class="showcase-tabs" role="tablist" aria-label="工作流程步骤">
+        <button class="showcase-tab" type="button" data-showcase-step="0" aria-selected="true"
+          data-src="${ASSETS_BASE}/screenshot-11.png"
+          data-alt="网页/对话一键提炼"
+          data-label="Step 01 · 提炼"
+          data-title="网页/对话一键提炼"
+          data-desc="自动抓取关键段落、引用与结构，把零散信息整理成可复用素材。">
+          <span class="showcase-tab-n">01</span>
+          <span>
+            <div class="showcase-tab-title">网页/对话一键提炼</div>
+            <div class="showcase-tab-sub">抓取要点与引用，形成素材库</div>
+          </span>
+        </button>
+        <button class="showcase-tab" type="button" data-showcase-step="1" aria-selected="false"
+          data-src="${ASSETS_BASE}/screenshot-12.png"
+          data-alt="按结构生成成稿"
+          data-label="Step 02 · 成稿"
+          data-title="按结构生成成稿"
+          data-desc="标题、提纲、分段、语气与风格可控，适配各平台的表达习惯。">
+          <span class="showcase-tab-n">02</span>
+          <span>
+            <div class="showcase-tab-title">按结构生成成稿</div>
+            <div class="showcase-tab-sub">提纲分段、语气风格可控</div>
+          </span>
+        </button>
+        <button class="showcase-tab" type="button" data-showcase-step="2" aria-selected="false"
+          data-src="${ASSETS_BASE}/screenshot-13.png"
+          data-alt="一键发布到多平台"
+          data-label="Step 03 · 发布"
+          data-title="一键发布到多平台"
+          data-desc="自动填充标题与正文，处理配图与封面，减少排版与来回切换。">
+          <span class="showcase-tab-n">03</span>
+          <span>
+            <div class="showcase-tab-title">一键发布到多平台</div>
+            <div class="showcase-tab-sub">自动填充、排版、封面配图</div>
+          </span>
+        </button>
+        <button class="showcase-tab" type="button" data-showcase-step="3" aria-selected="false"
+          data-src="${ASSETS_BASE}/screenshot-14.png"
+          data-alt="发布后复盘与沉淀"
+          data-label="Step 04 · 复盘"
+          data-title="发布后复盘与沉淀"
+          data-desc="在后台集中查看文章记录与表现，持续优化选题与写作套路。">
+          <span class="showcase-tab-n">04</span>
+          <span>
+            <div class="showcase-tab-title">发布后复盘与沉淀</div>
+            <div class="showcase-tab-sub">数据回看，形成可复用方法</div>
+          </span>
+        </button>
+      </div>
+
+      <div class="showcase-stage" aria-label="步骤截图展示">
+        <button class="carousel-btn prev" type="button" aria-label="上一张" data-showcase-prev disabled>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="showcase-frame">
+          <img data-showcase-image src="${ASSETS_BASE}/screenshot-11.png" alt="网页/对话一键提炼" loading="lazy" decoding="async">
+          <div class="shot-label" data-showcase-label>Step 01 · 提炼</div>
+        </div>
+        <button class="carousel-btn next" type="button" aria-label="下一张" data-showcase-next>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="showcase-copy">
+        <div>
+          <h3 data-showcase-title>网页/对话一键提炼</h3>
+          <p data-showcase-desc>自动抓取关键段落、引用与结构，把零散信息整理成可复用素材。</p>
         </div>
       </div>
     </div>
@@ -504,42 +719,86 @@ function renderMarketingHome(origin: string): string {
     </div>
     <div class="grid features">
       <div class="card">
-        <div class="thumb">🧠</div>
+        <div class="thumb" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M8.5 20c-2.2 0-4-1.8-4-4V9.5C4.5 6.5 7 4 10 4c1.4 0 2.8.6 3.8 1.6A4.8 4.8 0 0 1 16.5 5c2.2 0 4 1.8 4 4v6c0 2.8-2.2 5-5 5H8.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.5 14c.6.7 1.5 1.2 2.5 1.2 1 0 1.9-.5 2.5-1.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <h3>网页总结与要点提取</h3>
         <p>快速抓住文章、对话或页面的核心观点，适合做笔记与资料整理。</p>
       </div>
       <div class="card">
-        <div class="thumb">✍️</div>
+        <div class="thumb" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M12 20h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <h3>写作润色与改写</h3>
         <p>生成标题、扩写段落、降重改写，用更少时间产出更好的内容。</p>
       </div>
       <div class="card">
-        <div class="thumb">🔎</div>
+        <div class="thumb" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </div>
         <h3>对比与整理资料</h3>
         <p>把零散信息结构化，形成可复用的结论与模板，支持后续复盘。</p>
       </div>
       <div class="card">
-        <div class="thumb">📣</div>
+        <div class="thumb" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M3 11v2a2 2 0 0 0 2 2h2l5 4V5L7 9H5a2 2 0 0 0-2 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M16 8a4 4 0 0 1 0 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </div>
         <h3>自动发布到自媒体平台</h3>
         <p>支持头条号、知乎专栏、微信公众号：减少重复排版与来回切换。</p>
       </div>
       <div class="card">
-        <div class="thumb">🔐</div>
+        <div class="thumb" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M7 11V8a5 5 0 0 1 10 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M6 11h12v10H6V11z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <h3>隐私优先</h3>
         <p>设置与偏好使用客户端加密同步，服务器仅存储密文。</p>
       </div>
       <div class="card">
-        <div class="thumb">⚙️</div>
+        <div class="thumb" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M19.4 15a8 8 0 0 0 .1-1l2-1.2-2-3.4-2.3.7a8.3 8.3 0 0 0-1.7-1l-.3-2.4H11l-.3 2.4a8.3 8.3 0 0 0-1.7 1l-2.3-.7-2 3.4 2 1.2a8 8 0 0 0 .1 1 8 8 0 0 0-.1 1l-2 1.2 2 3.4 2.3-.7c.5.4 1.1.7 1.7 1l.3 2.4h4l.3-2.4c.6-.3 1.2-.6 1.7-1l2.3.7 2-3.4-2-1.2a8 8 0 0 0 .1-1z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <h3>轻量、即开即用</h3>
         <p>不改变你的工作习惯，把 AI 贴合在“正在看的那一页”。</p>
       </div>
       <div class="card">
-        <div class="thumb">📊</div>
+        <div class="thumb" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M4 19V5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M4 19h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M8 15v-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M12 15V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M16 15v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </div>
         <h3>内容表现回看</h3>
         <p>可在后台查看文章数据与趋势，方便复盘与策略调整。</p>
       </div>
       <div class="card">
-        <div class="thumb">🖼️</div>
+        <div class="thumb" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5v-11z" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M8.5 10a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2z" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M20 15.2l-4.1-4.1a1.8 1.8 0 0 0-2.5 0L6 18.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </div>
         <h3>智能配图与素材复用</h3>
         <p>文章配图上传到 R2 统一管理，稳定链接、方便二次创作。</p>
       </div>
@@ -555,42 +814,71 @@ function renderMarketingHome(origin: string): string {
     </div>
     <div class="grid usecases">
       <div class="card usecase">
-        <div class="icon">🧾</div>
+        <div class="icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M7 3h7l3 3v15a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M9 11h6M9 15h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </div>
         <div>
           <h4>阅读长文</h4>
           <div>提取摘要、结论、关键论据，快速做笔记。</div>
         </div>
       </div>
       <div class="card usecase">
-        <div class="icon">🎥</div>
+        <div class="icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M4 7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M16 10l4-2v8l-4-2v-4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <div>
           <h4>内容复盘</h4>
           <div>整理信息源与观点，对比不同资料的差异。</div>
         </div>
       </div>
       <div class="card usecase">
-        <div class="icon">🧩</div>
+        <div class="icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M8 8h3a2 2 0 1 0 0-4h5v5a2 2 0 1 1-4 0V8H8v4a2 2 0 1 1 0 4H4v-5a2 2 0 1 0 4 0V8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <div>
           <h4>写作与发布</h4>
           <div>从素材到成稿，生成标题与结构，减少卡壳。</div>
         </div>
       </div>
       <div class="card usecase">
-        <div class="icon">📚</div>
+        <div class="icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M6 4h10a2 2 0 0 1 2 2v14H8a2 2 0 0 0-2 2V4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M6 20h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </div>
         <div>
           <h4>学习新领域</h4>
           <div>把复杂概念解释成更容易理解的版本。</div>
         </div>
       </div>
       <div class="card usecase">
-        <div class="icon">📣</div>
+        <div class="icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M3 11v2a2 2 0 0 0 2 2h2l5 4V5L7 9H5a2 2 0 0 0-2 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M16 8a4 4 0 0 1 0 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </div>
         <div>
           <h4>营销文案</h4>
           <div>生成卖点、对比表、FAQ，快速出多版本文案。</div>
         </div>
       </div>
       <div class="card usecase">
-        <div class="icon">🧠</div>
+        <div class="icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M8.5 20c-2.2 0-4-1.8-4-4V9.5C4.5 6.5 7 4 10 4c1.4 0 2.8.6 3.8 1.6A4.8 4.8 0 0 1 16.5 5c2.2 0 4 1.8 4 4v6c0 2.8-2.2 5-5 5H8.5z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.5 14c.6.7 1.5 1.2 2.5 1.2 1 0 1.9-.5 2.5-1.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <div>
           <h4>灵感与头脑风暴</h4>
           <div>在页面里直接提问，持续推进你的想法。</div>
@@ -621,12 +909,94 @@ function renderMarketingHome(origin: string): string {
       <h3>把 AI 直接放进你的工作页面</h3>
       <p>无需切换 Tab、无需复制粘贴，边看边问，边写边改，一步到位。</p>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" rel="noreferrer">免费添加到 Chrome</a>
+        <a class="btn btn-chrome" href="https://chromewebstore.google.com/detail/memoraid/leonoilddlplhmmahjmnendflfnlnlmg" target="_blank" rel="noreferrer">
+          <span class="btn-icon">${chromeIcon}</span>
+          <span>免费添加到 Chrome</span>
+        </a>
         <a class="btn btn-ghost" href="/pricing">查看定价</a>
       </div>
     </div>
   </div>
 </section>
+<script>
+  (function () {
+    const root = document.querySelector('[data-showcase]');
+    if (!root) return;
+    const tabs = Array.from(root.querySelectorAll('.showcase-tab'));
+    const img = root.querySelector('[data-showcase-image]');
+    const label = root.querySelector('[data-showcase-label]');
+    const title = root.querySelector('[data-showcase-title]');
+    const desc = root.querySelector('[data-showcase-desc]');
+    const prev = root.querySelector('[data-showcase-prev]');
+    const next = root.querySelector('[data-showcase-next]');
+
+    if (!tabs.length || !img) return;
+    let current = 0;
+
+    function clamp(n) {
+      return Math.max(0, Math.min(tabs.length - 1, n));
+    }
+
+    function readTab(i) {
+      const el = tabs[i];
+      return {
+        el: el,
+        src: el.getAttribute('data-src') || '',
+        alt: el.getAttribute('data-alt') || '',
+        label: el.getAttribute('data-label') || '',
+        title: el.getAttribute('data-title') || '',
+        desc: el.getAttribute('data-desc') || ''
+      };
+    }
+
+    function preload(src) {
+      if (!src) return;
+      const im = new Image();
+      im.decoding = 'async';
+      im.loading = 'eager';
+      im.src = src;
+    }
+
+    function applyStep(idx, shouldFocus) {
+      const nextIdx = clamp(idx);
+      current = nextIdx;
+      for (let i = 0; i < tabs.length; i++) {
+        tabs[i].setAttribute('aria-selected', i === current ? 'true' : 'false');
+      }
+      const d = readTab(current);
+      if (d.src) img.setAttribute('src', d.src);
+      img.setAttribute('alt', d.alt || d.title || '步骤截图');
+      if (label) label.textContent = d.label || '';
+      if (title) title.textContent = d.title || '';
+      if (desc) desc.textContent = d.desc || '';
+      if (prev) prev.disabled = current === 0;
+      if (next) next.disabled = current === tabs.length - 1;
+      const p = readTab(clamp(current - 1)).src;
+      const n = readTab(clamp(current + 1)).src;
+      preload(p);
+      preload(n);
+      if (shouldFocus) tabs[current].focus();
+    }
+
+    for (let i = 0; i < tabs.length; i++) {
+      tabs[i].addEventListener('click', function () {
+        const raw = tabs[i].getAttribute('data-showcase-step') || '';
+        const idx = Number(raw);
+        if (!Number.isFinite(idx)) return;
+        applyStep(idx, false);
+      });
+    }
+    if (prev) prev.addEventListener('click', function () { applyStep(current - 1, false); });
+    if (next) next.addEventListener('click', function () { applyStep(current + 1, false); });
+
+    root.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowLeft') applyStep(current - 1, false);
+      if (e.key === 'ArrowRight') applyStep(current + 1, false);
+    });
+
+    applyStep(0, false);
+  })();
+</script>
 ${footer}`;
 
   return renderMarketingShell({
