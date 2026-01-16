@@ -7,6 +7,8 @@ interface PublishData {
   title: string;
   content: string;
   htmlContent?: string;
+  sourceUrl?: string;
+  sourceImages?: string[];
   timestamp: number;
 }
 
@@ -127,6 +129,215 @@ const isElementVisible = (el: HTMLElement): boolean => {
     style.visibility !== 'hidden' &&
     style.opacity !== '0'
   );
+};
+
+const isMediaAiEnabled = async (): Promise<boolean> => {
+  try {
+    const s = await chrome.storage.sync.get(['enableMediaAi', 'enableImageOcr']);
+    return s.enableMediaAi === true || s.enableImageOcr === true;
+  } catch {
+    return false;
+  }
+};
+
+const createThumbnailDataUrl = async (dataUrl: string, maxDim = 512): Promise<string | null> => {
+  return await new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const w = img.naturalWidth || img.width || 0;
+        const h = img.naturalHeight || img.height || 0;
+        if (!w || !h) { resolve(null); return; }
+        const scale = Math.min(1, maxDim / Math.max(w, h));
+        const tw = Math.max(1, Math.round(w * scale));
+        const th = Math.max(1, Math.round(h * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = tw;
+        canvas.height = th;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(null); return; }
+        ctx.drawImage(img, 0, 0, tw, th);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+};
+
+const getImageMetaFromDataUrl = async (dataUrl: string): Promise<{ width: number; height: number; aspect: number } | null> => {
+  return await new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth || img.width || 0;
+      const h = img.naturalHeight || img.height || 0;
+      if (!w || !h) { resolve(null); return; }
+      resolve({ width: w, height: h, aspect: Math.max(w / h, h / w) });
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+};
+
+const pickBestImageIndexWithAI = async (keyword: string, maxCandidates = 10): Promise<number | null> => {
+  const enabled = await isMediaAiEnabled();
+  if (!enabled) return null;
+
+  const containers = Array.from(document.querySelectorAll('.css-128iodx')) as HTMLElement[];
+  const candidates: Array<{ index: number; url: string; element: HTMLElement }> = [];
+  for (let i = 0; i < containers.length && candidates.length < maxCandidates; i++) {
+    const el = containers[i];
+    if (!isElementVisible(el)) continue;
+    const img = el.querySelector('img') as HTMLImageElement | null;
+    const url = (img?.currentSrc || img?.src || '').trim();
+    if (!url || url.startsWith('data:')) continue;
+    candidates.push({ index: i, url, element: el });
+  }
+  if (candidates.length <= 1) return null;
+
+  const titleEl = findElement(SELECTORS.titleInput);
+  const title = titleEl instanceof HTMLInputElement || titleEl instanceof HTMLTextAreaElement
+    ? (titleEl.value || '').trim()
+    : (titleEl?.innerText || '').trim();
+
+  const editorEl = findElement(SELECTORS.editor);
+  const contentSnippet = (editorEl?.innerText || '').trim().slice(0, 800);
+
+  const images: Array<{ url: string; thumbDataUrl: string; width?: number; height?: number; aspect?: number }> = [];
+  for (const c of candidates) {
+    const resp = await chrome.runtime.sendMessage({ type: 'FETCH_IMAGE_DATA_URL', payload: { url: c.url, referrer: window.location.href } });
+    const dataUrl = resp?.success ? (resp.dataUrl as string | undefined) : undefined;
+    if (!dataUrl) continue;
+    const meta = await getImageMetaFromDataUrl(dataUrl);
+    const thumb = await createThumbnailDataUrl(dataUrl, 512);
+    if (!thumb) continue;
+    images.push({ url: c.url, thumbDataUrl: thumb, width: meta?.width, height: meta?.height, aspect: meta?.aspect });
+  }
+  if (images.length <= 1) return null;
+
+  const aiResp = await chrome.runtime.sendMessage({
+    type: 'AI_RANK_IMAGES',
+    payload: {
+      title,
+      context: [`关键词：${keyword}`, contentSnippet ? `正文片段：${contentSnippet}` : ''].filter(Boolean).join('\n'),
+      images,
+      maxPick: Math.min(10, images.length)
+    }
+  });
+  const skippedCode = aiResp?.success ? (aiResp.result?.skipped?.code as string | undefined) : undefined;
+  if (skippedCode) {
+    if (skippedCode === 'missing_apiyi_key') {
+      logger.log('AI 图文增强已开启，但未配置 apiyi API Key，本次不会调用 apiyi 选图', 'warn');
+    } else if (skippedCode === 'media_ai_disabled') {
+      logger.log('AI 图文增强未开启，本次不会调用 apiyi 选图', 'warn');
+    } else {
+      logger.log(`AI 选图已跳过：${skippedCode}`, 'warn');
+    }
+    return null;
+  }
+  const errorMsg = aiResp?.success ? (aiResp.result?.error as string | undefined) : undefined;
+  if (errorMsg) {
+    logger.log(`AI 选图调用失败，本次不会调用 apiyi 选图：${String(errorMsg).slice(0, 160)}`, 'warn');
+    return null;
+  }
+  const ordered = aiResp?.success ? (aiResp.result?.orderedUrls as string[] | undefined) : undefined;
+  const reason = aiResp?.success ? (aiResp.result?.picked?.[0]?.reason as string | undefined) : undefined;
+  const bestUrl = ordered?.[0];
+  if (!bestUrl) return null;
+  logger.log(`AI 选图：${bestUrl}${reason ? `（理由：${reason.slice(0, 120)}）` : ''}`, 'info');
+  const hit = candidates.find(c => c.url === bestUrl);
+  return hit ? hit.index : null;
+};
+
+const dataUrlToBlob = (dataUrl: string): { blob: Blob; mimeType: string } => {
+  const [meta, data] = dataUrl.split(',');
+  const mimeMatch = meta?.match(/data:([^;]+);base64/i);
+  const mimeType = mimeMatch?.[1] || 'application/octet-stream';
+  const binary = atob(data);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return { blob: new Blob([bytes], { type: mimeType }), mimeType };
+};
+
+const getFileExtensionByMime = (mimeType: string): string => {
+  const m = (mimeType || '').toLowerCase();
+  if (m.includes('png')) return 'png';
+  if (m.includes('webp')) return 'webp';
+  if (m.includes('gif')) return 'gif';
+  if (m.includes('bmp')) return 'bmp';
+  return 'jpg';
+};
+
+const setInputFiles = (input: HTMLInputElement, files: File[]) => {
+  const dt = new DataTransfer();
+  for (const f of files) dt.items.add(f);
+  try {
+    Object.defineProperty(input, 'files', { value: dt.files, configurable: true });
+  } catch {
+    try {
+      (input as any).files = dt.files;
+    } catch {
+      return;
+    }
+  }
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+};
+
+const clickLocalUpload = async (): Promise<boolean> => {
+  const uploadTexts = ['本地上传', '上传图片', '本地图片', '上传', '本地'];
+  const elements = document.querySelectorAll('div, span, a, li, button');
+  for (const el of elements) {
+    const text = (el as HTMLElement).innerText?.trim();
+    if (!text) continue;
+    if (uploadTexts.includes(text) && isElementVisible(el as HTMLElement)) {
+      simulateClick(el as HTMLElement);
+      await new Promise(r => setTimeout(r, 400));
+      return true;
+    }
+  }
+  return false;
+};
+
+const waitForImageFileInput = async (timeout = 8000): Promise<HTMLInputElement | null> => {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const inputs = Array.from(document.querySelectorAll('input[type="file"]')) as HTMLInputElement[];
+    const candidate = inputs.find(input => {
+      if (input.disabled) return false;
+      const accept = (input.getAttribute('accept') || '').toLowerCase();
+      if (accept && !accept.includes('image')) return false;
+      return true;
+    });
+    if (candidate) return candidate;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  return null;
+};
+
+const uploadAndInsertSourceImage = async (imageUrl: string): Promise<boolean> => {
+  const resp = await chrome.runtime.sendMessage({
+    type: 'FETCH_IMAGE_DATA_URL',
+    payload: { url: imageUrl, referrer: pendingSourceUrl || window.location.href }
+  });
+  const dataUrl = resp?.success ? (resp.dataUrl as string | undefined) : undefined;
+  if (!dataUrl) return false;
+
+  const { blob, mimeType } = dataUrlToBlob(dataUrl);
+  const ext = getFileExtensionByMime(mimeType);
+  const file = new File([blob], `memoraid-${Date.now()}.${ext}`, { type: mimeType });
+
+  await clickLocalUpload();
+  const input = await waitForImageFileInput(8000);
+  if (!input) return false;
+  setInputFiles(input, [file]);
+
+  await new Promise(r => setTimeout(r, 1800));
+  const inserted = await clickInsertImage().catch(() => false);
+  await new Promise(r => setTimeout(r, 1200));
+  return inserted;
 };
 
 const simulateClick = (element: HTMLElement) => {
@@ -267,6 +478,8 @@ const logger = new ZhihuLogger();
 
 let isFlowCancelled = false;
 let isFlowRunning = false; // 添加锁机制，防止多个流程同时执行
+let pendingSourceImages: string[] = [];
+let pendingSourceUrl: string | undefined;
 
 const openImageDialog = async (): Promise<boolean> => {
   logger.log('查找图片按钮...', 'info');
@@ -1583,7 +1796,8 @@ const insertImageOnly = async (keyword: string, preserveSelection = false): Prom
   if (isFlowCancelled) return false;
   
   // 4. 选择图片
-  if (!await selectImage(0)) {
+  const smartIndex = await pickBestImageIndexWithAI(keyword);
+  if (!await selectImage(smartIndex ?? 0)) {
     logger.log('选择图片失败（可能没有搜索结果）', 'warn');
     await closeImageDialog();
     return false;
@@ -1622,6 +1836,9 @@ const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
   logger.log('🚀 开始知乎图片处理...', 'info');
   
   try {
+    const s = await chrome.storage.sync.get(['preferSourceImages']);
+    const preferSourceImages = s.preferSourceImages !== false;
+
     // 先取消任何选中状态，避免干扰
     const selection = window.getSelection();
     selection?.removeAllRanges();
@@ -1652,44 +1869,57 @@ const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
         sel?.addRange(range);
       }
       
-      // 按顺序执行图片插入流程
       logger.log('步骤 1/5: 打开图片对话框', 'info');
       const dialogOpened = await openImageDialog();
       if (!dialogOpened) {
         logger.log('无法打开图片对话框，流程终止', 'error');
         return;
       }
-      
-      logger.log('步骤 2/5: 点击公共图片库', 'info');
-      const publicLibraryOpened = await clickPublicLibrary();
-      if (!publicLibraryOpened) {
-        logger.log('无法打开公共图片库，流程终止', 'error');
-        await closeImageDialog();
-        return;
-      }
-      
-      logger.log('步骤 3/5: 搜索图片', 'info');
-      const searchSuccess = await searchImage(searchKeyword);
-      if (!searchSuccess) {
-        logger.log('搜索图片失败，流程终止', 'error');
-        await closeImageDialog();
-        return;
-      }
-      
-      logger.log('步骤 4/5: 选择图片', 'info');
-      const selectSuccess = await selectImage(0);
-      if (!selectSuccess) {
-        logger.log('选择图片失败，流程终止', 'error');
-        await closeImageDialog();
-        return;
-      }
-      
-      logger.log('步骤 5/5: 插入图片', 'info');
-      const insertSuccess = await clickInsertImage();
-      if (insertSuccess) {
-        logger.log('✅ 图片插入成功！', 'success');
+
+      const sourceUrl = (preferSourceImages && pendingSourceImages.length > 0) ? pendingSourceImages[0] : undefined;
+      if (sourceUrl) {
+        logger.log('步骤 2/5: 本地上传来源图片', 'info');
+        const ok = await uploadAndInsertSourceImage(sourceUrl);
+        if (ok) {
+          logger.log('✅ 图片插入成功！', 'success');
+        } else {
+          logger.log('来源图片插入失败，回退公共图片库', 'warn');
+          await closeImageDialog();
+          await insertImageOnly(searchKeyword, false);
+        }
       } else {
-        logger.log('插入图片失败', 'error');
+        logger.log('步骤 2/5: 点击公共图片库', 'info');
+        const publicLibraryOpened = await clickPublicLibrary();
+        if (!publicLibraryOpened) {
+          logger.log('无法打开公共图片库，流程终止', 'error');
+          await closeImageDialog();
+          return;
+        }
+        
+        logger.log('步骤 3/5: 搜索图片', 'info');
+        const searchSuccess = await searchImage(searchKeyword);
+        if (!searchSuccess) {
+          logger.log('搜索图片失败，流程终止', 'error');
+          await closeImageDialog();
+          return;
+        }
+        
+        logger.log('步骤 4/5: 选择图片', 'info');
+        const smartIndex = await pickBestImageIndexWithAI(searchKeyword);
+        const selectSuccess = await selectImage(smartIndex ?? 0);
+        if (!selectSuccess) {
+          logger.log('选择图片失败，流程终止', 'error');
+          await closeImageDialog();
+          return;
+        }
+        
+        logger.log('步骤 5/5: 插入图片', 'info');
+        const insertSuccess = await clickInsertImage();
+        if (insertSuccess) {
+          logger.log('✅ 图片插入成功！', 'success');
+        } else {
+          logger.log('插入图片失败', 'error');
+        }
       }
     } else {
       logger.log(`找到 ${placeholders.length} 个图片占位符`, 'info');
@@ -1727,9 +1957,25 @@ const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
           }
         }
         
-        // 步骤2: 插入图片（会替换选中的文本）
-        // 传入 true 表示需要保持选中状态，这样图片会插入到占位符位置
-        const success = await insertImageOnly(placeholder.keyword, selected);
+        const sourceUrl = preferSourceImages ? pendingSourceImages[i] : undefined;
+        let success = false;
+        if (sourceUrl) {
+          try {
+            const opened = await openImageDialogPreserveSelection(selected);
+            if (opened) {
+              success = await uploadAndInsertSourceImage(sourceUrl);
+              if (!success) await closeImageDialog();
+            }
+          } catch {
+            await closeImageDialog();
+            success = false;
+          }
+          if (!success) {
+            success = await insertImageOnly(placeholder.keyword, selected);
+          }
+        } else {
+          success = await insertImageOnly(placeholder.keyword, selected);
+        }
         
         if (success) {
           successCount++;
@@ -2068,10 +2314,15 @@ const fillContent = async () => {
       chrome.storage.local.remove('pending_zhihu_publish');
       return;
     }
+    pendingSourceImages = Array.isArray(payload.sourceImages) ? payload.sourceImages.filter(u => typeof u === 'string') : [];
+    pendingSourceUrl = payload.sourceUrl;
 
-    // 读取自动发布设置
-    const settings = await chrome.storage.sync.get(['zhihu']);
-    const autoPublish = settings.zhihu?.autoPublish || false;
+    const settings = await chrome.storage.sync.get(['autoPublishAll', 'zhihu']);
+    const autoPublish = settings.autoPublishAll === true
+      ? true
+      : settings.autoPublishAll === false
+      ? false
+      : settings.zhihu?.autoPublish !== false;
 
     logger.log(`📄 准备填充内容: ${payload.title}`, 'info');
     if (autoPublish) {

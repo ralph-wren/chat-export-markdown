@@ -767,6 +767,8 @@ const PAGE_PAGINATION_SELECTORS = [
   // 下一页按钮
   'a.next', 'a.nextpage', '.next-page a',
   '[class*="next"]',
+  // 微博搜索分页
+  '.m-page a', '.m-page .next a', '.m-page .prev a',
 ];
 
 // 分页文字匹配
@@ -923,7 +925,51 @@ async function extractGenericPage(): Promise<ExtractionResult> {
   // 根据设置决定是否启用，需要配置 apiyi API Key
   let ocrTexts: string[] = [];
   const mainImages = getMainImages(validImages as HTMLImageElement[], 5);
-  if (mainImages.length > 0 && !isExtractionCancelled) {
+  const mediaAiSettings = await chrome.storage.sync.get(['enableMediaAi', 'enableImageOcr']);
+  const mediaAiEnabled = mediaAiSettings.enableMediaAi === true || mediaAiSettings.enableImageOcr === true;
+  let extractedImages = Array.from(new Set(
+    getMainImages(validImages as HTMLImageElement[], 60)
+      .filter(img => {
+        const el = img as HTMLImageElement;
+        const w = el.naturalWidth || el.width || el.clientWidth || 0;
+        const h = el.naturalHeight || el.height || el.clientHeight || 0;
+        if (w <= 0 || h <= 0) return false;
+        if (w < 200 || h < 150) return false;
+        if (w * h < 60000) return false;
+        const metaText = `${el.getAttribute('alt') || ''} ${el.getAttribute('title') || ''}`.trim();
+        if (metaText.includes('无障碍') || metaText.includes('适老化')) return false;
+        const srcText = (el.currentSrc || el.src || '').toLowerCase();
+        if (srcText.includes('accessibility') || srcText.includes('wza') || srcText.includes('a11y')) return false;
+        if (srcText.includes('aria.png') || srcText.includes('32aria') || srcText.includes('mintra/pic') && srcText.includes('aria')) return false;
+        if (el.closest('footer')) return false;
+        const footerLike = el.closest('[id*=\"footer\"], [class*=\"footer\"], [id*=\"copyright\"], [class*=\"copyright\"]') as HTMLElement | null;
+        if (footerLike) return false;
+        const nearText = (el.closest('a,div,section,article') as HTMLElement | null)?.innerText || '';
+        if (nearText.includes('Copyright') || nearText.includes('营业执照') || nearText.includes('备案号') || nearText.includes('ICP备')) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const aw = a.naturalWidth || a.width || a.clientWidth || 0;
+        const ah = a.naturalHeight || a.height || a.clientHeight || 0;
+        const bw = b.naturalWidth || b.width || b.clientWidth || 0;
+        const bh = b.naturalHeight || b.height || b.clientHeight || 0;
+        return bw * bh - aw * ah;
+      })
+      .slice(0, 12)
+      .map(img => getBestImageUrl(img as HTMLImageElement))
+      .filter(src => !!src)
+  ));
+
+  if (paginationInfo.hasMorePages && paginationInfo.pageUrls.length > 0 && extractedImages.length < 12 && !isExtractionCancelled) {
+    panel.log('图片数量不足，尝试从后续分页补充图片...', 'info');
+    const otherPageImages = await fetchOtherPagesImages(paginationInfo.pageUrls, panel);
+    const merged = Array.from(new Set([...extractedImages, ...otherPageImages]))
+      .filter(u => !!u)
+      .slice(0, 24);
+    extractedImages = merged;
+    panel.log(`已补充图片，总计 ${extractedImages.length} 张`, 'success');
+  }
+  if (mediaAiEnabled && mainImages.length > 0 && !isExtractionCancelled) {
     panel.log(`正在识别 ${mainImages.length} 张图片中的文字...`, 'action');
     ocrTexts = await ocrImagesWithProgress(mainImages, panel);
     // 过滤掉未启用或失败的提示信息
@@ -1011,7 +1057,8 @@ async function extractGenericPage(): Promise<ExtractionResult> {
       role: 'user',
       content: fullContent
     }],
-    url: window.location.href
+    url: window.location.href,
+    images: extractedImages
   };
 }
 
@@ -1337,6 +1384,15 @@ function detectPagePagination(): PaginationInfo {
   
   // 收集所有分页链接
   const pageLinks: Array<{url: string, pageNum: number}> = [];
+
+  const isWeiboSearch = (() => {
+    try {
+      const u = new URL(currentUrl);
+      return u.hostname === 's.weibo.com' && (u.pathname.startsWith('/weibo') || u.pathname.startsWith('/realtime') || u.pathname.startsWith('/hot') || u.pathname.startsWith('/pic') || u.pathname.startsWith('/video'));
+    } catch {
+      return false;
+    }
+  })();
   
   // 1. 通过选择器查找分页区域
   for (const selector of PAGE_PAGINATION_SELECTORS) {
@@ -1416,7 +1472,32 @@ function detectPagePagination(): PaginationInfo {
     
     console.log(`[Memoraid] 分页检测结果: 当前第${result.currentPage}页，共${result.totalPages}页，将获取${result.pageUrls.length}页额外内容`);
   } else {
-    console.log('[Memoraid] 未检测到分页');
+    if (isWeiboSearch) {
+      try {
+        const u = new URL(currentUrl);
+        const currentPage = Number(u.searchParams.get('page') || '1') || 1;
+        result.currentPage = currentPage;
+        result.totalPages = currentPage + (EXTRACTION_CONFIG.MAX_PAGINATION_PAGES - 1);
+        const urls: string[] = [];
+        for (let p = currentPage + 1; p <= currentPage + (EXTRACTION_CONFIG.MAX_PAGINATION_PAGES - 1); p++) {
+          const next = new URL(currentUrl);
+          next.searchParams.set('page', String(p));
+          const nextUrl = next.toString();
+          if (!seenUrls.has(nextUrl)) urls.push(nextUrl);
+        }
+        if (urls.length > 0) {
+          result.hasMorePages = true;
+          result.pageUrls = urls;
+          console.log(`[Memoraid] 微博分页推断: 当前第${result.currentPage}页，将额外获取${result.pageUrls.length}页内容`);
+        } else {
+          console.log('[Memoraid] 微博分页推断失败');
+        }
+      } catch {
+        console.log('[Memoraid] 未检测到分页');
+      }
+    } else {
+      console.log('[Memoraid] 未检测到分页');
+    }
   }
   
   return result;
@@ -1481,6 +1562,55 @@ async function fetchOtherPagesContent(
     await sleep(300);
   }
   
+  return results;
+}
+
+async function fetchOtherPagesImages(
+  pageUrls: string[],
+  panel: ExtractionProgressPanel
+): Promise<string[]> {
+  const results: string[] = [];
+  const maxPages = Math.min(pageUrls.length, EXTRACTION_CONFIG.MAX_PAGINATION_PAGES - 1);
+
+  for (let i = 0; i < maxPages; i++) {
+    if (isExtractionCancelled) break;
+
+    const url = pageUrls[i];
+    const urlShort = url.length > 50 ? url.substring(0, 50) + '...' : url;
+    panel.log(`正在获取第 ${i + 2} 页图片: ${urlShort}`, 'action');
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'FETCH_PAGE_IMAGES',
+        payload: { url, maxCount: 40 }
+      });
+
+      if (response && response.success && Array.isArray(response.images)) {
+        const images = (response.images as string[])
+          .map(u => normalizeWeiboImageUrl(u))
+          .filter(u => !!u && !u.startsWith('data:'));
+        const filtered = images.filter(u => {
+          const s = u.toLowerCase();
+          if (s.includes('mintra/pic') && s.includes('aria')) return false;
+          if (s.includes('aria.png') || s.includes('32aria')) return false;
+          if (s.includes('accessibility') || s.includes('wza') || s.includes('a11y')) return false;
+          return true;
+        });
+
+        results.push(...filtered);
+        panel.log(`✅ 第 ${i + 2} 页图片获取成功 (+${filtered.length})`, 'success');
+      } else {
+        const errorMsg = response?.error || '未知错误';
+        panel.log(`⚠️ 第 ${i + 2} 页图片获取失败: ${errorMsg}`, 'warn');
+      }
+    } catch (e: any) {
+      const errorMsg = e?.message || '请求异常';
+      panel.log(`❌ 第 ${i + 2} 页图片异常: ${errorMsg}`, 'warn');
+    }
+
+    await sleep(250);
+  }
+
   return results;
 }
 
@@ -1628,7 +1758,8 @@ function getMainImages(images: HTMLImageElement[], maxCount: number = 5): HTMLIm
         srcLower.includes('logo') ||
         srcLower.includes('emoji') ||
         srcLower.includes('qrcode') ||
-        srcLower.includes('二维码')) {
+        srcLower.includes('二维码') ||
+        srcLower.includes('simg.s.weibo.com/imgtool')) {
       console.log(`[Memoraid] 跳过图片(非内容图片): ${src.substring(0, 50)}`);
       continue;
     }
@@ -1647,6 +1778,90 @@ function getMainImages(images: HTMLImageElement[], maxCount: number = 5): HTMLIm
   return mainImages;
 }
 
+function normalizeWeiboImageUrl(url: string): string {
+  try {
+    const u = new URL(url, window.location.href);
+    const host = u.hostname.toLowerCase();
+    if (!host.endsWith('sinaimg.cn')) return u.toString();
+    const p = u.pathname;
+    const segments = p.split('/').filter(Boolean);
+    if (segments.length < 2) return u.toString();
+    const size = segments[0].toLowerCase();
+    const replaceable = ['thumb150', 'thumb180', 'thumb300', 'orj360', 'mw2000', 'mw1024', 'mw690', 'bmiddle', 'small', 'square'];
+    if (replaceable.includes(size)) {
+      segments[0] = 'large';
+      u.pathname = '/' + segments.join('/');
+    }
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+function getBestImageUrl(img: HTMLImageElement): string {
+  const parseSrcset = (srcset?: string | null): string[] => {
+    if (!srcset) return [];
+    const parts = srcset
+      .split(',')
+      .map(p => p.trim())
+      .filter(Boolean);
+    const scored: Array<{ url: string; score: number }> = [];
+    for (const part of parts) {
+      const segs = part.split(/\s+/).filter(Boolean);
+      const rawUrl = segs[0];
+      const desc = segs[1] || '';
+      let score = 0;
+      const wMatch = desc.match(/^(\d+)w$/i);
+      const xMatch = desc.match(/^(\d+(?:\.\d+)?)x$/i);
+      if (wMatch?.[1]) score = Number(wMatch[1]);
+      if (xMatch?.[1]) score = Number(xMatch[1]) * 1000;
+      scored.push({ url: rawUrl, score });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map(s => s.url);
+  };
+
+  const parseJsonUrls = (raw?: string | null): string[] => {
+    if (!raw) return [];
+    const urls: string[] = [];
+    const re = /https?:\/\/[^"'\s]+/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(raw)) !== null) {
+      if (m[0]) urls.push(m[0]);
+    }
+    return urls;
+  };
+
+  const candidates: Array<string | null | undefined> = [
+    img.currentSrc,
+    img.src,
+    ...parseSrcset(img.getAttribute('srcset') || img.getAttribute('data-srcset') || img.getAttribute('data-srcSet')),
+    img.getAttribute('data-original'),
+    img.getAttribute('data-actualsrc'),
+    img.getAttribute('data-src'),
+    img.getAttribute('data-lazy-src'),
+    img.getAttribute('data-url'),
+    img.getAttribute('data-source'),
+    ...parseJsonUrls(img.getAttribute('data-sources')),
+    ...parseJsonUrls(img.getAttribute('data-attrs')),
+    ...parseJsonUrls(img.getAttribute('data-img')),
+  ];
+
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith('data:')) continue;
+    try {
+      const abs = new URL(trimmed, window.location.href).toString();
+      return normalizeWeiboImageUrl(abs);
+    } catch {
+      continue;
+    }
+  }
+  return '';
+}
+
 /**
  * OCR 识别多张图片（带进度显示）
  * 通过 background script 调用 GPT-4o-mini 进行识别
@@ -1656,57 +1871,117 @@ async function ocrImagesWithProgress(
   panel: ExtractionProgressPanel
 ): Promise<string[]> {
   const results: string[] = [];
-  
-  for (let i = 0; i < images.length; i++) {
-    if (isExtractionCancelled) break;
-    
-    const img = images[i];
-    const src = img.src;
-    
-    panel.log(`正在识别图片 ${i + 1}/${images.length}...`, 'action');
-    
-    try {
-      const response = await chrome.runtime.sendMessage({
-        type: 'OCR_IMAGE',
-        payload: { imageUrl: src }
-      });
-      
-      if (response && response.success && response.text) {
-        const text = response.text.trim();
-        results.push(text);
-        
-        // 检查是否是有效的识别结果
-        if (text && 
-            !text.includes('功能未启用') && 
-            !text.includes('未配置') &&
-            !text.includes('识别失败') &&
-            text !== '无文字内容') {
-          // 显示识别结果预览（显示更多内容，最多150字符）
-          const preview = text.substring(0, 150).replace(/\s+/g, ' ');
-          const suffix = text.length > 150 ? `... (共${text.length}字)` : '';
-          panel.log(`✅ 图片 ${i + 1} 识别成功 (${text.length}字)`, 'success');
-          panel.logDetail(`🔤 识别文字`, preview + suffix);
-          console.log(`[Memoraid] 图片 ${i + 1} OCR 结果:\n${text}`);
-        } else if (text.includes('功能未启用') || text.includes('未配置')) {
-          panel.log(`ℹ️ 图片识别功能未启用或未配置 API Key`, 'info');
-          // 如果功能未启用，跳过后续图片
-          break;
-        } else {
-          panel.log(`ℹ️ 图片 ${i + 1} 无文字内容`, 'info');
-        }
-      } else {
-        const errorMsg = response?.error || '识别失败';
-        panel.log(`❌ 图片 ${i + 1} 识别失败: ${errorMsg}`, 'warn');
-        console.error(`[Memoraid] 图片 ${i + 1} OCR 失败:`, errorMsg);
+  const getBestUrl = (img: HTMLImageElement): string => {
+    const candidates: Array<string | null | undefined> = [
+      img.currentSrc,
+      img.src,
+      img.getAttribute('data-original'),
+      img.getAttribute('data-actualsrc'),
+      img.getAttribute('data-src'),
+      img.getAttribute('data-lazy-src'),
+      img.getAttribute('data-url'),
+      img.getAttribute('data-source'),
+    ];
+    for (const raw of candidates) {
+      if (!raw) continue;
+      const trimmed = raw.trim();
+      if (!trimmed) continue;
+      if (trimmed.startsWith('data:')) continue;
+      try {
+        return new URL(trimmed, window.location.href).toString();
+      } catch {
+        continue;
       }
-    } catch (e: any) {
-      const errorMsg = e?.message || '请求异常';
-      panel.log(`❌ 图片 ${i + 1} 异常: ${errorMsg}`, 'error');
-      console.error(`[Memoraid] 图片 ${i + 1} OCR 异常:`, e);
     }
-    
-    // 每张图片识别后稍微等待
-    await sleep(200);
+    return img.src || '';
+  };
+  
+  const urls = images
+    .map(img => getBestUrl(img))
+    .map(u => u.trim())
+    .filter(u => !!u)
+    .slice(0, 10);
+
+  if (urls.length === 0) return results;
+
+  panel.log(`正在识别图片文字（一次调用，最多${urls.length}张）...`, 'action');
+
+  const aiImages: Array<{ url: string; thumbDataUrl: string }> = [];
+  for (let i = 0; i < urls.length; i++) {
+    if (isExtractionCancelled) break;
+    const url = urls[i];
+    try {
+      const resp = await chrome.runtime.sendMessage({
+        type: 'FETCH_IMAGE_DATA_URL',
+        payload: { url, referrer: window.location.href }
+      });
+      const dataUrl = resp?.success ? (resp.dataUrl as string | undefined) : undefined;
+      if (dataUrl && typeof dataUrl === 'string' && dataUrl.startsWith('data:')) {
+        aiImages.push({ url, thumbDataUrl: dataUrl });
+      }
+    } catch {
+    }
+  }
+
+  if (aiImages.length === 0) return results;
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: 'AI_MEDIA_ENHANCE',
+      payload: {
+        title: document.title || '',
+        context: '',
+        images: aiImages,
+        maxPick: 1
+      }
+    });
+
+    const skippedCode = response?.success ? (response.result?.skipped?.code as string | undefined) : undefined;
+    if (skippedCode === 'missing_apiyi_key') {
+      panel.log(`ℹ️ 图片识别功能未启用或未配置 API Key`, 'info');
+      return results;
+    }
+    if (skippedCode === 'media_ai_disabled') {
+      panel.log(`ℹ️ 图片识别功能未启用或未配置 API Key`, 'info');
+      return results;
+    }
+
+    const parsedImages = response?.success ? (response.result?.images as Array<{ url: string; ocrText?: string }> | undefined) : undefined;
+    const map = new Map<string, string>();
+    (parsedImages || []).forEach(x => {
+      if (!x?.url) return;
+      const t = typeof x.ocrText === 'string' ? x.ocrText.trim() : '';
+      map.set(x.url, t);
+    });
+
+    for (let i = 0; i < urls.length; i++) {
+      if (isExtractionCancelled) break;
+      const url = urls[i];
+      const text = (map.get(url) || '无文字内容').trim();
+      results.push(text);
+
+      if (text &&
+          !text.includes('功能未启用') &&
+          !text.includes('未配置') &&
+          !text.includes('识别失败') &&
+          text !== '无文字内容') {
+        const preview = text.substring(0, 150).replace(/\s+/g, ' ');
+        const suffix = text.length > 150 ? `... (共${text.length}字)` : '';
+        panel.log(`✅ 图片 ${i + 1} 识别成功 (${text.length}字)`, 'success');
+        panel.logDetail(`🔤 识别文字`, preview + suffix);
+        console.log(`[Memoraid] 图片 ${i + 1} OCR 结果:\n${text}`);
+      } else if (text.includes('功能未启用') || text.includes('未配置')) {
+        panel.log(`ℹ️ 图片识别功能未启用或未配置 API Key`, 'info');
+        break;
+      } else {
+        panel.log(`ℹ️ 图片 ${i + 1} 无文字内容`, 'info');
+      }
+      await sleep(120);
+    }
+  } catch (e: any) {
+    const errorMsg = e?.message || '请求异常';
+    panel.log(`❌ 图片识别异常: ${errorMsg}`, 'error');
+    console.error(`[Memoraid] 图片 OCR 异常:`, e);
   }
   
   return results;

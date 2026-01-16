@@ -7,6 +7,8 @@ interface PublishData {
   title: string;
   content: string;
   htmlContent?: string;
+  sourceUrl?: string;
+  sourceImages?: string[];
   timestamp: number;
 }
 
@@ -171,6 +173,49 @@ const findElementByText = (text: string, tagNames: string[] = ['button', 'span',
     }
   }
   return null;
+};
+
+const findVisibleElementsByTextIncludes = (
+  text: string,
+  scope: ParentNode = document,
+  tagNames: string[] = ['button', 'span', 'div', 'a', 'label']
+): HTMLElement[] => {
+  const wanted = text.trim();
+  if (!wanted) return [];
+
+  const result: HTMLElement[] = [];
+  for (const tag of tagNames) {
+    const elements = scope.querySelectorAll(tag);
+    for (const el of elements) {
+      const h = el as HTMLElement;
+      const elText = h.innerText?.trim();
+      if (!elText) continue;
+      if (!elText.includes(wanted)) continue;
+      if (!isElementVisible(h)) continue;
+      result.push(h);
+    }
+  }
+  return result;
+};
+
+const pickClosestElementToRectCenter = (elements: HTMLElement[], rect: DOMRect): HTMLElement | null => {
+  if (elements.length === 0) return null;
+  const targetX = rect.left + rect.width / 2;
+  const targetY = rect.top + rect.height / 2;
+
+  let best: HTMLElement | null = null;
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (const el of elements) {
+    const r = el.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    const d = (x - targetX) * (x - targetX) + (y - targetY) * (y - targetY);
+    if (d < bestDist) {
+      bestDist = d;
+      best = el;
+    }
+  }
+  return best;
 };
 
 const isElementVisible = (el: HTMLElement): boolean => {
@@ -1006,14 +1051,14 @@ const insertAIImage = async (): Promise<boolean> => {
     }
   }
   
-  // 方法2：通过文本"插入"查找
+  // 方法2：通过文本"插入/使用"查找
   if (!insertBtn) {
     const btns = targetItem.querySelectorAll('div, span, button');
     for (const btn of btns) {
       const text = (btn as HTMLElement).innerText?.trim();
-      if (text === '插入') {
+      if (text === '插入' || text === '使用') {
         insertBtn = btn as HTMLElement;
-        logger.log('通过文本"插入"找到按钮', 'success');
+        logger.log('通过文本找到按钮', 'success');
         break;
       }
     }
@@ -1043,9 +1088,10 @@ const insertAIImage = async (): Promise<boolean> => {
         }
         
         // 通过文本查找
-        const textBtns = operationGroup.querySelectorAll('div, span');
+        const textBtns = operationGroup.querySelectorAll('div, span, button');
         for (const textBtn of textBtns) {
-          if ((textBtn as HTMLElement).innerText?.trim() === '插入') {
+          const t = (textBtn as HTMLElement).innerText?.trim();
+          if (t === '插入' || t === '使用') {
             insertBtn = textBtn as HTMLElement;
             logger.log(`在第 ${i + 1} 张图片上通过文本找到插入按钮`, 'success');
             break;
@@ -1063,10 +1109,10 @@ const insertAIImage = async (): Promise<boolean> => {
     
     const searchArea = activeDialog || imageList;
     if (searchArea) {
-      const allBtns = searchArea.querySelectorAll('.ai-image-operation-group div, [class*="operation"] div');
+      const allBtns = searchArea.querySelectorAll('.ai-image-operation-group div, .ai-image-operation-group button, .ai-image-operation-group span, [class*="operation"] div, [class*="operation"] button, [class*="operation"] span');
       for (const btn of allBtns) {
         const text = (btn as HTMLElement).innerText?.trim();
-        if (text === '插入') {
+        if (text === '插入' || text === '使用') {
           // 检查按钮是否可见
           const btnRect = (btn as HTMLElement).getBoundingClientRect();
           if (btnRect.width > 0 && btnRect.height > 0) {
@@ -1815,9 +1861,18 @@ const setCoverWithAI = async (title?: string, content?: string): Promise<boolean
  * - 弹出菜单: <div class="pop-opr__group pop-opr__group-select-cover js_cover_null_pop js_cover_opr">
  * - 从正文选择链接: <a class="pop-opr__button js_selectCoverFromContent">从正文选择</a>
  */
-const setCoverFromContent = async (): Promise<boolean> => {
+const setCoverFromContent = async (options?: { preferredIndex?: number }): Promise<boolean> => {
   logger.log('设置封面图片（从正文选择）...', 'info');
   
+  const preferredIndex = options?.preferredIndex;
+  const bestCoverIndex = typeof preferredIndex === 'number' && Number.isFinite(preferredIndex) && preferredIndex >= 0
+    ? preferredIndex
+    : await pickBestCoverImageIndexWithAI();
+  const targetIndex = typeof bestCoverIndex === 'number' && Number.isFinite(bestCoverIndex) && bestCoverIndex >= 0 ? bestCoverIndex : 0;
+  if (typeof preferredIndex !== 'number' && bestCoverIndex === null) {
+    logger.log('未使用 AI 选择封面图，将默认选择第一张', 'warn');
+  }
+
   // 滚动到页面底部，确保封面区域可见
   window.scrollTo(0, document.body.scrollHeight);
   await new Promise(r => setTimeout(r, 500));
@@ -1998,43 +2053,28 @@ const setCoverFromContent = async (): Promise<boolean> => {
   // 等待图片选择弹窗出现
   await new Promise(r => setTimeout(r, 1000));
   
-  // 查找图片选择项
-  let imageSelect: HTMLElement | null = null;
-  
-  // 方法1: 查找图片卡片（带选中标记的）
-  imageSelect = document.querySelector('.icon_card_selected_global, .card_mask_global') as HTMLElement;
-  
-  // 方法2: 查找封面选择弹窗中的图片
-  if (!imageSelect) {
-    const coverDialog = document.querySelector('.weui-desktop-dialog:not([style*="display: none"])');
-    if (coverDialog) {
-      // 查找弹窗中的图片项
-      const imageItems = coverDialog.querySelectorAll('.cover-image-item, .image-item, [class*="cover-item"], img');
-      if (imageItems.length > 0) {
-        // 选择第一张图片
-        imageSelect = imageItems[0].closest('div') as HTMLElement || imageItems[0] as HTMLElement;
-        logger.log(`在弹窗中找到 ${imageItems.length} 张图片`, 'info');
-      }
-    }
-  }
-  
-  // 方法3: 查找任何可点击的图片
-  if (!imageSelect) {
-    const images = document.querySelectorAll('.weui-desktop-dialog img');
-    for (const img of images) {
-      if (isElementVisible(img as HTMLElement)) {
-        imageSelect = img.closest('div') as HTMLElement || img as HTMLElement;
-        break;
-      }
-    }
-  }
-  
-  if (imageSelect) {
-    logger.log('选择封面图片', 'action');
-    simulateClick(imageSelect);
+  const pickImageInDialog = async (index: number): Promise<boolean> => {
+    const dialogs = Array.from(document.querySelectorAll('.weui-desktop-dialog')) as HTMLElement[];
+    const currentDialog = dialogs.find(d => isElementVisible(d)) || null;
+    if (!currentDialog) return false;
+
+    const imgs = Array.from(currentDialog.querySelectorAll('img')) as HTMLImageElement[];
+    const visible = imgs.filter(i => isElementVisible(i));
+    if (visible.length === 0) return false;
+
+    const i = Math.max(0, Math.min(index, visible.length - 1));
+    const targetImg = visible[i];
+    const clickable = (targetImg.closest('li, .cover-image-item, .image-item, [class*=\"cover-item\"], [class*=\"card\"], div') as HTMLElement | null) || (targetImg as any as HTMLElement);
+    logger.log(`选择封面图片：弹窗第 ${i + 1}/${visible.length} 张`, 'action');
+    simulateClick(clickable);
     await new Promise(r => setTimeout(r, 800));
-  } else {
-    logger.log('未找到可选择的图片', 'warn');
+    return true;
+  };
+
+  const picked = await pickImageInDialog(targetIndex);
+  if (!picked) {
+    logger.log('未找到可选择的图片，将尝试默认选择', 'warn');
+    await pickImageInDialog(0);
   }
   
   // 封面设置流程可能有多个步骤，循环处理直到完成
@@ -2874,6 +2914,838 @@ const generateAndInsertImageForPlaceholder = async (
   return true;
 };
 
+const dataUrlToBlob = (dataUrl: string): { blob: Blob; mimeType: string } => {
+  const [meta, base64] = dataUrl.split(',');
+  const mimeMatch = meta.match(/data:([^;]+);base64/i);
+  const mimeType = mimeMatch?.[1] || 'image/jpeg';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return { blob: new Blob([bytes], { type: mimeType }), mimeType };
+};
+
+const getFileExtensionByMime = (mimeType: string) => {
+  const mime = mimeType.toLowerCase();
+  if (mime.includes('png')) return 'png';
+  if (mime.includes('webp')) return 'webp';
+  if (mime.includes('gif')) return 'gif';
+  if (mime.includes('bmp')) return 'bmp';
+  return 'jpg';
+};
+
+const normalizeWeiboImageUrl = (url: string): string => {
+  try {
+    const u = new URL(url, window.location.href);
+    const host = u.hostname.toLowerCase();
+    if (host.endsWith('sinajs.cn')) return '';
+    if (!host.endsWith('sinaimg.cn')) return u.toString();
+    if (host.startsWith('tvax')) {
+      const parts = u.pathname.split('/').filter(Boolean);
+      const file = parts[parts.length - 1] || '';
+      if (/\.(jpg|jpeg|png|webp|gif)$/i.test(file)) {
+        return `https://wx1.sinaimg.cn/large/${file}`;
+      }
+    }
+    const segments = u.pathname.split('/').filter(Boolean);
+    if (segments.length < 2) return u.toString();
+    const size = segments[0].toLowerCase();
+    const replaceable = ['thumb150', 'thumb180', 'thumb300', 'orj360', 'mw2000', 'mw1024', 'mw690', 'bmiddle', 'small', 'square'];
+    if (replaceable.includes(size)) {
+      segments[0] = 'large';
+      u.pathname = '/' + segments.join('/');
+    }
+    return u.toString();
+  } catch {
+    return url;
+  }
+};
+
+const shouldAvoidHotlinkInsert = (url: string): boolean => {
+  try {
+    const u = new URL(url, window.location.href);
+    const host = u.hostname.toLowerCase();
+    if (host.endsWith('sinaimg.cn')) return true;
+    if (host.includes('weibo.com') || host.includes('weibo.cn')) return true;
+    return false;
+  } catch {
+    return false;
+  }
+};
+
+const fetchSourceImageDataUrl = async (url: string, referrer?: string): Promise<{ dataUrl: string; mimeType: string } | null> => {
+  const effectiveReferrer = (() => {
+    try {
+      const u = new URL(url, window.location.href);
+      const host = u.hostname.toLowerCase();
+      if (host.endsWith('sinaimg.cn')) {
+        const r = (referrer || '').toLowerCase();
+        if (!r.includes('weibo.com') && !r.includes('weibo.cn') && !r.includes('s.weibo.com')) {
+          return 'https://weibo.com/';
+        }
+      }
+    } catch {
+      return referrer;
+    }
+    return referrer;
+  })();
+
+  const tryOnce = async (targetUrl: string) => {
+    const res = await chrome.runtime.sendMessage({ type: 'FETCH_IMAGE_DATA_URL', payload: { url: targetUrl, referrer: effectiveReferrer } });
+    if (!res || !res.success || !res.dataUrl) return null;
+    const dataUrl = res.dataUrl as string;
+    const mimeType = (res.mimeType as string) || 'image/jpeg';
+    if (dataUrl.length < 50000) return null;
+    return { dataUrl, mimeType };
+  };
+
+  const normalizedUrl = normalizeWeiboImageUrl(url);
+  if (!normalizedUrl) return null;
+  try {
+    const r1 = await tryOnce(normalizedUrl);
+    if (r1) return r1;
+    await new Promise(r => setTimeout(r, 600));
+    const r2 = await tryOnce(normalizedUrl);
+    if (r2) return r2;
+    if (normalizedUrl !== url) {
+      await new Promise(r => setTimeout(r, 600));
+      const r3 = await tryOnce(url);
+      if (r3) return r3;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const fetchSourceImageFile = async (url: string, referrer?: string): Promise<File | null> => {
+  try {
+    const result = await fetchSourceImageDataUrl(url, referrer);
+    if (!result) return null;
+    const { blob, mimeType } = dataUrlToBlob(result.dataUrl);
+    const ext = getFileExtensionByMime(mimeType);
+    const fileName = `memoraid-${Date.now()}.${ext}`;
+    return new File([blob], fileName, { type: mimeType });
+  } catch {
+    return null;
+  }
+};
+
+const isMediaAiEnabled = async (): Promise<boolean> => {
+  try {
+    const s = await chrome.storage.sync.get(['enableMediaAi', 'enableImageOcr']);
+    return s.enableMediaAi === true || s.enableImageOcr === true;
+  } catch {
+    return false;
+  }
+};
+
+const escapeHtmlAttr = (value: string): string => {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+};
+
+const markImageOriginal = (img: HTMLImageElement, originalUrl?: string) => {
+  const v = (originalUrl || '').trim();
+  if (!v) return;
+  try {
+    img.setAttribute('data-memoraid-original', v);
+    (img as any).dataset && ((img as any).dataset.memoraidOriginal = v);
+  } catch {
+  }
+};
+
+const blobToDataUrl = async (blob: Blob): Promise<string> => {
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('FileReader failed'));
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.readAsDataURL(blob);
+  });
+};
+
+const getDataUrlFromAnyImageUrl = async (url: string): Promise<string | null> => {
+  const u = (url || '').trim();
+  if (!u) return null;
+  if (u.startsWith('data:')) return u;
+  if (u.startsWith('blob:')) {
+    try {
+      const resp = await fetch(u);
+      if (!resp.ok) return null;
+      const blob = await resp.blob();
+      return await blobToDataUrl(blob);
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const resp = await chrome.runtime.sendMessage({
+      type: 'FETCH_IMAGE_DATA_URL',
+      payload: { url: u, referrer: window.location.href }
+    });
+    const dataUrl = resp?.success ? (resp.dataUrl as string | undefined) : undefined;
+    return dataUrl || null;
+  } catch {
+    return null;
+  }
+};
+
+const createThumbnailDataUrl = async (dataUrl: string, maxDim = 512): Promise<string | null> => {
+  return await new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const w = img.naturalWidth || img.width || 0;
+        const h = img.naturalHeight || img.height || 0;
+        if (!w || !h) { resolve(null); return; }
+        const scale = Math.min(1, maxDim / Math.max(w, h));
+        const tw = Math.max(1, Math.round(w * scale));
+        const th = Math.max(1, Math.round(h * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = tw;
+        canvas.height = th;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(null); return; }
+        ctx.drawImage(img, 0, 0, tw, th);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+};
+
+const getImageMetaFromDataUrl = async (dataUrl: string): Promise<{ width: number; height: number; aspect: number } | null> => {
+  return await new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth || img.width || 0;
+      const h = img.naturalHeight || img.height || 0;
+      if (!w || !h) { resolve(null); return; }
+      resolve({ width: w, height: h, aspect: Math.max(w / h, h / w) });
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+};
+
+const pickEvenlySpacedIndices = (length: number, maxCount: number): number[] => {
+  const len = Math.max(0, Math.floor(length));
+  const max = Math.max(0, Math.floor(maxCount));
+  if (len === 0 || max === 0) return [];
+  if (len <= max) return Array.from({ length: len }, (_, i) => i);
+  if (max === 1) return [0];
+
+  const out: number[] = [];
+  for (let i = 0; i < max; i++) {
+    const idx = Math.round(i * (len - 1) / (max - 1));
+    if (out.length === 0 || out[out.length - 1] !== idx) out.push(idx);
+  }
+  if (out[0] !== 0) out.unshift(0);
+  const last = len - 1;
+  if (out[out.length - 1] !== last) out.push(last);
+  return Array.from(new Set(out)).slice(0, max);
+};
+
+const pickBestCoverImageIndexWithAI = async (): Promise<number | null> => {
+  const enabled = await isMediaAiEnabled();
+  if (!enabled) return null;
+
+  const editor = findElement(SELECTORS.editor);
+  if (!editor) return null;
+
+  const imgs = Array.from(editor.querySelectorAll('img')) as HTMLImageElement[];
+  const visibleImgs = imgs.filter(img => isElementVisible(img));
+  if (visibleImgs.length <= 1) return null;
+
+  const title = getArticleTitle().trim();
+  const contentSnippet = getArticleContent().trim().slice(0, 800);
+
+  const indices = pickEvenlySpacedIndices(visibleImgs.length, 10);
+  const images: Array<{ url: string; thumbDataUrl: string; width?: number; height?: number; aspect?: number }> = [];
+  for (const idx of indices) {
+    const img = visibleImgs[idx];
+    const src = (img.currentSrc || img.src || '').trim();
+    if (!src) continue;
+    const dataUrl = await getDataUrlFromAnyImageUrl(src);
+    if (!dataUrl) continue;
+    const meta = await getImageMetaFromDataUrl(dataUrl);
+    const thumb = await createThumbnailDataUrl(dataUrl, 512);
+    if (!thumb) continue;
+    images.push({ url: `editor://img/${idx}`, thumbDataUrl: thumb, width: meta?.width, height: meta?.height, aspect: meta?.aspect });
+  }
+  if (images.length <= 1) return null;
+
+  try {
+    const resp = await chrome.runtime.sendMessage({
+      type: 'AI_MEDIA_ENHANCE',
+      payload: {
+        title,
+        context: contentSnippet ? `正文片段：${contentSnippet}` : '',
+        images,
+        maxPick: 1
+      }
+    });
+    const skippedCode = resp?.success ? (resp.result?.skipped?.code as string | undefined) : undefined;
+    if (skippedCode) return null;
+    const coverUrl = resp?.success ? (resp.result?.cover?.url as string | undefined) : undefined;
+    const coverReason = resp?.success ? (resp.result?.cover?.reason as string | undefined) : undefined;
+    const best = typeof coverUrl === 'string' ? coverUrl : '';
+    if (best) {
+      const m = best.match(/^editor:\/\/img\/(\d+)$/);
+      const bestIdx = m ? Number(m[1]) : NaN;
+      if (Number.isFinite(bestIdx)) {
+        const reason = typeof coverReason === 'string' ? coverReason : '';
+        logger.log(`AI 封面图选择：第 ${bestIdx + 1} 张${reason ? `（理由：${String(reason).slice(0, 120)}）` : ''}`, 'info');
+        return bestIdx;
+      }
+    }
+  } catch {
+  }
+  return null;
+};
+
+const analyzeSourceImagesWithAIOnce = async (options: {
+  title: string;
+  content: string;
+  placeholders: Array<{ text: string; keyword: string }>;
+  sourceImages: string[];
+  sourceUrl?: string;
+}): Promise<{ orderedUrls: string[]; coverUrl?: string }> => {
+  const unique = Array.from(new Set(options.sourceImages));
+  const normalized = unique
+    .map(u => normalizeWeiboImageUrl(u))
+    .filter(u => !!u) as string[];
+
+  const candidates = normalized.slice(0, 10);
+  if (candidates.length <= 1) return { orderedUrls: normalized };
+
+  const enabled = await isMediaAiEnabled();
+  if (!enabled) return { orderedUrls: normalized };
+
+  const images: Array<{ url: string; thumbDataUrl: string; width?: number; height?: number; aspect?: number }> = [];
+  for (const url of candidates) {
+    const data = await fetchSourceImageDataUrl(url, options.sourceUrl);
+    if (!data?.dataUrl) continue;
+    const meta = await getImageMetaFromDataUrl(data.dataUrl);
+    const thumb = await createThumbnailDataUrl(data.dataUrl, 512);
+    if (!thumb) continue;
+    images.push({ url, thumbDataUrl: thumb, width: meta?.width, height: meta?.height, aspect: meta?.aspect });
+  }
+
+  if (images.length <= 1) return { orderedUrls: normalized };
+
+  const context = [
+    options.placeholders.length ? `占位符：${options.placeholders.map(p => p.keyword).filter(Boolean).join('；')}` : '',
+    options.content.slice(0, 800)
+  ].filter(Boolean).join('\n');
+
+  try {
+    const resp = await chrome.runtime.sendMessage({
+      type: 'AI_MEDIA_ENHANCE',
+      payload: {
+        title: options.title,
+        context,
+        images,
+        maxPick: Math.min(options.placeholders.length || 10, images.length)
+      }
+    });
+    const skippedCode = resp?.success ? (resp.result?.skipped?.code as string | undefined) : undefined;
+    if (skippedCode) {
+      if (skippedCode === 'missing_apiyi_key') {
+        logger.log('AI 图文增强已开启，但未配置 apiyi API Key，本次不会调用 apiyi 选图', 'warn');
+      } else if (skippedCode === 'media_ai_disabled') {
+        logger.log('AI 图文增强未开启，本次不会调用 apiyi 选图', 'warn');
+      } else {
+        logger.log(`AI 选图已跳过：${skippedCode}`, 'warn');
+      }
+      return { orderedUrls: normalized };
+    }
+    const errorMsg = resp?.success ? (resp.result?.error as string | undefined) : undefined;
+    if (errorMsg) {
+      logger.log(`AI 选图调用失败，本次不会调用 apiyi 选图：${String(errorMsg).slice(0, 160)}`, 'warn');
+      return { orderedUrls: normalized };
+    }
+    const orderedUrls = resp?.success ? (resp.result?.inline?.orderedUrls as string[] | undefined) : undefined;
+    const picked = resp?.success ? (resp.result?.inline?.picked as Array<{ url: string; reason?: string }> | undefined) : undefined;
+    const coverUrl = resp?.success ? (resp.result?.cover?.url as string | undefined) : undefined;
+    const coverReason = resp?.success ? (resp.result?.cover?.reason as string | undefined) : undefined;
+    if (coverUrl && typeof coverUrl === 'string') {
+      logger.log(`AI 封面图：${coverUrl}${coverReason ? `（理由：${String(coverReason).slice(0, 120)}）` : ''}`, 'info');
+    }
+    if (orderedUrls && orderedUrls.length > 0) {
+      if (picked && picked.length > 0) {
+        logger.log(`AI 选图（优先 ${Math.min(options.placeholders.length || 6, images.length)} 张）:`, 'info');
+        picked.slice(0, 10).forEach((p, idx) => {
+          if (!p?.url) return;
+          const reason = typeof p.reason === 'string' ? p.reason.trim() : '';
+          logger.log(`  #${idx + 1}: ${p.url}${reason ? `（理由：${reason.slice(0, 120)}）` : ''}`, 'info');
+        });
+      } else {
+        logger.log(`AI 选图排序结果: ${orderedUrls.slice(0, 10).join(' , ')}`, 'info');
+      }
+      const ranked = orderedUrls.filter(u => normalized.includes(u));
+      const rest = normalized.filter(u => !ranked.includes(u));
+      const combined = [...ranked, ...rest];
+      const coverFirst = coverUrl && combined.includes(coverUrl) ? [coverUrl, ...combined.filter(u => u !== coverUrl)] : combined;
+      return { orderedUrls: coverFirst, coverUrl };
+    }
+  } catch {
+  }
+  return { orderedUrls: normalized };
+};
+
+const waitForImageFileInput = async (timeout = 8000): Promise<HTMLInputElement | null> => {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const inputs = Array.from(document.querySelectorAll('input[type="file"]')) as HTMLInputElement[];
+    const candidate = inputs.find(input => {
+      if (input.disabled) return false;
+      const accept = (input.getAttribute('accept') || '').toLowerCase();
+      if (accept && !accept.includes('image')) return false;
+      return true;
+    });
+    if (candidate) return candidate;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  return null;
+};
+
+const tryClickLocalUploadMenu = async (): Promise<void> => {
+  const uploadTexts = ['上传图片', '本地上传', '本地图片', '上传', '本地'];
+  const elements = document.querySelectorAll('div, span, a, li, button');
+  for (const el of elements) {
+    const text = (el as HTMLElement).innerText?.trim();
+    if (!text) continue;
+    if (uploadTexts.includes(text) && isElementVisible(el as HTMLElement)) {
+      simulateClick(el as HTMLElement);
+      await new Promise(r => setTimeout(r, 500));
+      break;
+    }
+  }
+};
+
+const setInputFiles = (input: HTMLInputElement, files: File[]) => {
+  const dt = new DataTransfer();
+  for (const f of files) dt.items.add(f);
+  try {
+    Object.defineProperty(input, 'files', { value: dt.files, configurable: true });
+  } catch {
+    try {
+      (input as any).files = dt.files;
+    } catch {
+      return;
+    }
+  }
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+};
+
+const setCursorToEditorEnd = (): boolean => {
+  const editor = findElement(SELECTORS.editor);
+  if (!editor) return false;
+  editor.focus();
+  const range = document.createRange();
+  range.selectNodeContents(editor);
+  range.collapse(false);
+  const sel = window.getSelection();
+  if (!sel) return false;
+  sel.removeAllRanges();
+  sel.addRange(range);
+  return true;
+};
+
+const getEditorFromSelection = (): HTMLElement | null => {
+  const selection = window.getSelection();
+  if (selection && selection.rangeCount > 0) {
+    const range = selection.getRangeAt(0);
+    const container = range.commonAncestorContainer;
+    const el = container instanceof Element ? container : container.parentElement;
+    const editable = el?.closest?.('[contenteditable="true"], .edui-body-container') as HTMLElement | null;
+    if (editable) return editable;
+  }
+  return findElement(SELECTORS.editor);
+};
+
+const insertRemoteImageAtSelection = async (imageUrl: string, placeholderText?: string, originalUrl?: string): Promise<boolean> => {
+  const editor = getEditorFromSelection();
+  if (!editor) return false;
+  const beforeImgs = Array.from(editor.querySelectorAll('img')) as HTMLImageElement[];
+  const beforeSet = new Set(beforeImgs);
+
+  try {
+    const original = (originalUrl || imageUrl || '').trim();
+    document.execCommand(
+      'insertHTML',
+      false,
+      `<img src="${escapeHtmlAttr(imageUrl)}" data-memoraid-original="${escapeHtmlAttr(original)}" style="max-width:100%;height:auto;"/>`
+    );
+  } catch {
+    return false;
+  }
+
+  editor.dispatchEvent(new Event('input', { bubbles: true }));
+  editor.dispatchEvent(new Event('change', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 900));
+
+  const waitForNewImageOk = async (): Promise<boolean> => {
+    const start = Date.now();
+    while (Date.now() - start < 6000) {
+      const imgs = Array.from(editor.querySelectorAll('img')) as HTMLImageElement[];
+      const newImg = imgs.find(i => !beforeSet.has(i));
+      if (!newImg) {
+        await new Promise(r => setTimeout(r, 200));
+        continue;
+      }
+      const w = newImg.naturalWidth || newImg.width || newImg.clientWidth || 0;
+      const h = newImg.naturalHeight || newImg.height || newImg.clientHeight || 0;
+      if (newImg.complete && w > 0 && h > 0) {
+        markImageOriginal(newImg, originalUrl || imageUrl);
+        if (w >= 200 && h >= 150) return true;
+        const parent = newImg.parentNode;
+        const next = newImg.nextSibling;
+        newImg.remove();
+        if (placeholderText && parent) parent.insertBefore(document.createTextNode(placeholderText), next);
+        return false;
+      }
+      await new Promise(r => setTimeout(r, 200));
+    }
+    const imgs = Array.from(editor.querySelectorAll('img')) as HTMLImageElement[];
+    const newImg = imgs.find(i => !beforeSet.has(i));
+    if (newImg) {
+      const parent = newImg.parentNode;
+      const next = newImg.nextSibling;
+      newImg.remove();
+      if (placeholderText && parent) parent.insertBefore(document.createTextNode(placeholderText), next);
+    }
+    return false;
+  };
+
+  return await waitForNewImageOk();
+};
+
+const getClickableForToolbarItem = (el: HTMLElement): HTMLElement => {
+  const isClickable = (node: HTMLElement) => {
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'button' || tag === 'a') return true;
+    const role = node.getAttribute('role') || '';
+    if (role.toLowerCase() === 'button') return true;
+    const tabindex = node.getAttribute('tabindex');
+    if (tabindex && tabindex !== '-1') return true;
+    if (typeof (node as any).onclick === 'function') return true;
+    return false;
+  };
+
+  if (isClickable(el)) return el;
+  let cur: HTMLElement | null = el;
+  for (let i = 0; i < 4; i++) {
+    cur = cur.parentElement;
+    if (!cur) break;
+    if (isClickable(cur)) return cur;
+  }
+  return el;
+};
+
+const isToolbarItemActive = (el: HTMLElement): boolean => {
+  const ariaPressed = (el.getAttribute('aria-pressed') || '').toLowerCase();
+  const ariaSelected = (el.getAttribute('aria-selected') || '').toLowerCase();
+  if (ariaPressed === 'true' || ariaSelected === 'true') return true;
+  const cls = el.classList;
+  return cls.contains('active') || cls.contains('selected') || cls.contains('is-active') || cls.contains('is-selected');
+};
+
+const clickWeixinImageAdaptive = async (img: HTMLImageElement): Promise<boolean> => {
+  if (!img) return false;
+  if (!isElementVisible(img)) return false;
+
+  simulateClick(img);
+  await new Promise(r => setTimeout(r, 250));
+
+  const rect = img.getBoundingClientRect();
+  const preferredLabels = ['自适应', '适应宽度', '适应', '自适应宽度'];
+  for (const label of preferredLabels) {
+    const all = findVisibleElementsByTextIncludes(label);
+    if (all.length === 0) continue;
+    const exact = all.filter(el => (el.innerText || '').trim() === label);
+    if (label === '适应' && exact.length === 0) continue;
+    const compact = (exact.length > 0 ? exact : all).filter(el => ((el.innerText || '').trim().length || 0) <= 12);
+    const candidates = compact.length > 0 ? compact : (exact.length > 0 ? exact : all);
+
+    const picked = pickClosestElementToRectCenter(candidates, rect);
+    if (!picked) continue;
+    const clickable = getClickableForToolbarItem(picked);
+    if (isToolbarItemActive(clickable)) return true;
+    simulateClick(clickable);
+    await new Promise(r => setTimeout(r, 250));
+    return true;
+  }
+
+  return false;
+};
+
+const clickWeixinAdaptiveForAllImagesInEditor = async (maxImages = 30): Promise<number> => {
+  const editor = getEditorFromSelection();
+  if (!editor) return 0;
+
+  const imgs = Array.from(editor.querySelectorAll('img')) as HTMLImageElement[];
+  let ok = 0;
+  for (const img of imgs.slice(0, Math.max(0, maxImages))) {
+    const success = await clickWeixinImageAdaptive(img);
+    if (success) ok += 1;
+    await new Promise(r => setTimeout(r, 350));
+  }
+  return ok;
+};
+
+const tryConfirmImageInsert = async (): Promise<void> => {
+  const candidates = ['确定', '完成', '插入', '使用'];
+  const dialogs = Array.from(document.querySelectorAll('.weui-desktop-dialog, [class*="dialog"], [class*="modal"]')) as HTMLElement[];
+  const visibleDialogs = dialogs.filter(d => isElementVisible(d) && d.querySelector('button, a, div, span'));
+  const scopes = visibleDialogs.length > 0 ? visibleDialogs : [document.body as unknown as HTMLElement];
+  for (const scope of scopes) {
+    const buttons = Array.from(scope.querySelectorAll('button, a, div')) as HTMLElement[];
+    for (const btn of buttons) {
+      const text = btn.innerText?.trim();
+      if (!text) continue;
+      if (!candidates.includes(text)) continue;
+      if (!isElementVisible(btn)) continue;
+      simulateClick(btn);
+      await new Promise(r => setTimeout(r, 500));
+      return;
+    }
+  }
+};
+
+const pasteImageFileToEditor = async (file: File): Promise<boolean> => {
+  const editor = findElement(SELECTORS.editor);
+  if (!editor) return false;
+  const initialImgCount = editor.querySelectorAll('img').length;
+
+  try {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    editor.focus();
+    const pasteEvent = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true });
+    editor.dispatchEvent(pasteEvent);
+  } catch {
+    return false;
+  }
+
+  const start = Date.now();
+  while (Date.now() - start < 3000) {
+    const currentImgCount = editor.querySelectorAll('img').length;
+    if (currentImgCount > initialImgCount) return true;
+    await new Promise(r => setTimeout(r, 150));
+  }
+  return false;
+};
+
+const uploadImageFileToEditor = async (file: File, placeholderText?: string, originalUrl?: string): Promise<boolean> => {
+  const editor = findElement(SELECTORS.editor);
+  if (!editor) return false;
+  const initialImgs = Array.from(editor.querySelectorAll('img')) as HTMLImageElement[];
+  const initialSet = new Set(initialImgs);
+
+  const pasted = await pasteImageFileToEditor(file);
+  if (pasted) {
+    const start = Date.now();
+    while (Date.now() - start < 8000) {
+      const imgs = Array.from(editor.querySelectorAll('img')) as HTMLImageElement[];
+      const img = imgs.find(i => !initialSet.has(i));
+      if (!img) {
+        await new Promise(r => setTimeout(r, 200));
+        continue;
+      }
+      const w = img.naturalWidth || img.width || img.clientWidth || 0;
+      const h = img.naturalHeight || img.height || img.clientHeight || 0;
+      if (img.complete && w > 0 && h > 0) {
+        markImageOriginal(img, originalUrl);
+        if (w >= 200 && h >= 150) return true;
+        const parent = img.parentNode;
+        const next = img.nextSibling;
+        img.remove();
+        if (placeholderText && parent) {
+          parent.insertBefore(document.createTextNode(placeholderText), next);
+        }
+        return false;
+      }
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    const imgs = Array.from(editor.querySelectorAll('img')) as HTMLImageElement[];
+    const img = imgs.find(i => !initialSet.has(i));
+    if (img) {
+      const parent = img.parentNode;
+      const next = img.nextSibling;
+      img.remove();
+      if (placeholderText && parent) parent.insertBefore(document.createTextNode(placeholderText), next);
+    }
+    return false;
+  }
+
+  if (!await openImageDialog()) return false;
+  await tryClickLocalUploadMenu();
+
+  const input = await waitForImageFileInput(8000);
+  if (!input) return false;
+  setInputFiles(input, [file]);
+  await new Promise(r => setTimeout(r, 800));
+  await tryConfirmImageInsert();
+
+  const start = Date.now();
+  while (Date.now() - start < 20000) {
+    const currentImgCount = editor.querySelectorAll('img').length;
+    if (currentImgCount > initialImgs.length) {
+      const imgs = Array.from(editor.querySelectorAll('img')) as HTMLImageElement[];
+      const img = imgs.find(i => !initialSet.has(i)) || imgs[imgs.length - 1];
+      const waitStart = Date.now();
+      while (Date.now() - waitStart < 8000) {
+        const w = img.naturalWidth || img.width || img.clientWidth || 0;
+        const h = img.naturalHeight || img.height || img.clientHeight || 0;
+        if (img.complete && w > 0 && h > 0) {
+          markImageOriginal(img, originalUrl);
+          if (w >= 200 && h >= 150) return true;
+          const parent = img.parentNode;
+          const next = img.nextSibling;
+          img.remove();
+          if (placeholderText && parent) {
+            parent.insertBefore(document.createTextNode(placeholderText), next);
+          }
+          return false;
+        }
+        await new Promise(r => setTimeout(r, 200));
+      }
+
+      const parent = img.parentNode;
+      const next = img.nextSibling;
+      img.remove();
+      if (placeholderText && parent) {
+        parent.insertBefore(document.createTextNode(placeholderText), next);
+      }
+      return false;
+    }
+    if (Date.now() - start > 6000 && Date.now() - start < 7000) {
+      await tryConfirmImageInsert();
+    }
+    await new Promise(r => setTimeout(r, 300));
+  }
+  return false;
+};
+
+const insertSourceImageForPlaceholder = async (
+  placeholderText: string,
+  imageUrl: string,
+  referrer?: string
+): Promise<boolean> => {
+  if (!selectPlaceholderInEditor(placeholderText)) return false;
+  await new Promise(r => setTimeout(r, 200));
+
+  const normalizedUrl = normalizeWeiboImageUrl(imageUrl);
+  if (!normalizedUrl) return false;
+  const avoidHotlink = shouldAvoidHotlinkInsert(normalizedUrl);
+  logger.log(`来源图片URL: ${imageUrl}`, 'info');
+  if (normalizedUrl !== imageUrl) logger.log(`来源图片URL(规格提升): ${normalizedUrl}`, 'info');
+
+  if (!avoidHotlink) {
+    logger.log('尝试直接插入来源图片链接', 'info');
+    const insertedByHtml = await insertRemoteImageAtSelection(normalizedUrl, placeholderText, normalizedUrl);
+    if (insertedByHtml) {
+      logger.log('来源图片链接插入成功', 'success');
+      await new Promise(r => setTimeout(r, 1000));
+      return true;
+    }
+    logger.log('来源图片链接插入失败，尝试插入 base64 图片', 'warn');
+  } else {
+    logger.log('检测到可能防盗链的图片来源，跳过直接链接插入', 'info');
+  }
+
+  const dataUrlResult = await fetchSourceImageDataUrl(normalizedUrl, referrer);
+  if (dataUrlResult?.dataUrl) {
+    logger.log(`来源图片base64已获取: mime=${dataUrlResult.mimeType}, len=${dataUrlResult.dataUrl.length}`, 'info');
+    const insertedByDataUrl = await insertRemoteImageAtSelection(dataUrlResult.dataUrl, placeholderText, normalizedUrl);
+    if (insertedByDataUrl) {
+      logger.log('base64 图片插入成功', 'success');
+      await new Promise(r => setTimeout(r, 1200));
+      return true;
+    }
+  }
+
+  logger.log('base64 插入失败，尝试上传图片', 'warn');
+
+  const file = await fetchSourceImageFile(normalizedUrl, referrer);
+  if (!file) return false;
+  logger.log(`来源图片File已获取: name=${file.name}, size=${file.size}, type=${file.type}`, 'info');
+
+  const ok = await uploadImageFileToEditor(file, placeholderText, normalizedUrl);
+  await new Promise(r => setTimeout(r, 800));
+  return ok;
+};
+
+const insertSourceImagesAtEnd = async (imageUrls: string[], maxInsert = 3, referrer?: string): Promise<number> => {
+  if (!setCursorToEditorEnd()) return 0;
+  let inserted = 0;
+  for (const url of imageUrls.slice(0, maxInsert)) {
+    const normalizedUrl = normalizeWeiboImageUrl(url);
+    const avoidHotlink = shouldAvoidHotlinkInsert(normalizedUrl);
+    logger.log(`来源图片URL: ${url}`, 'info');
+    if (normalizedUrl !== url) logger.log(`来源图片URL(规格提升): ${normalizedUrl}`, 'info');
+
+    if (!avoidHotlink) {
+      const insertedByHtml = await insertRemoteImageAtSelection(normalizedUrl, undefined, normalizedUrl);
+      if (insertedByHtml) {
+        inserted += 1;
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+    }
+
+    const dataUrlResult = await fetchSourceImageDataUrl(normalizedUrl, referrer);
+    if (dataUrlResult?.dataUrl) {
+      logger.log(`来源图片base64已获取: mime=${dataUrlResult.mimeType}, len=${dataUrlResult.dataUrl.length}`, 'info');
+      const insertedByDataUrl = await insertRemoteImageAtSelection(dataUrlResult.dataUrl, undefined, normalizedUrl);
+      if (insertedByDataUrl) {
+        inserted += 1;
+        await new Promise(r => setTimeout(r, 1200));
+        continue;
+      }
+    }
+
+    const file = await fetchSourceImageFile(normalizedUrl, referrer);
+    if (!file) continue;
+    logger.log(`来源图片File已获取: name=${file.name}, size=${file.size}, type=${file.type}`, 'info');
+    const ok = await uploadImageFileToEditor(file, undefined, normalizedUrl);
+    if (ok) inserted += 1;
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  return inserted;
+};
+
+const findEditorImageIndexByOriginalUrl = (originalUrl?: string): number | null => {
+  const u = (originalUrl || '').trim();
+  if (!u) return null;
+  const editor = findElement(SELECTORS.editor);
+  if (!editor) return null;
+  const imgs = Array.from(editor.querySelectorAll('img')) as HTMLImageElement[];
+  if (imgs.length === 0) return null;
+  const normalizedTarget = normalizeWeiboImageUrl(u) || u;
+  for (let i = 0; i < imgs.length; i++) {
+    const img = imgs[i];
+    const tagged = (img.getAttribute('data-memoraid-original') || (img as any)?.dataset?.memoraidOriginal || '').trim();
+    const src = (img.currentSrc || img.src || '').trim();
+    const taggedNorm = tagged ? (normalizeWeiboImageUrl(tagged) || tagged) : '';
+    const srcNorm = src ? (normalizeWeiboImageUrl(src) || src) : '';
+    if (taggedNorm && taggedNorm === normalizedTarget) return i;
+    if (srcNorm && srcNorm === normalizedTarget) return i;
+  }
+  return null;
+};
+
 /**
  * 获取当前文章标题
  */
@@ -2908,6 +3780,9 @@ const runPublishFlow = async (options: {
   authorName?: string;
   generateAI?: boolean;
   aiPrompt?: string;
+  imageSource?: 'source' | 'platform';
+  sourceImages?: string[];
+  sourceUrl?: string;
   autoPreview?: boolean;
   autoPublish?: boolean;  // 是否自动发布
 }) => {
@@ -2942,9 +3817,101 @@ const runPublishFlow = async (options: {
     
     await new Promise(r => setTimeout(r, 1000));
     
+    // 3. 插入配图
+    let shouldFallbackToAI = false;
+    let preferredCoverOriginalUrl: string | undefined;
+    if (options.imageSource === 'source') {
+      logger.log('🖼️ 步骤3: 插入素材来源页面图片', 'info');
+      
+      // 查找文章中的图片占位符
+      const placeholders = findImagePlaceholders();
+      let sourceImages = options.sourceImages || [];
+      
+      if (sourceImages.length === 0) {
+        logger.log('未找到可用的来源图片，将回退到 AI 配图', 'warn');
+        shouldFallbackToAI = true;
+      } else if (placeholders.length > 0) {
+        const analyzed = await analyzeSourceImagesWithAIOnce({
+          title: options.title,
+          content: options.content,
+          placeholders,
+          sourceImages,
+          sourceUrl: options.sourceUrl
+        });
+        sourceImages = analyzed.orderedUrls;
+        preferredCoverOriginalUrl = analyzed.coverUrl;
+        logger.log(`找到 ${placeholders.length} 个图片占位符，开始逐个处理...`, 'info');
+        let insertedAny = false;
+        let sourceIndex = 0;
+        const failedPlaceholders = new Set<string>();
+        if (sourceImages.length < placeholders.length) {
+          logger.log(`来源图片数量不足（${sourceImages.length} 张），剩余占位符将回退 AI 配图`, 'warn');
+          shouldFallbackToAI = true;
+        }
+        
+        for (let i = 0; i < placeholders.length; i++) {
+          if (isFlowCancelled) return;
+          
+          const currentPlaceholders = findImagePlaceholders();
+          const placeholder = currentPlaceholders.find(p => !failedPlaceholders.has(p.text)) || currentPlaceholders[0];
+          if (!placeholder) break;
+          logger.log(`📷 处理第 ${i + 1}/${placeholders.length} 张来源图片`, 'info');
+
+          let success = false;
+          for (let attempt = 0; attempt < 2; attempt++) {
+            const imgUrl = sourceImages[sourceIndex];
+            if (!imgUrl) {
+              logger.log('来源图片已用尽，剩余占位符将回退 AI 配图', 'warn');
+              shouldFallbackToAI = true;
+              break;
+            }
+            logger.log(`使用来源图片 ${sourceIndex + 1}/${sourceImages.length}`, 'info');
+            success = await insertSourceImageForPlaceholder(placeholder.text, imgUrl, options.sourceUrl);
+            sourceIndex += 1;
+            if (success) break;
+            await new Promise(r => setTimeout(r, 1200));
+          }
+          
+          if (success) {
+            logger.log(`✅ 第 ${i + 1} 张图片插入成功`, 'success');
+            insertedAny = true;
+          } else {
+            logger.log(`⚠️ 第 ${i + 1} 张图片处理失败，继续下一个`, 'warn');
+            failedPlaceholders.add(placeholder.text);
+          }
+          
+          // 等待一段时间再处理下一个，避免操作过快
+          if (i < placeholders.length - 1) {
+            await new Promise(r => setTimeout(r, success ? 3500 : 2500));
+          }
+        }
+        
+        logger.log(`图片处理完成，共处理 ${placeholders.length} 个占位符，消耗 ${Math.min(sourceIndex, sourceImages.length)} 张来源图片`, 'success');
+        const remaining = findImagePlaceholders();
+        if (remaining.length > 0) {
+          logger.log(`仍有 ${remaining.length} 个占位符未填充，将回退 AI 配图`, 'warn');
+          shouldFallbackToAI = true;
+        }
+        if (!insertedAny) {
+          logger.log('未成功插入任何来源图片，将回退到 AI 配图', 'warn');
+          shouldFallbackToAI = true;
+        }
+      } else {
+        if (sourceImages.length > 0) {
+          const inserted = await insertSourceImagesAtEnd(sourceImages, 3, options.sourceUrl);
+          if (inserted > 0) {
+            logger.log(`✅ 已在文章末尾插入 ${inserted} 张来源图片`, 'success');
+          } else {
+            logger.log('⚠️ 插入来源图片失败，将回退到 AI 配图', 'warn');
+            shouldFallbackToAI = true;
+          }
+        }
+      }
+    } 
+
     // 3. 生成 AI 配图（如果启用）
     // 支持多个图片占位符，为每个占位符生成不同的 AI 图片
-    if (options.generateAI !== false) {
+    if (options.generateAI !== false && (options.imageSource !== 'source' || shouldFallbackToAI)) {
       logger.log('🎨 步骤3: 生成 AI 配图', 'info');
       
       // 查找文章中的图片占位符
@@ -2959,7 +3926,6 @@ const runPublishFlow = async (options: {
           const placeholder = placeholders[i];
           logger.log(`📷 处理第 ${i + 1}/${placeholders.length} 个图片: ${placeholder.keyword}`, 'info');
           
-          // 为每个占位符生成并插入图片（传入标题和内容以生成更贴合的提示词）
           const success = await generateAndInsertImageForPlaceholder(placeholder, options.title, options.content);
           
           if (success) {
@@ -2968,7 +3934,6 @@ const runPublishFlow = async (options: {
             logger.log(`⚠️ 第 ${i + 1} 张图片处理失败，继续下一个`, 'warn');
           }
           
-          // 等待一段时间再处理下一个，避免操作过快
           if (i < placeholders.length - 1) {
             await new Promise(r => setTimeout(r, 2000));
           }
@@ -2976,30 +3941,23 @@ const runPublishFlow = async (options: {
         
         logger.log(`图片处理完成，共处理 ${placeholders.length} 个占位符`, 'success');
       } else {
-        // 没有占位符，生成一张通用配图插入到文章末尾
         logger.log('未找到图片占位符，生成一张通用配图', 'info');
         
-        // 打开图片对话框
         if (!await openImageDialog()) {
           logger.log('无法打开图片对话框，跳过 AI 配图', 'warn');
         } else {
           if (isFlowCancelled) return;
           
-          // 点击 AI 配图
           if (!await clickAIImage()) {
             logger.log('无法点击 AI 配图，跳过', 'warn');
           } else {
             if (isFlowCancelled) return;
             
-            // 生成图片提示词
             const aiPrompt = options.aiPrompt || generateImagePrompt(options.title, options.content);
             logger.log(`AI 提示词: ${aiPrompt}`, 'info');
             
-            // 生成 AI 图片
             if (await generateAIImage(aiPrompt)) {
               if (isFlowCancelled) return;
-              
-              // 插入最后一张图片（最新生成的）
               await insertAIImage();
             }
           }
@@ -3009,11 +3967,22 @@ const runPublishFlow = async (options: {
     if (isFlowCancelled) return;
     
     await new Promise(r => setTimeout(r, 1000));
+
+    logger.log('🧭 步骤3.5: 尝试对正文图片点击“自适应”', 'info');
+    const adaptTriggered = await clickWeixinAdaptiveForAllImagesInEditor();
+    if (adaptTriggered > 0) {
+      logger.log(`已触发“自适应”操作 ${adaptTriggered} 次`, 'success');
+    } else {
+      logger.log('未找到可用的“自适应”按钮或无需处理', 'warn');
+    }
     
     // 4. 设置封面（直接从正文选择，更可靠）
     // 因为正文已经有 AI 生成的图片了，直接从正文选择作为封面更稳定
     logger.log('🖼️ 步骤4: 设置封面图片（从正文选择）', 'info');
-    await setCoverFromContent();
+    const preferredCoverIndex = preferredCoverOriginalUrl
+      ? (findEditorImageIndexByOriginalUrl(preferredCoverOriginalUrl) ?? 0)
+      : null;
+    await setCoverFromContent(preferredCoverIndex !== null ? { preferredIndex: preferredCoverIndex } : undefined);
     if (isFlowCancelled) return;
     
     await new Promise(r => setTimeout(r, 1000));
@@ -3292,10 +4261,20 @@ const autoFillContent = async () => {
       return;
     }
 
-    // 读取设置
-    const settings = await chrome.storage.sync.get(['weixin']);
+    const settings = await chrome.storage.sync.get(['autoPublishAll', 'preferSourceImages', 'weixin']);
     const authorName = settings.weixin?.authorName || '';
-    const autoPublish = settings.weixin?.autoPublish !== false;
+    const autoPublish = settings.autoPublishAll === true
+      ? true
+      : settings.autoPublishAll === false
+      ? false
+      : settings.weixin?.autoPublish !== false;
+    const imageSource: 'source' | 'platform' = settings.preferSourceImages === true
+      ? 'source'
+      : settings.preferSourceImages === false
+      ? 'platform'
+      : settings.weixin?.imageSource === 'platform'
+      ? 'platform'
+      : 'source';
 
     logger.log(`📄 准备填充内容: ${payload.title}`, 'info');
     logger.log('⏳ 检测页面状态...', 'info');
@@ -3368,7 +4347,10 @@ const autoFillContent = async () => {
       content: payload.content,
       htmlContent: payload.htmlContent,
       authorName: authorName,
-      generateAI: true,  // 始终自动生成 AI 配图
+      generateAI: true,
+      imageSource,
+      sourceImages: payload.sourceImages,
+      sourceUrl: payload.sourceUrl,
       autoPublish: autoPublish,
       autoPreview: false
     });
