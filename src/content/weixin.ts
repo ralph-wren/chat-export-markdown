@@ -1865,13 +1865,7 @@ const setCoverFromContent = async (options?: { preferredIndex?: number }): Promi
   logger.log('设置封面图片（从正文选择）...', 'info');
   
   const preferredIndex = options?.preferredIndex;
-  const bestCoverIndex = typeof preferredIndex === 'number' && Number.isFinite(preferredIndex) && preferredIndex >= 0
-    ? preferredIndex
-    : await pickBestCoverImageIndexWithAI();
-  const targetIndex = typeof bestCoverIndex === 'number' && Number.isFinite(bestCoverIndex) && bestCoverIndex >= 0 ? bestCoverIndex : 0;
-  if (typeof preferredIndex !== 'number' && bestCoverIndex === null) {
-    logger.log('未使用 AI 选择封面图，将默认选择第一张', 'warn');
-  }
+  const targetIndex = typeof preferredIndex === 'number' && Number.isFinite(preferredIndex) && preferredIndex >= 0 ? preferredIndex : 0;
 
   // 滚动到页面底部，确保封面区域可见
   window.scrollTo(0, document.body.scrollHeight);
@@ -2054,21 +2048,41 @@ const setCoverFromContent = async (options?: { preferredIndex?: number }): Promi
   await new Promise(r => setTimeout(r, 1000));
   
   const pickImageInDialog = async (index: number): Promise<boolean> => {
-    const dialogs = Array.from(document.querySelectorAll('.weui-desktop-dialog')) as HTMLElement[];
-    const currentDialog = dialogs.find(d => isElementVisible(d)) || null;
-    if (!currentDialog) return false;
+    const deadline = Date.now() + 10000;
+    while (Date.now() < deadline) {
+      const dialogs = Array.from(document.querySelectorAll('.weui-desktop-dialog, [class*="dialog"], [class*="modal"]')) as HTMLElement[];
+      const currentDialog = dialogs.find(d => isElementVisible(d)) || null;
+      if (!currentDialog) { await new Promise(r => setTimeout(r, 250)); continue; }
 
-    const imgs = Array.from(currentDialog.querySelectorAll('img')) as HTMLImageElement[];
-    const visible = imgs.filter(i => isElementVisible(i));
-    if (visible.length === 0) return false;
+      const candidates: HTMLElement[] = [];
 
-    const i = Math.max(0, Math.min(index, visible.length - 1));
-    const targetImg = visible[i];
-    const clickable = (targetImg.closest('li, .cover-image-item, .image-item, [class*=\"cover-item\"], [class*=\"card\"], div') as HTMLElement | null) || (targetImg as any as HTMLElement);
-    logger.log(`选择封面图片：弹窗第 ${i + 1}/${visible.length} 张`, 'action');
-    simulateClick(clickable);
-    await new Promise(r => setTimeout(r, 800));
-    return true;
+      const imgs = Array.from(currentDialog.querySelectorAll('img')) as HTMLImageElement[];
+      for (const img of imgs) {
+        if (!isElementVisible(img)) continue;
+        const c = (img.closest('li, [role="option"], .cover-image-item, .image-item, [class*="cover"], [class*="card"], div') as HTMLElement | null) || img;
+        candidates.push(c);
+      }
+
+      const bgEls = Array.from(currentDialog.querySelectorAll('li, [role="option"], div')) as HTMLElement[];
+      for (const el of bgEls) {
+        if (!isElementVisible(el)) continue;
+        const bg = (el.style.backgroundImage || '').trim();
+        if (bg && bg !== 'none') candidates.push(el);
+      }
+
+      const uniq = Array.from(new Set(candidates));
+      if (uniq.length === 0) { await new Promise(r => setTimeout(r, 250)); continue; }
+
+      const i = Math.max(0, Math.min(index, uniq.length - 1));
+      const target = uniq[i];
+      target.scrollIntoView({ behavior: 'instant', block: 'center' });
+      await new Promise(r => setTimeout(r, 150));
+      logger.log(`选择封面图片：弹窗第 ${i + 1}/${uniq.length} 张`, 'action');
+      simulateClick(target);
+      await new Promise(r => setTimeout(r, 800));
+      return true;
+    }
+    return false;
   };
 
   const picked = await pickImageInDialog(targetIndex);
@@ -3059,41 +3073,6 @@ const markImageOriginal = (img: HTMLImageElement, originalUrl?: string) => {
   }
 };
 
-const blobToDataUrl = async (blob: Blob): Promise<string> => {
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('FileReader failed'));
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.readAsDataURL(blob);
-  });
-};
-
-const getDataUrlFromAnyImageUrl = async (url: string): Promise<string | null> => {
-  const u = (url || '').trim();
-  if (!u) return null;
-  if (u.startsWith('data:')) return u;
-  if (u.startsWith('blob:')) {
-    try {
-      const resp = await fetch(u);
-      if (!resp.ok) return null;
-      const blob = await resp.blob();
-      return await blobToDataUrl(blob);
-    } catch {
-      return null;
-    }
-  }
-  try {
-    const resp = await chrome.runtime.sendMessage({
-      type: 'FETCH_IMAGE_DATA_URL',
-      payload: { url: u, referrer: window.location.href }
-    });
-    const dataUrl = resp?.success ? (resp.dataUrl as string | undefined) : undefined;
-    return dataUrl || null;
-  } catch {
-    return null;
-  }
-};
-
 const createThumbnailDataUrl = async (dataUrl: string, maxDim = 512): Promise<string | null> => {
   return await new Promise((resolve) => {
     const img = new Image();
@@ -3135,82 +3114,6 @@ const getImageMetaFromDataUrl = async (dataUrl: string): Promise<{ width: number
   });
 };
 
-const pickEvenlySpacedIndices = (length: number, maxCount: number): number[] => {
-  const len = Math.max(0, Math.floor(length));
-  const max = Math.max(0, Math.floor(maxCount));
-  if (len === 0 || max === 0) return [];
-  if (len <= max) return Array.from({ length: len }, (_, i) => i);
-  if (max === 1) return [0];
-
-  const out: number[] = [];
-  for (let i = 0; i < max; i++) {
-    const idx = Math.round(i * (len - 1) / (max - 1));
-    if (out.length === 0 || out[out.length - 1] !== idx) out.push(idx);
-  }
-  if (out[0] !== 0) out.unshift(0);
-  const last = len - 1;
-  if (out[out.length - 1] !== last) out.push(last);
-  return Array.from(new Set(out)).slice(0, max);
-};
-
-const pickBestCoverImageIndexWithAI = async (): Promise<number | null> => {
-  const enabled = await isMediaAiEnabled();
-  if (!enabled) return null;
-
-  const editor = findElement(SELECTORS.editor);
-  if (!editor) return null;
-
-  const imgs = Array.from(editor.querySelectorAll('img')) as HTMLImageElement[];
-  const visibleImgs = imgs.filter(img => isElementVisible(img));
-  if (visibleImgs.length <= 1) return null;
-
-  const title = getArticleTitle().trim();
-  const contentSnippet = getArticleContent().trim().slice(0, 800);
-
-  const indices = pickEvenlySpacedIndices(visibleImgs.length, 10);
-  const images: Array<{ url: string; thumbDataUrl: string; width?: number; height?: number; aspect?: number }> = [];
-  for (const idx of indices) {
-    const img = visibleImgs[idx];
-    const src = (img.currentSrc || img.src || '').trim();
-    if (!src) continue;
-    const dataUrl = await getDataUrlFromAnyImageUrl(src);
-    if (!dataUrl) continue;
-    const meta = await getImageMetaFromDataUrl(dataUrl);
-    const thumb = await createThumbnailDataUrl(dataUrl, 512);
-    if (!thumb) continue;
-    images.push({ url: `editor://img/${idx}`, thumbDataUrl: thumb, width: meta?.width, height: meta?.height, aspect: meta?.aspect });
-  }
-  if (images.length <= 1) return null;
-
-  try {
-    const resp = await chrome.runtime.sendMessage({
-      type: 'AI_MEDIA_ENHANCE',
-      payload: {
-        title,
-        context: contentSnippet ? `正文片段：${contentSnippet}` : '',
-        images,
-        maxPick: 1
-      }
-    });
-    const skippedCode = resp?.success ? (resp.result?.skipped?.code as string | undefined) : undefined;
-    if (skippedCode) return null;
-    const coverUrl = resp?.success ? (resp.result?.cover?.url as string | undefined) : undefined;
-    const coverReason = resp?.success ? (resp.result?.cover?.reason as string | undefined) : undefined;
-    const best = typeof coverUrl === 'string' ? coverUrl : '';
-    if (best) {
-      const m = best.match(/^editor:\/\/img\/(\d+)$/);
-      const bestIdx = m ? Number(m[1]) : NaN;
-      if (Number.isFinite(bestIdx)) {
-        const reason = typeof coverReason === 'string' ? coverReason : '';
-        logger.log(`AI 封面图选择：第 ${bestIdx + 1} 张${reason ? `（理由：${String(reason).slice(0, 120)}）` : ''}`, 'info');
-        return bestIdx;
-      }
-    }
-  } catch {
-  }
-  return null;
-};
-
 const analyzeSourceImagesWithAIOnce = async (options: {
   title: string;
   content: string;
@@ -3242,6 +3145,7 @@ const analyzeSourceImagesWithAIOnce = async (options: {
   if (images.length <= 1) return { orderedUrls: normalized };
 
   const context = [
+    normalized.length > 0 ? `封面要求：必须使用第一张图片作为封面（URL：${normalized[0]}）。` : '',
     options.placeholders.length ? `占位符：${options.placeholders.map(p => p.keyword).filter(Boolean).join('；')}` : '',
     options.content.slice(0, 800)
   ].filter(Boolean).join('\n');
@@ -3269,15 +3173,21 @@ const analyzeSourceImagesWithAIOnce = async (options: {
     }
     const errorMsg = resp?.success ? (resp.result?.error as string | undefined) : undefined;
     if (errorMsg) {
-      logger.log(`AI 选图调用失败，本次不会调用 apiyi 选图：${String(errorMsg).slice(0, 160)}`, 'warn');
+      const msg = String(errorMsg);
+      const isQuota = /quota|not enough|insufficient/i.test(msg);
+      logger.log(
+        isQuota
+          ? `AI 选图调用失败：apiyi 额度不足/已用尽（${msg.slice(0, 120)}）。请充值或更换 apiyi API Key。`
+          : `AI 选图调用失败，本次不会调用 apiyi 选图：${msg.slice(0, 160)}`,
+        'warn'
+      );
       return { orderedUrls: normalized };
     }
     const orderedUrls = resp?.success ? (resp.result?.inline?.orderedUrls as string[] | undefined) : undefined;
     const picked = resp?.success ? (resp.result?.inline?.picked as Array<{ url: string; reason?: string }> | undefined) : undefined;
-    const coverUrl = resp?.success ? (resp.result?.cover?.url as string | undefined) : undefined;
-    const coverReason = resp?.success ? (resp.result?.cover?.reason as string | undefined) : undefined;
-    if (coverUrl && typeof coverUrl === 'string') {
-      logger.log(`AI 封面图：${coverUrl}${coverReason ? `（理由：${String(coverReason).slice(0, 120)}）` : ''}`, 'info');
+    const forcedCoverUrl = normalized[0];
+    if (forcedCoverUrl) {
+      logger.log(`封面固定使用第一张图片：${forcedCoverUrl}`, 'info');
     }
     if (orderedUrls && orderedUrls.length > 0) {
       if (picked && picked.length > 0) {
@@ -3293,8 +3203,8 @@ const analyzeSourceImagesWithAIOnce = async (options: {
       const ranked = orderedUrls.filter(u => normalized.includes(u));
       const rest = normalized.filter(u => !ranked.includes(u));
       const combined = [...ranked, ...rest];
-      const coverFirst = coverUrl && combined.includes(coverUrl) ? [coverUrl, ...combined.filter(u => u !== coverUrl)] : combined;
-      return { orderedUrls: coverFirst, coverUrl };
+      const coverFirst = forcedCoverUrl && combined.includes(forcedCoverUrl) ? [forcedCoverUrl, ...combined.filter(u => u !== forcedCoverUrl)] : combined;
+      return { orderedUrls: coverFirst, coverUrl: forcedCoverUrl };
     }
   } catch {
   }
@@ -3354,6 +3264,20 @@ const setCursorToEditorEnd = (): boolean => {
   const range = document.createRange();
   range.selectNodeContents(editor);
   range.collapse(false);
+  const sel = window.getSelection();
+  if (!sel) return false;
+  sel.removeAllRanges();
+  sel.addRange(range);
+  return true;
+};
+
+const setCursorToEditorStart = (): boolean => {
+  const editor = findElement(SELECTORS.editor);
+  if (!editor) return false;
+  editor.focus();
+  const range = document.createRange();
+  range.selectNodeContents(editor);
+  range.collapse(true);
   const sel = window.getSelection();
   if (!sel) return false;
   sel.removeAllRanges();
@@ -3726,24 +3650,37 @@ const insertSourceImagesAtEnd = async (imageUrls: string[], maxInsert = 3, refer
   return inserted;
 };
 
-const findEditorImageIndexByOriginalUrl = (originalUrl?: string): number | null => {
-  const u = (originalUrl || '').trim();
-  if (!u) return null;
-  const editor = findElement(SELECTORS.editor);
-  if (!editor) return null;
-  const imgs = Array.from(editor.querySelectorAll('img')) as HTMLImageElement[];
-  if (imgs.length === 0) return null;
-  const normalizedTarget = normalizeWeiboImageUrl(u) || u;
-  for (let i = 0; i < imgs.length; i++) {
-    const img = imgs[i];
-    const tagged = (img.getAttribute('data-memoraid-original') || (img as any)?.dataset?.memoraidOriginal || '').trim();
-    const src = (img.currentSrc || img.src || '').trim();
-    const taggedNorm = tagged ? (normalizeWeiboImageUrl(tagged) || tagged) : '';
-    const srcNorm = src ? (normalizeWeiboImageUrl(src) || src) : '';
-    if (taggedNorm && taggedNorm === normalizedTarget) return i;
-    if (srcNorm && srcNorm === normalizedTarget) return i;
+const insertSourceImageAtEditorStart = async (imageUrl: string, referrer?: string): Promise<boolean> => {
+  if (!setCursorToEditorStart()) return false;
+  const normalizedUrl = normalizeWeiboImageUrl(imageUrl);
+  const avoidHotlink = shouldAvoidHotlinkInsert(normalizedUrl);
+  logger.log(`来源图片URL: ${imageUrl}`, 'info');
+  if (normalizedUrl !== imageUrl) logger.log(`来源图片URL(规格提升): ${normalizedUrl}`, 'info');
+
+  if (!avoidHotlink) {
+    const insertedByHtml = await insertRemoteImageAtSelection(normalizedUrl, undefined, normalizedUrl);
+    if (insertedByHtml) {
+      await new Promise(r => setTimeout(r, 1000));
+      return true;
+    }
   }
-  return null;
+
+  const dataUrlResult = await fetchSourceImageDataUrl(normalizedUrl, referrer);
+  if (dataUrlResult?.dataUrl) {
+    logger.log(`来源图片base64已获取: mime=${dataUrlResult.mimeType}, len=${dataUrlResult.dataUrl.length}`, 'info');
+    const insertedByDataUrl = await insertRemoteImageAtSelection(dataUrlResult.dataUrl, undefined, normalizedUrl);
+    if (insertedByDataUrl) {
+      await new Promise(r => setTimeout(r, 1200));
+      return true;
+    }
+  }
+
+  const file = await fetchSourceImageFile(normalizedUrl, referrer);
+  if (!file) return false;
+  logger.log(`来源图片File已获取: name=${file.name}, size=${file.size}, type=${file.type}`, 'info');
+  const ok = await uploadImageFileToEditor(file, undefined, normalizedUrl);
+  await new Promise(r => setTimeout(r, 800));
+  return ok;
 };
 
 /**
@@ -3819,7 +3756,6 @@ const runPublishFlow = async (options: {
     
     // 3. 插入配图
     let shouldFallbackToAI = false;
-    let preferredCoverOriginalUrl: string | undefined;
     if (options.imageSource === 'source') {
       logger.log('🖼️ 步骤3: 插入素材来源页面图片', 'info');
       
@@ -3839,7 +3775,13 @@ const runPublishFlow = async (options: {
           sourceUrl: options.sourceUrl
         });
         sourceImages = analyzed.orderedUrls;
-        preferredCoverOriginalUrl = analyzed.coverUrl;
+        if (sourceImages.length > 0) {
+          const coverCandidate = sourceImages[0];
+          const coverInserted = await insertSourceImageAtEditorStart(coverCandidate, options.sourceUrl);
+          if (coverInserted) {
+            sourceImages = sourceImages.slice(1);
+          }
+        }
         logger.log(`找到 ${placeholders.length} 个图片占位符，开始逐个处理...`, 'info');
         let insertedAny = false;
         let sourceIndex = 0;
@@ -3898,9 +3840,14 @@ const runPublishFlow = async (options: {
         }
       } else {
         if (sourceImages.length > 0) {
-          const inserted = await insertSourceImagesAtEnd(sourceImages, 3, options.sourceUrl);
+          const coverCandidate = sourceImages[0];
+          const coverInserted = await insertSourceImageAtEditorStart(coverCandidate, options.sourceUrl);
+          const rest = coverInserted ? sourceImages.slice(1) : sourceImages;
+          const inserted = await insertSourceImagesAtEnd(rest, 2, options.sourceUrl);
           if (inserted > 0) {
             logger.log(`✅ 已在文章末尾插入 ${inserted} 张来源图片`, 'success');
+          } else if (coverInserted) {
+            logger.log('✅ 已插入封面来源图片到正文开头', 'success');
           } else {
             logger.log('⚠️ 插入来源图片失败，将回退到 AI 配图', 'warn');
             shouldFallbackToAI = true;
@@ -3979,10 +3926,7 @@ const runPublishFlow = async (options: {
     // 4. 设置封面（直接从正文选择，更可靠）
     // 因为正文已经有 AI 生成的图片了，直接从正文选择作为封面更稳定
     logger.log('🖼️ 步骤4: 设置封面图片（从正文选择）', 'info');
-    const preferredCoverIndex = preferredCoverOriginalUrl
-      ? (findEditorImageIndexByOriginalUrl(preferredCoverOriginalUrl) ?? 0)
-      : null;
-    await setCoverFromContent(preferredCoverIndex !== null ? { preferredIndex: preferredCoverIndex } : undefined);
+    await setCoverFromContent({ preferredIndex: 0 });
     if (isFlowCancelled) return;
     
     await new Promise(r => setTimeout(r, 1000));
@@ -4112,7 +4056,7 @@ const runSmartImageFlow = async (_autoPublish = false) => {
     
     // 设置封面（直接从正文选择，更可靠）
     logger.log('🖼️ 设置封面图片（从正文选择）...', 'info');
-    await setCoverFromContent();
+    await setCoverFromContent({ preferredIndex: 0 });
     
     logger.log('✅ 图片处理完成！', 'success');
     

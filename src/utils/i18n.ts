@@ -3,6 +3,12 @@ export interface Translation {
   settingsTitle: string;
   languageLabel: string;
   languageHint: string;
+  mediaEnhanceTitle: string;
+  mediaEnhanceHint: string;
+  autoPublishAllTitle: string;
+  autoPublishAllHint: string;
+  preferSourceImagesTitle: string;
+  preferSourceImagesHint: string;
   providerLabel: string;
   apiKeyLabel: string;
   getKey: string;
@@ -172,6 +178,12 @@ export const TRANSLATIONS: Record<string, Translation> = {
     settingsTitle: 'Settings',
     languageLabel: 'Language (Output Language)',
     languageHint: 'Changing language will update the System Prompt if you are using a default template.',
+    mediaEnhanceTitle: 'AI Media Enhance',
+    mediaEnhanceHint: 'When enabled, recognizes text in images and auto-selects better illustrations (requires apiyi API Key).',
+    autoPublishAllTitle: 'Auto Publish',
+    autoPublishAllHint: 'Auto publish after content is ready (applies to all platforms).',
+    preferSourceImagesTitle: 'Prefer Source Images',
+    preferSourceImagesHint: 'Prefer images from the source page; if insufficient, fallback to platform public images.',
     providerLabel: 'Provider',
     apiKeyLabel: 'API Key',
     getKey: 'Get Key',
@@ -339,6 +351,12 @@ export const TRANSLATIONS: Record<string, Translation> = {
     settingsTitle: '设置',
     languageLabel: '语言 (输出语言)',
     languageHint: '切换语言将会更新系统提示词（如果使用的是默认模板）。',
+    mediaEnhanceTitle: 'AI 图文增强',
+    mediaEnhanceHint: '开启后将识别图片文字用于生成文章，并自动挑选更合适的插图（需配置 apiyi API Key）',
+    autoPublishAllTitle: '自动发布',
+    autoPublishAllHint: '内容准备好后自动发布文章（对所有平台生效）',
+    preferSourceImagesTitle: '优先使用素材来源图片',
+    preferSourceImagesHint: '开启后优先使用素材来源页面图片，不足则自动退回发布平台公共图片；关闭则全程使用发布平台公共图片。',
     providerLabel: '模型提供商',
     apiKeyLabel: 'API Key',
     getKey: '获取 Key',
@@ -506,6 +524,12 @@ export const TRANSLATIONS: Record<string, Translation> = {
     settingsTitle: '設定',
     languageLabel: '言語 (出力言語)',
     languageHint: '言語を変更すると、デフォルトのテンプレートを使用している場合、システムプロンプトが更新されます。',
+    mediaEnhanceTitle: 'AI 図文強化',
+    mediaEnhanceHint: '有効にすると画像内テキストを認識し、より適切な挿絵を自動選択します（apiyi APIキーが必要）。',
+    autoPublishAllTitle: '自動公開',
+    autoPublishAllHint: '内容準備後に自動公開します（全プラットフォームに適用）。',
+    preferSourceImagesTitle: '素材元画像を優先',
+    preferSourceImagesHint: '素材元ページの画像を優先し、不足時はプラットフォームの公開画像にフォールバックします。',
     providerLabel: 'プロバイダー',
     apiKeyLabel: 'APIキー',
     getKey: 'キーを取得',
@@ -673,6 +697,12 @@ export const TRANSLATIONS: Record<string, Translation> = {
     settingsTitle: '설정',
     languageLabel: '언어 (출력 언어)',
     languageHint: '언어를 변경하면 기본 템플릿을 사용하는 경우 시스템 프롬프트가 업데이트됩니다.',
+    mediaEnhanceTitle: 'AI 미디어 강화',
+    mediaEnhanceHint: '이미지의 텍스트를 인식하고 더 적절한 삽화를 자동 선택합니다 (apiyi API 키 필요).',
+    autoPublishAllTitle: '자동 게시',
+    autoPublishAllHint: '콘텐츠 준비 후 자동 게시합니다 (전체 플랫폼 적용).',
+    preferSourceImagesTitle: '원본 이미지 우선',
+    preferSourceImagesHint: '원문 페이지 이미지를 우선 사용하고 부족하면 플랫폼 공개 이미지로 대체합니다.',
     providerLabel: '제공자',
     apiKeyLabel: 'API 키',
     getKey: '키 발급',
@@ -840,6 +870,12 @@ export const TRANSLATIONS: Record<string, Translation> = {
     settingsTitle: 'Einstellungen',
     languageLabel: 'Sprache (Ausgabesprache)',
     languageHint: 'Das Ändern der Sprache aktualisiert den System-Prompt, wenn Sie eine Standardvorlage verwenden.',
+    mediaEnhanceTitle: 'KI-Medienverbesserung',
+    mediaEnhanceHint: 'Erkennt Text in Bildern und wählt automatisch passende Illustrationen (apiyi API-Schlüssel erforderlich).',
+    autoPublishAllTitle: 'Automatisch veröffentlichen',
+    autoPublishAllHint: 'Nach Fertigstellung automatisch veröffentlichen (gilt für alle Plattformen).',
+    preferSourceImagesTitle: 'Quellbilder bevorzugen',
+    preferSourceImagesHint: 'Bevorzugt Bilder der Quellseite; bei Bedarf Fallback auf öffentliche Plattformbilder.',
     providerLabel: 'Anbieter',
     apiKeyLabel: 'API-Schlüssel',
     getKey: 'Schlüssel erhalten',
@@ -1007,6 +1043,12 @@ export const TRANSLATIONS: Record<string, Translation> = {
     settingsTitle: 'Paramètres',
     languageLabel: 'Langue (Langue de sortie)',
     languageHint: 'Changer de langue mettra à jour le prompt système si vous utilisez un modèle par défaut.',
+    mediaEnhanceTitle: 'Amélioration IA (médias)',
+    mediaEnhanceHint: 'Reconnaît le texte des images et sélectionne de meilleures illustrations (clé API apiyi requise).',
+    autoPublishAllTitle: 'Publication automatique',
+    autoPublishAllHint: 'Publier automatiquement quand le contenu est prêt (toutes plateformes).',
+    preferSourceImagesTitle: 'Préférer les images source',
+    preferSourceImagesHint: 'Privilégie les images de la page source, sinon bascule sur des images publiques de la plateforme.',
     providerLabel: 'Fournisseur',
     apiKeyLabel: 'Clé API',
     getKey: 'Obtenir une clé',
@@ -1174,6 +1216,12 @@ export const TRANSLATIONS: Record<string, Translation> = {
     settingsTitle: 'Configuración',
     languageLabel: 'Idioma (Idioma de salida)',
     languageHint: 'Cambiar el idioma actualizará el prompt del sistema si está utilizando una plantilla predeterminada.',
+    mediaEnhanceTitle: 'Mejora IA (medios)',
+    mediaEnhanceHint: 'Reconoce texto en imágenes y selecciona mejores ilustraciones (requiere clave API apiyi).',
+    autoPublishAllTitle: 'Publicación automática',
+    autoPublishAllHint: 'Publica automáticamente cuando el contenido esté listo (todas las plataformas).',
+    preferSourceImagesTitle: 'Preferir imágenes fuente',
+    preferSourceImagesHint: 'Prioriza imágenes de la página fuente; si faltan, usa imágenes públicas de la plataforma.',
     providerLabel: 'Proveedor',
     apiKeyLabel: 'Clave API',
     getKey: 'Obtener clave',

@@ -303,7 +303,12 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       console.error(error);
       let errorMsg = error.message;
       
-      if (errorMsg.includes('Could not establish connection') || errorMsg.includes('Receiving end does not exist')) {
+      if (
+        errorMsg.includes('Could not establish connection') ||
+        errorMsg.includes('Receiving end does not exist') ||
+        errorMsg.includes('message channel closed') ||
+        errorMsg.includes('asynchronous response')
+      ) {
         setErrorMessage(
           <div className="flex flex-col gap-2">
             <span>{t.connectionFailed}</span>
@@ -381,7 +386,12 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       console.error(error);
       let errorMsg = error.message;
       
-      if (errorMsg.includes('Could not establish connection') || errorMsg.includes('Receiving end does not exist')) {
+      if (
+        errorMsg.includes('Could not establish connection') ||
+        errorMsg.includes('Receiving end does not exist') ||
+        errorMsg.includes('message channel closed') ||
+        errorMsg.includes('asynchronous response')
+      ) {
         setErrorMessage(
           <div className="flex flex-col gap-2">
             <span>{t.connectionFailed}</span>
@@ -459,7 +469,12 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       console.error(error);
       let errorMsg = error.message;
       
-      if (errorMsg.includes('Could not establish connection') || errorMsg.includes('Receiving end does not exist')) {
+      if (
+        errorMsg.includes('Could not establish connection') ||
+        errorMsg.includes('Receiving end does not exist') ||
+        errorMsg.includes('message channel closed') ||
+        errorMsg.includes('asynchronous response')
+      ) {
         setErrorMessage(
           <div className="flex flex-col gap-2">
             <span>{t.connectionFailed}</span>

@@ -250,12 +250,59 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === 'AI_MEDIA_ENHANCE') {
+    handleAiMediaEnhance(message.payload)
+      .then(result => sendResponse({ success: true, result }))
+      .catch(e => sendResponse({ success: false, error: e.message || String(e) }));
+    return true;
+  }
+
   // 处理 PING 请求（用于检测扩展连接是否有效，特别是 bfcache 恢复后）
   if (message.type === 'PING') {
     sendResponse({ success: true, pong: true });
     return false; // 同步响应
   }
 });
+
+async function handleAiMediaEnhance(payload: {
+  title?: string;
+  context?: string;
+  images?: Array<{ url: string; thumbDataUrl: string; width?: number; height?: number; aspect?: number }>;
+  maxPick?: number;
+}): Promise<{
+  skipped?: { code: string };
+  inline?: { orderedUrls: string[]; picked?: Array<{ url: string; reason?: string }> };
+  cover?: { url: string; reason?: string };
+  error?: string;
+}> {
+  try {
+    const settings = await getSettings();
+    const enabled = settings.enableMediaAi === true || settings.enableImageOcr === true;
+    if (!enabled) return { skipped: { code: 'media_ai_disabled' } };
+
+    const apiyiKey = settings.apiKeys?.apiyi || '';
+    if (!apiyiKey) return { skipped: { code: 'missing_apiyi_key' } };
+
+    const urls = Array.isArray(payload.images) ? payload.images.map(i => String(i.url || '')).filter(Boolean) : [];
+    if (urls.length === 0) return { skipped: { code: 'no_images' } };
+
+    const coverUrl = urls[0];
+    const orderedUrls = urls;
+    const maxPick = Math.max(1, Math.min(Number(payload.maxPick || 1), urls.length));
+    const picked = orderedUrls.slice(0, maxPick).map((url, idx) => ({
+      url,
+      reason: idx === 0 ? '按规则固定选择第 1 张图片' : '按原始顺序'
+    }));
+
+    return {
+      cover: { url: coverUrl, reason: '按规则固定使用正文第 1 张图片作为封面' },
+      inline: { orderedUrls, picked }
+    };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { error: msg };
+  }
+}
 
 /**
  * 获取链接页面的文本内容

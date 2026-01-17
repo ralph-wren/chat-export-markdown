@@ -799,6 +799,71 @@ const Settings: React.FC = () => {
         </p>
       </div>
 
+      <div className="border-t pt-4 space-y-3">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Image className={`w-5 h-5 ${settings.enableMediaAi ? 'text-purple-500' : 'text-gray-400'}`} />
+              <div>
+                <span className="font-medium text-gray-800">{t.mediaEnhanceTitle}</span>
+                <p className="text-xs text-gray-500">{t.mediaEnhanceHint}</p>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={settings.enableMediaAi || false}
+                onChange={(e) => setSettings({ ...settings, enableMediaAi: e.target.checked })}
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+            </label>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Send className={`w-5 h-5 ${settings.autoPublishAll !== false ? 'text-green-500' : 'text-gray-400'}`} />
+              <div>
+                <span className="font-medium text-gray-800">{t.autoPublishAllTitle}</span>
+                <p className="text-xs text-gray-500">{t.autoPublishAllHint}</p>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={settings.autoPublishAll !== false}
+                onChange={(e) => setSettings({ ...settings, autoPublishAll: e.target.checked })}
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+            </label>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Image className={`w-5 h-5 ${settings.preferSourceImages !== false ? 'text-blue-500' : 'text-gray-400'}`} />
+              <div>
+                <span className="font-medium text-gray-800">{t.preferSourceImagesTitle}</span>
+                <p className="text-xs text-gray-500">{t.preferSourceImagesHint}</p>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={settings.preferSourceImages !== false}
+                onChange={(e) => setSettings({ ...settings, preferSourceImages: e.target.checked })}
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+            </label>
+          </div>
+        </div>
+      </div>
+
       {/* AI 模型配置 */}
       <div className="border-t pt-4 space-y-4">
       <div className="space-y-2">
@@ -1596,30 +1661,6 @@ const Settings: React.FC = () => {
                  )}
             </div>
         )}
-      </div>
-
-      {/* ========== AI 图片文字识别 ========== */}
-      <div className="border-t pt-4">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
-          <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                  <Image className={`w-5 h-5 ${settings.enableImageOcr ? 'text-purple-500' : 'text-gray-400'}`} />
-                  <div>
-                      <span className="font-medium text-gray-800">{t.imageOcrTitle}</span>
-                      <p className="text-xs text-gray-500">{t.imageOcrHint}</p>
-                  </div>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                      type="checkbox" 
-                      className="sr-only peer"
-                      checked={settings.enableImageOcr || false}
-                      onChange={(e) => setSettings({ ...settings, enableImageOcr: e.target.checked })}
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
-              </label>
-          </div>
-        </div>
       </div>
 
       {/* ========== 自动保存状态提示 ========== */}

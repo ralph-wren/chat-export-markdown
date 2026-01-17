@@ -26,6 +26,9 @@ export interface AppSettings {
   language: string;
   systemPrompt: string;
   provider: string;
+  enableMediaAi?: boolean; // AI 图文增强（识图 + 选图）
+  autoPublishAll?: boolean; // 自动发布（对所有平台生效）
+  preferSourceImages?: boolean; // 优先使用素材来源图片
   github?: GitHubSettings;
   toutiao?: {
     cookie: string;
@@ -63,6 +66,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   model: 'deepseek-ai/deepseek-r1',
   provider: 'nvidia',
   language: 'zh-CN',
+  enableMediaAi: false,
+  autoPublishAll: undefined,
+  preferSourceImages: undefined,
   github: {
     token: '',
     owner: '',

@@ -654,7 +654,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'EXTRACT_CONTENT') {
     (async () => {
       try {
-        const data = await extractContent();
+        const timeoutMs = 25000;
+        let timeoutId: number | undefined;
+        const timeoutPromise = new Promise<ExtractionResult>((_resolve, reject) => {
+          timeoutId = window.setTimeout(() => {
+            isExtractionCancelled = true;
+            reject(new Error('内容抓取超时，请刷新页面后重试'));
+          }, timeoutMs);
+        });
+
+        const data = await Promise.race([extractContent(), timeoutPromise]);
+        if (timeoutId) window.clearTimeout(timeoutId);
         sendResponse({ type: 'CONTENT_EXTRACTED', payload: data });
       } catch (err: any) {
         console.error('[Memoraid] 内容提取错误:', err);
@@ -811,6 +821,59 @@ async function extractGenericPage(): Promise<ExtractionResult> {
   });
   panel.updateStats({ imagesCount: validImages.length });
   panel.log(`发现 ${validImages.length} 张图片`, 'info');
+
+  const hostname = window.location.hostname;
+  const isWeiboPage = hostname === 's.weibo.com' || hostname.endsWith('weibo.com') || hostname.endsWith('weibo.cn');
+  if (isWeiboPage) {
+    panel.log('检测到微博页面，启用快速抓取模式', 'info');
+
+    let title = document.title || 'Weibo';
+    let mainContent = '';
+    try {
+      const documentClone = document.cloneNode(true) as Document;
+      const reader = new Readability(documentClone);
+      const article = reader.parse();
+      title = article?.title || title;
+      mainContent = article?.textContent || document.body.innerText;
+    } catch {
+      mainContent = document.body.innerText;
+    }
+
+    const extractedImages = Array.from(new Set(
+      getMainImages(validImages as HTMLImageElement[], 60)
+        .filter(img => {
+          const el = img as HTMLImageElement;
+          const w = el.naturalWidth || el.width || el.clientWidth || 0;
+          const h = el.naturalHeight || el.height || el.clientHeight || 0;
+          if (w <= 0 || h <= 0) return false;
+          if (w < 200 || h < 150) return false;
+          if (w * h < 60000) return false;
+          return true;
+        })
+        .sort((a, b) => {
+          const aw = a.naturalWidth || a.width || a.clientWidth || 0;
+          const ah = a.naturalHeight || a.height || a.clientHeight || 0;
+          const bw = b.naturalWidth || b.width || b.clientWidth || 0;
+          const bh = b.naturalHeight || b.height || b.clientHeight || 0;
+          return bw * bh - aw * ah;
+        })
+        .slice(0, 12)
+        .map(img => getBestImageUrl(img as HTMLImageElement))
+        .filter(src => !!src)
+    ));
+
+    panel.updateStats({ mainContentChars: mainContent.length, totalChars: mainContent.length });
+    panel.showComplete();
+    return {
+      title,
+      messages: [{
+        role: 'user',
+        content: `【正文内容】\n\n${(mainContent || '').trim()}`
+      }],
+      url: window.location.href,
+      images: extractedImages
+    };
+  }
 
   // 如果是列表页（如百度搜索、头条热榜、微博热搜），提取文章列表
   let articleList: Array<{title: string, url: string, summary: string}> = [];

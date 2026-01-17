@@ -7,6 +7,8 @@ export interface ExtractionResult {
   title: string;
   messages: ChatMessage[];
   url: string;
+
+  images?: string[];
 }
 
 export type ExtensionMessage = 
