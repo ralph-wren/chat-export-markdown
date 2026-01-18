@@ -1,4 +1,6 @@
 import { reportArticlePublish, reportError } from '../utils/debug';
+import { DOMHelper } from '../utils/domHelper';
+import { ImageHandler } from '../utils/imageHandler';
 
 // Zhihu Publish Content Script - 基于 Playwright 录制
 // 知乎专栏发布页面自动化
@@ -89,98 +91,25 @@ const SELECTORS = {
 };
 
 // ============================================
-// DOM 工具函数
+// DOM 工具函数 - 使用统一工具类
 // ============================================
 
-const findElement = (selectors: string[]): HTMLElement | null => {
-  for (const selector of selectors) {
-    try {
-      if (selector.includes(':contains(')) {
-        const match = selector.match(/(.+):contains\("([^"]+)"\)/);
-        if (match) {
-          const [, baseSelector, text] = match;
-          const elements = document.querySelectorAll(baseSelector);
-          for (const el of elements) {
-            if (el.textContent?.includes(text)) {
-              return el as HTMLElement;
-            }
-          }
-        }
-        continue;
-      }
-      
-      const el = document.querySelector(selector);
-      if (el && isElementVisible(el as HTMLElement)) {
-        return el as HTMLElement;
-      }
-    } catch (e) { /* ignore */ }
-  }
-  return null;
-};
+const findElement = (selectors: string[]): HTMLElement | null => DOMHelper.findElement(selectors);
+const isElementVisible = (el: HTMLElement): boolean => DOMHelper.isElementVisible(el);
+const simulateClick = (element: HTMLElement) => DOMHelper.simulateClick(element);
+const simulateInput = (element: HTMLElement, value: string) => DOMHelper.simulateInput(element, value);
 
-const isElementVisible = (el: HTMLElement): boolean => {
-  if (!el) return false;
-  const rect = el.getBoundingClientRect();
-  const style = window.getComputedStyle(el);
-  return (
-    rect.width > 0 &&
-    rect.height > 0 &&
-    style.display !== 'none' &&
-    style.visibility !== 'hidden' &&
-    style.opacity !== '0'
-  );
-};
+// 使用 ImageHandler 工具类
+const isMediaAiEnabled = async (): Promise<boolean> => ImageHandler.isMediaAiEnabled();
+const createThumbnailDataUrl = async (dataUrl: string, maxDim = 512): Promise<string | null> => 
+  ImageHandler.createThumbnailDataUrl(dataUrl, maxDim);
+const getImageMetaFromDataUrl = async (dataUrl: string): Promise<{ width: number; height: number; aspect: number } | null> => 
+  ImageHandler.getImageMetaFromDataUrl(dataUrl);
+const dataUrlToBlob = (dataUrl: string): { blob: Blob; mimeType: string } => ImageHandler.dataUrlToBlob(dataUrl);
+const getFileExtensionByMime = (mimeType: string): string => ImageHandler.getFileExtensionByMime(mimeType);
+const setInputFiles = (input: HTMLInputElement, files: File[]) => ImageHandler.setInputFiles(input, files);
 
-const isMediaAiEnabled = async (): Promise<boolean> => {
-  try {
-    const s = await chrome.storage.sync.get(['enableMediaAi', 'enableImageOcr']);
-    return s.enableMediaAi === true || s.enableImageOcr === true;
-  } catch {
-    return false;
-  }
-};
-
-const createThumbnailDataUrl = async (dataUrl: string, maxDim = 512): Promise<string | null> => {
-  return await new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      try {
-        const w = img.naturalWidth || img.width || 0;
-        const h = img.naturalHeight || img.height || 0;
-        if (!w || !h) { resolve(null); return; }
-        const scale = Math.min(1, maxDim / Math.max(w, h));
-        const tw = Math.max(1, Math.round(w * scale));
-        const th = Math.max(1, Math.round(h * scale));
-        const canvas = document.createElement('canvas');
-        canvas.width = tw;
-        canvas.height = th;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { resolve(null); return; }
-        ctx.drawImage(img, 0, 0, tw, th);
-        resolve(canvas.toDataURL('image/jpeg', 0.72));
-      } catch {
-        resolve(null);
-      }
-    };
-    img.onerror = () => resolve(null);
-    img.src = dataUrl;
-  });
-};
-
-const getImageMetaFromDataUrl = async (dataUrl: string): Promise<{ width: number; height: number; aspect: number } | null> => {
-  return await new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const w = img.naturalWidth || img.width || 0;
-      const h = img.naturalHeight || img.height || 0;
-      if (!w || !h) { resolve(null); return; }
-      resolve({ width: w, height: h, aspect: Math.max(w / h, h / w) });
-    };
-    img.onerror = () => resolve(null);
-    img.src = dataUrl;
-  });
-};
-
+// 知乎特有的 AI 选图逻辑
 const pickBestImageIndexWithAI = async (keyword: string, maxCandidates = 10): Promise<number | null> => {
   const enabled = await isMediaAiEnabled();
   if (!enabled) return null;
@@ -251,41 +180,6 @@ const pickBestImageIndexWithAI = async (keyword: string, maxCandidates = 10): Pr
   return hit ? hit.index : null;
 };
 
-const dataUrlToBlob = (dataUrl: string): { blob: Blob; mimeType: string } => {
-  const [meta, data] = dataUrl.split(',');
-  const mimeMatch = meta?.match(/data:([^;]+);base64/i);
-  const mimeType = mimeMatch?.[1] || 'application/octet-stream';
-  const binary = atob(data);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return { blob: new Blob([bytes], { type: mimeType }), mimeType };
-};
-
-const getFileExtensionByMime = (mimeType: string): string => {
-  const m = (mimeType || '').toLowerCase();
-  if (m.includes('png')) return 'png';
-  if (m.includes('webp')) return 'webp';
-  if (m.includes('gif')) return 'gif';
-  if (m.includes('bmp')) return 'bmp';
-  return 'jpg';
-};
-
-const setInputFiles = (input: HTMLInputElement, files: File[]) => {
-  const dt = new DataTransfer();
-  for (const f of files) dt.items.add(f);
-  try {
-    Object.defineProperty(input, 'files', { value: dt.files, configurable: true });
-  } catch {
-    try {
-      (input as any).files = dt.files;
-    } catch {
-      return;
-    }
-  }
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-  input.dispatchEvent(new Event('change', { bubbles: true }));
-};
-
 const clickLocalUpload = async (): Promise<boolean> => {
   const uploadTexts = ['本地上传', '上传图片', '本地图片', '上传', '本地'];
   const elements = document.querySelectorAll('div, span, a, li, button');
@@ -338,53 +232,6 @@ const uploadAndInsertSourceImage = async (imageUrl: string): Promise<boolean> =>
   const inserted = await clickInsertImage().catch(() => false);
   await new Promise(r => setTimeout(r, 1200));
   return inserted;
-};
-
-const simulateClick = (element: HTMLElement) => {
-  element.scrollIntoView({ behavior: 'instant', block: 'center' });
-  
-  const rect = element.getBoundingClientRect();
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  
-  const eventOptions = {
-    bubbles: true,
-    cancelable: true,
-    view: window,
-    clientX: centerX,
-    clientY: centerY
-  };
-  
-  element.dispatchEvent(new MouseEvent('mouseover', eventOptions));
-  element.dispatchEvent(new MouseEvent('mouseenter', eventOptions));
-  element.dispatchEvent(new MouseEvent('mousedown', eventOptions));
-  element.dispatchEvent(new MouseEvent('mouseup', eventOptions));
-  element.dispatchEvent(new MouseEvent('click', eventOptions));
-  element.click();
-};
-
-const simulateInput = (element: HTMLElement, value: string) => {
-  element.focus();
-  
-  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-    element.select();
-    document.execCommand('delete');
-  }
-  
-  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-  const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-
-  if (element instanceof HTMLInputElement && nativeInputValueSetter) {
-    nativeInputValueSetter.call(element, value);
-  } else if (element instanceof HTMLTextAreaElement && nativeTextAreaValueSetter) {
-    nativeTextAreaValueSetter.call(element, value);
-  } else {
-    element.innerText = value;
-  }
-  
-  element.dispatchEvent(new Event('input', { bubbles: true }));
-  element.dispatchEvent(new Event('change', { bubbles: true }));
-  element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
 };
 
 // ============================================

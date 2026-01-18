@@ -1,4 +1,6 @@
 import { reportArticlePublish, reportError } from '../utils/debug';
+import { ImageHandler } from '../utils/imageHandler';
+import { DOMHelper } from '../utils/domHelper';
 
 // Toutiao Publish Content Script - 元素识别版
 // 完全通过 DOM 选择器操作，不依赖截图和 AI 对话
@@ -140,159 +142,25 @@ const SELECTORS = {
 };
 
 // ============================================
-// DOM 工具函数 - 增强版
+// DOM 工具函数 - 使用统一工具类
 // ============================================
 
-/**
- * 查找元素 - 支持多种选择器
- */
-const findElement = (selectors: string[]): HTMLElement | null => {
-  for (const selector of selectors) {
-    try {
-      // 处理 :contains() 伪选择器（jQuery 风格）
-      if (selector.includes(':contains(')) {
-        const match = selector.match(/(.+):contains\("([^"]+)"\)/);
-        if (match) {
-          const [, baseSelector, text] = match;
-          const elements = document.querySelectorAll(baseSelector);
-          for (const el of elements) {
-            if (el.textContent?.includes(text)) {
-              return el as HTMLElement;
-            }
-          }
-        }
-        continue;
-      }
-      
-      const el = document.querySelector(selector);
-      if (el && isElementVisible(el as HTMLElement)) {
-        return el as HTMLElement;
-      }
-    } catch (e) { 
-      // 选择器语法错误，跳过
-    }
-  }
-  return null;
-};
+const findElement = (selectors: string[]): HTMLElement | null => DOMHelper.findElement(selectors);
+const isElementVisible = (el: HTMLElement): boolean => DOMHelper.isElementVisible(el);
+const simulateClick = (element: HTMLElement) => DOMHelper.simulateClick(element);
+const simulateInput = (element: HTMLElement, value: string) => DOMHelper.simulateInput(element, value);
+const waitForElement = (selectors: string[], timeout = 5000): Promise<HTMLElement | null> => 
+  DOMHelper.waitForElement(selectors, timeout);
 
-/**
- * 查找所有匹配的元素
- * @internal 保留供将来使用
- */
-// @ts-ignore - 保留供将来使用
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _findAllElements = (selectors: string[]): HTMLElement[] => {
-  const results: HTMLElement[] = [];
-  const seen = new Set<HTMLElement>();
-  
-  for (const selector of selectors) {
-    try {
-      if (selector.includes(':contains(')) {
-        const match = selector.match(/(.+):contains\("([^"]+)"\)/);
-        if (match) {
-          const [, baseSelector, text] = match;
-          const elements = document.querySelectorAll(baseSelector);
-          for (const el of elements) {
-            if (el.textContent?.includes(text) && !seen.has(el as HTMLElement)) {
-              seen.add(el as HTMLElement);
-              results.push(el as HTMLElement);
-            }
-          }
-        }
-        continue;
-      }
-      
-      const elements = document.querySelectorAll(selector);
-      for (const el of elements) {
-        if (!seen.has(el as HTMLElement) && isElementVisible(el as HTMLElement)) {
-          seen.add(el as HTMLElement);
-          results.push(el as HTMLElement);
-        }
-      }
-    } catch (e) { /* ignore */ }
-  }
-  return results;
-};
-
-/**
- * 检查元素是否可见
- */
-const isElementVisible = (el: HTMLElement): boolean => {
-  if (!el) return false;
-  const rect = el.getBoundingClientRect();
-  const style = window.getComputedStyle(el);
-  return (
-    rect.width > 0 &&
-    rect.height > 0 &&
-    style.display !== 'none' &&
-    style.visibility !== 'hidden' &&
-    style.opacity !== '0'
-  );
-};
-
-const isMediaAiEnabled = async (): Promise<boolean> => {
-  try {
-    const s = await chrome.storage.sync.get(['enableMediaAi', 'enableImageOcr']);
-    return s.enableMediaAi === true || s.enableImageOcr === true;
-  } catch {
-    return false;
-  }
-};
-
-const createThumbnailDataUrl = async (dataUrl: string, maxDim = 512): Promise<string | null> => {
-  return await new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      try {
-        const w = img.naturalWidth || img.width || 0;
-        const h = img.naturalHeight || img.height || 0;
-        if (!w || !h) { resolve(null); return; }
-        const scale = Math.min(1, maxDim / Math.max(w, h));
-        const tw = Math.max(1, Math.round(w * scale));
-        const th = Math.max(1, Math.round(h * scale));
-        const canvas = document.createElement('canvas');
-        canvas.width = tw;
-        canvas.height = th;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { resolve(null); return; }
-        ctx.drawImage(img, 0, 0, tw, th);
-        resolve(canvas.toDataURL('image/jpeg', 0.72));
-      } catch {
-        resolve(null);
-      }
-    };
-    img.onerror = () => resolve(null);
-    img.src = dataUrl;
-  });
-};
-
-const getImageMetaFromDataUrl = async (dataUrl: string): Promise<{ width: number; height: number; aspect: number } | null> => {
-  return await new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const w = img.naturalWidth || img.width || 0;
-      const h = img.naturalHeight || img.height || 0;
-      if (!w || !h) { resolve(null); return; }
-      resolve({ width: w, height: h, aspect: Math.max(w / h, h / w) });
-    };
-    img.onerror = () => resolve(null);
-    img.src = dataUrl;
-  });
-};
-
-const getBackgroundImageUrl = (el: HTMLElement): string => {
-  const bg = window.getComputedStyle(el).backgroundImage || '';
-  const m = bg.match(/url\((['"]?)(.*?)\1\)/i);
-  return (m?.[2] || '').trim();
-};
+// 使用统一的图片处理工具类
+const getImageUrlFromElement = (el: HTMLElement): string => ImageHandler.getImageUrlFromElement(el);
 
 const getCandidateImageGroups = (container: ParentNode, maxCandidates = 10): Array<{ index: number; url: string }> => {
   const groups = Array.from(container.querySelectorAll('.img')).filter(el => isElementVisible(el as HTMLElement)) as HTMLElement[];
   const out: Array<{ index: number; url: string }> = [];
   for (let i = 0; i < groups.length && out.length < maxCandidates; i++) {
     const g = groups[i];
-    const imgEl = g.querySelector('img') as HTMLImageElement | null;
-    const url = (imgEl?.currentSrc || imgEl?.src || getBackgroundImageUrl(g)).trim();
+    const url = getImageUrlFromElement(g);
     if (!url || url.startsWith('data:')) continue;
     out.push({ index: i, url });
   }
@@ -300,9 +168,6 @@ const getCandidateImageGroups = (container: ParentNode, maxCandidates = 10): Arr
 };
 
 const pickBestImageGroupIndexWithAI = async (keyword: string, container: ParentNode): Promise<number | null> => {
-  const enabled = await isMediaAiEnabled();
-  if (!enabled) return null;
-
   const candidates = getCandidateImageGroups(container, 10);
   if (candidates.length <= 1) return null;
 
@@ -314,86 +179,25 @@ const pickBestImageGroupIndexWithAI = async (keyword: string, container: ParentN
   const editorEl = findElement(SELECTORS.editor);
   const contentSnippet = (editorEl?.innerText || '').trim().slice(0, 800);
 
-  const images: Array<{ url: string; thumbDataUrl: string; width?: number; height?: number; aspect?: number }> = [];
-  for (const c of candidates) {
-    const resp = await chrome.runtime.sendMessage({ type: 'FETCH_IMAGE_DATA_URL', payload: { url: c.url, referrer: window.location.href } });
-    const dataUrl = resp?.success ? (resp.dataUrl as string | undefined) : undefined;
-    if (!dataUrl) continue;
-    const meta = await getImageMetaFromDataUrl(dataUrl);
-    const thumb = await createThumbnailDataUrl(dataUrl, 512);
-    if (!thumb) continue;
-    images.push({ url: c.url, thumbDataUrl: thumb, width: meta?.width, height: meta?.height, aspect: meta?.aspect });
-  }
-  if (images.length <= 1) return null;
+  // 使用ImageHandler的AI选图功能
+  const bestIndex = await ImageHandler.pickBestImageWithAI(
+    keyword,
+    candidates,
+    title,
+    contentSnippet
+  );
 
-  const aiResp = await chrome.runtime.sendMessage({
-    type: 'AI_RANK_IMAGES',
-    payload: {
-      title,
-      context: [`关键词：${keyword}`, contentSnippet ? `正文片段：${contentSnippet}` : ''].filter(Boolean).join('\n'),
-      images,
-      maxPick: Math.min(10, images.length)
-    }
-  });
-  const skippedCode = aiResp?.success ? (aiResp.result?.skipped?.code as string | undefined) : undefined;
-  if (skippedCode) {
-    if (skippedCode === 'missing_apiyi_key') {
-      logger.log('AI 图文增强已开启，但未配置 apiyi API Key，本次不会调用 apiyi 选图', 'warn');
-    } else if (skippedCode === 'media_ai_disabled') {
-      logger.log('AI 图文增强未开启，本次不会调用 apiyi 选图', 'warn');
-    } else {
-      logger.log(`AI 选图已跳过：${skippedCode}`, 'warn');
-    }
-    return null;
+  if (bestIndex !== null) {
+    const bestUrl = candidates[bestIndex]?.url;
+    logger.log(`AI 推荐第 ${bestIndex + 1} 张图片: ${bestUrl}`, 'info');
   }
-  const errorMsg = aiResp?.success ? (aiResp.result?.error as string | undefined) : undefined;
-  if (errorMsg) {
-    logger.log(`AI 选图调用失败，本次不会调用 apiyi 选图：${String(errorMsg).slice(0, 160)}`, 'warn');
-    return null;
-  }
-  const ordered = aiResp?.success ? (aiResp.result?.orderedUrls as string[] | undefined) : undefined;
-  const reason = aiResp?.success ? (aiResp.result?.picked?.[0]?.reason as string | undefined) : undefined;
-  const bestUrl = ordered?.[0];
-  if (!bestUrl) return null;
-  logger.log(`AI 选图：${bestUrl}${reason ? `（理由：${reason.slice(0, 120)}）` : ''}`, 'info');
-  const hit = candidates.find(c => c.url === bestUrl);
-  return hit ? hit.index : null;
+
+  return bestIndex;
 };
 
-const dataUrlToBlob = (dataUrl: string): { blob: Blob; mimeType: string } => {
-  const [meta, data] = dataUrl.split(',');
-  const mimeMatch = meta?.match(/data:([^;]+);base64/i);
-  const mimeType = mimeMatch?.[1] || 'application/octet-stream';
-  const binary = atob(data);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return { blob: new Blob([bytes], { type: mimeType }), mimeType };
-};
-
-const getFileExtensionByMime = (mimeType: string): string => {
-  const m = (mimeType || '').toLowerCase();
-  if (m.includes('png')) return 'png';
-  if (m.includes('webp')) return 'webp';
-  if (m.includes('gif')) return 'gif';
-  if (m.includes('bmp')) return 'bmp';
-  return 'jpg';
-};
-
-const setInputFiles = (input: HTMLInputElement, files: File[]) => {
-  const dt = new DataTransfer();
-  for (const f of files) dt.items.add(f);
-  try {
-    Object.defineProperty(input, 'files', { value: dt.files, configurable: true });
-  } catch {
-    try {
-      (input as any).files = dt.files;
-    } catch {
-      return;
-    }
-  }
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-  input.dispatchEvent(new Event('change', { bubbles: true }));
-};
+// 使用统一的图片处理工具类
+const setInputFiles = (input: HTMLInputElement, files: File[]) => ImageHandler.setInputFiles(input, files);
+const dataUrlToFile = (dataUrl: string, filename?: string) => ImageHandler.dataUrlToFile(dataUrl, filename);
 
 const waitForImageFileInput = async (timeout = 8000): Promise<HTMLInputElement | null> => {
   const start = Date.now();
@@ -427,62 +231,93 @@ const tryClickLocalUploadMenu = async (): Promise<void> => {
   }
 };
 
-const openImageDialogFromToolbarPreserveCursor = async (): Promise<boolean> => {
-  const editor = findElement(SELECTORS.editor);
-  if (editor) editor.focus();
+// 已移除 openImageDialogFromToolbarPreserveCursor，使用直接复制粘贴方式
 
-  let imageBtn = document.querySelector('.syl-toolbar-tool.image > div > .syl-toolbar-button') as HTMLElement;
-  if (!imageBtn) imageBtn = document.querySelector('.syl-toolbar-tool.image') as HTMLElement;
-  if (!imageBtn) {
-    const toolbarTools = document.querySelectorAll('.syl-toolbar-tool');
-    for (const tool of toolbarTools) {
-      if (tool.classList.contains('image')) { imageBtn = tool as HTMLElement; break; }
+/**
+ * 方法1: 直接复制粘贴图片（推荐，更快更可靠）
+ */
+const copyAndPasteImageFromUrl = async (imageUrl: string): Promise<boolean> => {
+  try {
+    logger.log('使用复制粘贴方式插入图片', 'info');
+    
+    const editor = findElement(SELECTORS.editor);
+    if (!editor) {
+      logger.log('未找到编辑器', 'error');
+      return false;
     }
+
+    // 使用ImageHandler直接复制粘贴
+    const success = await ImageHandler.copyAndPasteImage(
+      imageUrl,
+      editor,
+      pendingSourceUrl || window.location.href
+    );
+
+    if (success) {
+      logger.log('图片复制粘贴成功', 'success');
+      await new Promise(r => setTimeout(r, 1000));
+      return true;
+    }
+
+    logger.log('复制粘贴失败，尝试备用方法', 'warn');
+    return false;
+  } catch (error) {
+    logger.log(`复制粘贴异常: ${error}`, 'error');
+    return false;
   }
-  if (!imageBtn) return false;
-  simulateClick(imageBtn);
-  await new Promise(r => setTimeout(r, 500));
-  const dialog = await waitForDialog(3000);
-  return !!dialog;
-};
-
-const uploadAndInsertImageFromUrl = async (imageUrl: string): Promise<boolean> => {
-  const resp = await chrome.runtime.sendMessage({
-    type: 'FETCH_IMAGE_DATA_URL',
-    payload: { url: imageUrl, referrer: pendingSourceUrl || window.location.href }
-  });
-  const dataUrl = resp?.success ? (resp.dataUrl as string | undefined) : undefined;
-  if (!dataUrl) return false;
-
-  const { blob, mimeType } = dataUrlToBlob(dataUrl);
-  const ext = getFileExtensionByMime(mimeType);
-  const file = new File([blob], `memoraid-${Date.now()}.${ext}`, { type: mimeType });
-
-  await tryClickLocalUploadMenu();
-  const input = await waitForImageFileInput(8000);
-  if (!input) return false;
-  setInputFiles(input, [file]);
-
-  await new Promise(r => setTimeout(r, 1500));
-  await clickConfirmButton().catch(() => {});
-  await new Promise(r => setTimeout(r, 1500));
-  return true;
 };
 
 /**
- * 等待元素出现
+ * 方法2: 通过文件上传（备用方法）
  */
-const waitForElement = (selectors: string[], timeout = 5000): Promise<HTMLElement | null> => {
-  return new Promise((resolve) => {
-    const startTime = Date.now();
-    const check = () => {
-      const el = findElement(selectors);
-      if (el) { resolve(el); return; }
-      if (Date.now() - startTime > timeout) { resolve(null); return; }
-      requestAnimationFrame(check);
-    };
-    check();
-  });
+const uploadAndInsertImageFromUrl = async (imageUrl: string): Promise<boolean> => {
+  try {
+    logger.log('使用文件上传方式插入图片', 'info');
+    
+    const dataUrl = await ImageHandler.fetchImageDataUrl(
+      imageUrl,
+      pendingSourceUrl || window.location.href
+    );
+    
+    if (!dataUrl) {
+      logger.log('无法获取图片DataURL', 'error');
+      return false;
+    }
+
+    const file = dataUrlToFile(dataUrl);
+
+    await tryClickLocalUploadMenu();
+    const input = await waitForImageFileInput(8000);
+    if (!input) {
+      logger.log('未找到文件输入框', 'error');
+      return false;
+    }
+    
+    setInputFiles(input, [file]);
+
+    await new Promise(r => setTimeout(r, 1500));
+    await clickConfirmButton().catch(() => {});
+    await new Promise(r => setTimeout(r, 1500));
+    return true;
+  } catch (error) {
+    logger.log(`文件上传异常: ${error}`, 'error');
+    return false;
+  }
+};
+
+/**
+ * 智能插入图片（优先复制粘贴，失败则使用上传）
+ */
+const insertImageFromUrl = async (imageUrl: string): Promise<boolean> => {
+  // 先尝试复制粘贴（更快更可靠）
+  const copyPasteSuccess = await copyAndPasteImageFromUrl(imageUrl);
+  if (copyPasteSuccess) {
+    return true;
+  }
+
+  // 复制粘贴失败，尝试文件上传
+  logger.log('尝试备用上传方法', 'warn');
+  return await uploadAndInsertImageFromUrl(imageUrl);
 };
 
 /**
@@ -508,95 +343,7 @@ const waitForDialogClose = async (timeout = 3000): Promise<boolean> => {
   });
 };
 
-/**
- * 模拟点击 - 增强版（同步执行）
- */
-const simulateClick = (element: HTMLElement) => {
-  // 确保元素可见
-  element.scrollIntoView({ behavior: 'instant', block: 'center' });
-  
-  // 触发完整的鼠标事件序列
-  const rect = element.getBoundingClientRect();
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  
-  const eventOptions = {
-    bubbles: true,
-    cancelable: true,
-    view: window,
-    clientX: centerX,
-    clientY: centerY
-  };
-  
-  element.dispatchEvent(new MouseEvent('mouseover', eventOptions));
-  element.dispatchEvent(new MouseEvent('mouseenter', eventOptions));
-  element.dispatchEvent(new MouseEvent('mousedown', eventOptions));
-  element.dispatchEvent(new MouseEvent('mouseup', eventOptions));
-  element.dispatchEvent(new MouseEvent('click', eventOptions));
-  
-  // 备用：直接调用 click
-  element.click();
-};
-
-/**
- * 模拟输入 - 增强版
- */
-const simulateInput = (element: HTMLElement, value: string) => {
-  element.focus();
-  
-  // 清空现有内容
-  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-    element.select();
-    document.execCommand('delete');
-  }
-  
-  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-  const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-
-  if (element instanceof HTMLInputElement && nativeInputValueSetter) {
-    nativeInputValueSetter.call(element, value);
-  } else if (element instanceof HTMLTextAreaElement && nativeTextAreaValueSetter) {
-    nativeTextAreaValueSetter.call(element, value);
-  } else {
-    element.innerText = value;
-  }
-  
-  // 触发各种输入事件
-  element.dispatchEvent(new Event('input', { bubbles: true }));
-  element.dispatchEvent(new Event('change', { bubbles: true }));
-  element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-};
-
-/**
- * 模拟键盘输入（逐字符）
- * @internal 保留供将来使用
- */
-// @ts-ignore - 保留供将来使用
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _simulateTyping = async (element: HTMLElement, value: string, delay = 50): Promise<void> => {
-  element.focus();
-  
-  for (const char of value) {
-    element.dispatchEvent(new KeyboardEvent('keydown', { key: char, bubbles: true }));
-    
-    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-      element.value += char;
-    } else {
-      element.innerText += char;
-    }
-    
-    element.dispatchEvent(new Event('input', { bubbles: true }));
-    element.dispatchEvent(new KeyboardEvent('keyup', { key: char, bubbles: true }));
-    
-    await new Promise(r => setTimeout(r, delay));
-  }
-  
-  element.dispatchEvent(new Event('change', { bubbles: true }));
-};
-
-/**
- * 在编辑器中选中文本
- */
+// 编辑器辅助函数 - 使用本地实现（特定于头条编辑器）
 const selectTextInEditor = (searchText: string): boolean => {
   const editor = findElement(SELECTORS.editor);
   if (!editor) return false;
@@ -619,9 +366,6 @@ const selectTextInEditor = (searchText: string): boolean => {
   return false;
 };
 
-/**
- * 将光标移动到编辑器指定位置
- */
 const moveCursorToPosition = (position: 'start' | 'end' | 'afterText', afterText?: string): boolean => {
   const editor = findElement(SELECTORS.editor);
   if (!editor) return false;
@@ -654,9 +398,6 @@ const moveCursorToPosition = (position: 'start' | 'end' | 'afterText', afterText
   return true;
 };
 
-/**
- * 查找图片占位符
- */
 const findImagePlaceholders = (): { text: string; keyword: string; position: number }[] => {
   const editor = findElement(SELECTORS.editor);
   if (!editor) return [];
@@ -685,51 +426,8 @@ const findImagePlaceholders = (): { text: string; keyword: string; position: num
     }
   }
   
-  // 按位置排序
   placeholders.sort((a, b) => a.position - b.position);
   return placeholders;
-};
-
-/**
- * 通过文本内容查找元素
- * @internal 保留供将来使用
- */
-// @ts-ignore - 保留供将来使用
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _findElementByText = (text: string, tagNames: string[] = ['button', 'span', 'div', 'a']): HTMLElement | null => {
-  for (const tag of tagNames) {
-    const elements = document.querySelectorAll(tag);
-    for (const el of elements) {
-      const elText = (el as HTMLElement).innerText?.trim();
-      if (elText === text || elText?.includes(text)) {
-        if (isElementVisible(el as HTMLElement)) {
-          return el as HTMLElement;
-        }
-      }
-    }
-  }
-  return null;
-};
-
-/**
- * 在对话框内查找元素
- * @internal 保留供将来使用
- */
-// @ts-ignore - 保留供将来使用
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _findElementInDialog = (selectors: string[]): HTMLElement | null => {
-  const dialog = findElement(SELECTORS.imageDialog);
-  if (!dialog) return null;
-  
-  for (const selector of selectors) {
-    try {
-      const el = dialog.querySelector(selector);
-      if (el && isElementVisible(el as HTMLElement)) {
-        return el as HTMLElement;
-      }
-    } catch (e) { /* ignore */ }
-  }
-  return null;
 };
 
 // ============================================
@@ -1536,17 +1234,12 @@ const insertSourceImageAtPlaceholder = async (placeholder: { text: string; keywo
   document.execCommand('delete');
   await new Promise(r => setTimeout(r, 300));
 
-  if (!await openImageDialogFromToolbarPreserveCursor()) {
-    logger.log('无法打开图片对话框', 'error');
-    return false;
-  }
-  if (isFlowCancelled) return false;
-
-  const uploaded = await uploadAndInsertImageFromUrl(imageUrl);
-  if (uploaded) {
+  // 直接复制粘贴图片，不需要打开对话框
+  const success = await insertImageFromUrl(imageUrl);
+  if (success) {
     logger.log(`占位符 "${placeholder.text}" 已替换为来源图片`, 'success');
   }
-  return uploaded;
+  return success;
 };
 
 /**

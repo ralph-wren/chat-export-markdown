@@ -1,4 +1,5 @@
 import { reportArticlePublish, reportError } from '../utils/debug';
+import { DOMHelper } from '../utils/domHelper';
 
 // WeChat Official Account Publish Content Script
 // 微信公众号发布页面自动化 - 基于 Playwright 录制
@@ -133,35 +134,15 @@ const SELECTORS = {
 };
 
 // ============================================
-// DOM 工具函数
+// DOM 工具函数 - 使用统一工具类
 // ============================================
 
-const findElement = (selectors: string[]): HTMLElement | null => {
-  for (const selector of selectors) {
-    try {
-      if (selector.includes(':contains(')) {
-        const match = selector.match(/(.+):contains\("([^"]+)"\)/);
-        if (match) {
-          const [, baseSelector, text] = match;
-          const elements = document.querySelectorAll(baseSelector);
-          for (const el of elements) {
-            if (el.textContent?.includes(text)) {
-              return el as HTMLElement;
-            }
-          }
-        }
-        continue;
-      }
-      
-      const el = document.querySelector(selector);
-      if (el && isElementVisible(el as HTMLElement)) {
-        return el as HTMLElement;
-      }
-    } catch (e) { /* ignore */ }
-  }
-  return null;
-};
+const findElement = (selectors: string[]): HTMLElement | null => DOMHelper.findElement(selectors);
+const isElementVisible = (el: HTMLElement): boolean => DOMHelper.isElementVisible(el);
+const simulateClick = (element: HTMLElement) => DOMHelper.simulateClick(element);
+const simulateInput = (element: HTMLElement, value: string) => DOMHelper.simulateInput(element, value);
 
+// 微信特有的辅助函数
 const findElementByText = (text: string, tagNames: string[] = ['button', 'span', 'div', 'a', 'label']): HTMLElement | null => {
   for (const tag of tagNames) {
     const elements = document.querySelectorAll(tag);
@@ -218,78 +199,8 @@ const pickClosestElementToRectCenter = (elements: HTMLElement[], rect: DOMRect):
   return best;
 };
 
-const isElementVisible = (el: HTMLElement): boolean => {
-  if (!el) return false;
-  const rect = el.getBoundingClientRect();
-  const style = window.getComputedStyle(el);
-  return (
-    rect.width > 0 &&
-    rect.height > 0 &&
-    style.display !== 'none' &&
-    style.visibility !== 'hidden' &&
-    style.opacity !== '0'
-  );
-};
-
-const simulateClick = (element: HTMLElement) => {
-  element.scrollIntoView({ behavior: 'instant', block: 'center' });
-  
-  const rect = element.getBoundingClientRect();
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  
-  const eventOptions = {
-    bubbles: true,
-    cancelable: true,
-    view: window,
-    clientX: centerX,
-    clientY: centerY
-  };
-  
-  element.dispatchEvent(new MouseEvent('mouseover', eventOptions));
-  element.dispatchEvent(new MouseEvent('mouseenter', eventOptions));
-  element.dispatchEvent(new MouseEvent('mousedown', eventOptions));
-  element.dispatchEvent(new MouseEvent('mouseup', eventOptions));
-  element.dispatchEvent(new MouseEvent('click', eventOptions));
-  // 注意：不要再调用 element.click()，避免重复点击
-};
-
-const simulateInput = (element: HTMLElement, value: string) => {
-  element.focus();
-  
-  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-    element.select();
-    document.execCommand('delete');
-  }
-  
-  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-  const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-
-  if (element instanceof HTMLInputElement && nativeInputValueSetter) {
-    nativeInputValueSetter.call(element, value);
-  } else if (element instanceof HTMLTextAreaElement && nativeTextAreaValueSetter) {
-    nativeTextAreaValueSetter.call(element, value);
-  } else {
-    element.innerText = value;
-  }
-  
-  element.dispatchEvent(new Event('input', { bubbles: true }));
-  element.dispatchEvent(new Event('change', { bubbles: true }));
-  element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-};
-
-const waitForElement = (selectors: string[], timeout = 10000): Promise<HTMLElement | null> => {
-  return new Promise((resolve) => {
-    const startTime = Date.now();
-    const check = () => {
-      const el = findElement(selectors);
-      if (el) { resolve(el); return; }
-      if (Date.now() - startTime > timeout) { resolve(null); return; }
-      requestAnimationFrame(check);
-    };
-    check();
-  });
-};
+const waitForElement = (selectors: string[], timeout = 10000): Promise<HTMLElement | null> => 
+  DOMHelper.waitForElement(selectors, timeout);
 
 // ============================================
 // Logger UI
