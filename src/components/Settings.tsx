@@ -243,7 +243,14 @@ const Settings: React.FC = () => {
       setTimeout(() => setAutoSaveStatus('idle'), 2000);
     }, 500); // 500ms 防抖
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      // 如果定时器被清除时还有未保存的更改，立即保存
+      if (isDirtyRef.current) {
+        saveSettings(settings);
+        isDirtyRef.current = false;
+      }
+    };
   }, [settings]);
 
   useEffect(() => {
@@ -1201,33 +1208,7 @@ const Settings: React.FC = () => {
             </p>
           </div>
           
-          {/* 微信自动发布开关 */}
-          <div className="bg-white rounded-lg border border-gray-100 p-3">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Send className={`w-4 h-4 ${settings.weixin?.autoPublish !== false ? 'text-green-500' : 'text-gray-400'}`} />
-                    <div>
-                        <span className="font-medium text-gray-800 text-sm">{t.autoPublish}</span>
-                        <p className="text-[10px] text-gray-500">{t.autoPublishHintWeixin}</p>
-                    </div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                        type="checkbox" 
-                        className="sr-only peer"
-                        checked={settings.weixin?.autoPublish !== false}
-                        onChange={(e) => setSettings({ 
-                          ...settings, 
-                          weixin: {
-                            ...settings.weixin || { cookie: '' },
-                            autoPublish: e.target.checked
-                          }
-                        })}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-                </label>
-            </div>
-          </div>
+
         </div>
       </div>
 
@@ -1303,34 +1284,7 @@ const Settings: React.FC = () => {
               {t.customPromptHint}
             </p>
           </div>
-          
-          {/* 自动发布开关 */}
-          <div className="bg-white rounded-lg border border-gray-100 p-3">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Send className={`w-4 h-4 ${settings.toutiao?.autoPublish ? 'text-green-500' : 'text-gray-400'}`} />
-                    <div>
-                        <span className="font-medium text-gray-800 text-sm">{t.autoPublish}</span>
-                        <p className="text-[10px] text-gray-500">{t.autoPublishHintToutiao}</p>
-                    </div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                        type="checkbox" 
-                        className="sr-only peer"
-                        checked={settings.toutiao?.autoPublish || false}
-                        onChange={(e) => setSettings({ 
-                          ...settings, 
-                          toutiao: {
-                            ...settings.toutiao || { cookie: '' },
-                            autoPublish: e.target.checked
-                          }
-                        })}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500"></div>
-                </label>
-            </div>
-          </div>
+
         </div>
       </div>
 
@@ -1406,34 +1360,7 @@ const Settings: React.FC = () => {
               {t.customPromptHint}
             </p>
           </div>
-          
-          {/* 知乎自动发布开关 */}
-          <div className="bg-white rounded-lg border border-gray-100 p-3">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Send className={`w-4 h-4 ${settings.zhihu?.autoPublish ? 'text-blue-500' : 'text-gray-400'}`} />
-                    <div>
-                        <span className="font-medium text-gray-800 text-sm">{t.autoPublish}</span>
-                        <p className="text-[10px] text-gray-500">{t.autoPublishHintZhihu}</p>
-                    </div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                        type="checkbox" 
-                        className="sr-only peer"
-                        checked={settings.zhihu?.autoPublish || false}
-                        onChange={(e) => setSettings({ 
-                          ...settings, 
-                          zhihu: {
-                            ...settings.zhihu || { cookie: '' },
-                            autoPublish: e.target.checked
-                          }
-                        })}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
-                </label>
-            </div>
-          </div>
+
         </div>
       </div>
 

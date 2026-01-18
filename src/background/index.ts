@@ -1421,7 +1421,7 @@ function broadcastUpdate() {
   });
 }
 
-async function handlePublishToToutiao(payload: { title: string; content: string }) {
+async function handlePublishToToutiao(payload: { title: string; content: string; sourceUrl?: string; sourceImages?: string[] }) {
   try {
     const settings = await getSettings();
     const cookieStr = settings.toutiao?.cookie;
@@ -1516,6 +1516,8 @@ async function handlePublishToToutiao(payload: { title: string; content: string 
         title: articleTitle,
         content: cleanedContent, // Keep cleaned markdown
         htmlContent: htmlContent, // Add converted HTML
+        sourceUrl: payload.sourceUrl,
+        sourceImages: Array.isArray(payload.sourceImages) ? payload.sourceImages.filter(u => typeof u === 'string' && u.trim()) : undefined,
         timestamp: Date.now()
       }
     });
@@ -1535,7 +1537,7 @@ async function handlePublishToToutiao(payload: { title: string; content: string 
   }
 }
 
-async function handlePublishToZhihu(payload: { title: string; content: string }) {
+async function handlePublishToZhihu(payload: { title: string; content: string; sourceUrl?: string; sourceImages?: string[] }) {
   try {
     const settings = await getSettings();
     const cookieStr = settings.zhihu?.cookie;
@@ -1613,6 +1615,8 @@ async function handlePublishToZhihu(payload: { title: string; content: string })
         title: articleTitle,
         content: cleanedContent,
         htmlContent: htmlContent,
+        sourceUrl: payload.sourceUrl,
+        sourceImages: Array.isArray(payload.sourceImages) ? payload.sourceImages.filter(u => typeof u === 'string' && u.trim()) : undefined,
         timestamp: Date.now()
       }
     });
@@ -1742,7 +1746,9 @@ async function startArticleGeneration(extraction: ExtractionResult) {
       status: 'Processing...', 
       message: 'Initializing Article Generation...', 
       progress: 5,
-      title: extraction.title 
+      title: extraction.title,
+      sourceUrl: extraction.url,
+      sourceImages: extraction.images
     };
     chrome.storage.local.set({ currentTask });
     broadcastUpdate();
@@ -1893,6 +1899,8 @@ async function startArticleGeneration(extraction: ExtractionResult) {
       progress: 100, 
       result: summary, 
       title: finalTitle, // 同步更新任务状态中的标题
+      sourceUrl: extraction.url,
+      sourceImages: extraction.images,
       conversationHistory: [
         ...initialMessages as ChatMessage[],
         { role: 'assistant', content: summary }
@@ -1955,7 +1963,9 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
       status: 'Processing...', 
       message: `正在生成文章并准备发布到${platformName}...`, 
       progress: 5,
-      title: extraction.title 
+      title: extraction.title,
+      sourceUrl: extraction.url,
+      sourceImages: extraction.images
     };
     chrome.storage.local.set({ currentTask });
     broadcastUpdate();
@@ -2142,12 +2152,16 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
     if (platform === 'toutiao') {
       await handlePublishToToutiao({
         title: finalTitle,
-        content: summary
+        content: summary,
+        sourceUrl: extraction.url,
+        sourceImages: extraction.images
       });
     } else if (platform === 'zhihu') {
       await handlePublishToZhihu({
         title: finalTitle,
-        content: summary
+        content: summary,
+        sourceUrl: extraction.url,
+        sourceImages: extraction.images
       });
     } else if (platform === 'weixin') {
       await handlePublishToWeixin({

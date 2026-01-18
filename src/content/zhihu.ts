@@ -1957,7 +1957,8 @@ const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
           }
         }
         
-        const sourceUrl = preferSourceImages ? pendingSourceImages[i] : undefined;
+        // 修复：检查数组边界，确保有足够的素材图片
+        const sourceUrl = (preferSourceImages && i < pendingSourceImages.length) ? pendingSourceImages[i] : undefined;
         let success = false;
         if (sourceUrl) {
           try {

@@ -1587,13 +1587,27 @@ const replaceAllImagePlaceholders = async (): Promise<number> => {
   const s = await chrome.storage.sync.get(['preferSourceImages']);
   const preferSourceImages = s.preferSourceImages !== false;
 
+  // 调试日志
+  logger.log(`优先使用素材来源图片: ${preferSourceImages}`, 'info');
+  logger.log(`可用素材图片数量: ${pendingSourceImages.length}`, 'info');
+  if (pendingSourceImages.length > 0) {
+    logger.log(`素材图片列表: ${pendingSourceImages.slice(0, 3).join(', ')}...`, 'info');
+  }
+
   let successCount = 0;
 
   for (let i = 0; i < placeholders.length; i++) {
     if (isFlowCancelled) break;
 
     const placeholder = placeholders[i];
-    const sourceUrl = preferSourceImages ? pendingSourceImages[i] : undefined;
+    // 修复：检查数组边界，确保有足够的素材图片
+    const sourceUrl = (preferSourceImages && i < pendingSourceImages.length) ? pendingSourceImages[i] : undefined;
+    
+    if (sourceUrl) {
+      logger.log(`占位符 ${i + 1}: 使用素材来源图片 ${sourceUrl}`, 'info');
+    } else {
+      logger.log(`占位符 ${i + 1}: 使用图库搜索 "${placeholder.keyword}"`, 'info');
+    }
 
     const success = sourceUrl
       ? await insertSourceImageAtPlaceholder(placeholder, sourceUrl).catch(() => false)
@@ -1990,6 +2004,10 @@ const fillContent = async () => {
     }
     pendingSourceImages = Array.isArray(payload.sourceImages) ? payload.sourceImages.filter(u => typeof u === 'string') : [];
     pendingSourceUrl = payload.sourceUrl;
+    
+    // 调试日志
+    console.log('[Toutiao] 素材来源图片数量:', pendingSourceImages.length);
+    console.log('[Toutiao] 素材来源图片列表:', pendingSourceImages);
 
     const settings = await chrome.storage.sync.get(['autoPublishAll', 'toutiao']);
     const autoPublish = settings.autoPublishAll === true

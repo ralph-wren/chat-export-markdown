@@ -120,11 +120,13 @@ class ExtractionProgressPanel {
   private logContent: HTMLDivElement;
   private statsContent: HTMLDivElement;
   private stopBtn: HTMLButtonElement;
+  private copyBtn: HTMLButtonElement;
   private onStop?: () => void;
   private stats: ExtractionStats;
   private pageType: PageType = 'unknown';
   private startTime: number = 0;
   private timerInterval: number | null = null; // 定时器ID
+  private extractedContent: string = ''; // 存储抓取的完整内容
 
   constructor() {
     // 初始化统计数据
@@ -185,6 +187,40 @@ class ExtractionProgressPanel {
     const controls = document.createElement('div');
     controls.style.cssText = 'display: flex; gap: 8px; align-items: center;';
 
+    // 复制按钮
+    this.copyBtn = document.createElement('button');
+    this.copyBtn.innerText = '📋';
+    this.copyBtn.title = '复制所有抓取信息';
+    this.copyBtn.style.cssText = `
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      display: none;
+      transition: all 0.2s;
+    `;
+    this.copyBtn.onmouseover = () => { this.copyBtn.style.transform = 'scale(1.05)'; };
+    this.copyBtn.onmouseout = () => { this.copyBtn.style.transform = 'scale(1)'; };
+    this.copyBtn.onclick = () => {
+      if (this.extractedContent) {
+        navigator.clipboard.writeText(this.extractedContent).then(() => {
+          const originalText = this.copyBtn.innerText;
+          this.copyBtn.innerText = '✅';
+          setTimeout(() => {
+            this.copyBtn.innerText = originalText;
+          }, 1500);
+          this.log('已复制到剪贴板', 'success');
+        }).catch(err => {
+          console.error('复制失败:', err);
+          this.log('复制失败', 'error');
+        });
+      }
+    };
+
     // 停止按钮
     this.stopBtn = document.createElement('button');
     this.stopBtn.innerText = '停止';
@@ -226,6 +262,7 @@ class ExtractionProgressPanel {
       this.container.style.display = 'none';
     };
 
+    controls.appendChild(this.copyBtn);
     controls.appendChild(this.stopBtn);
     controls.appendChild(closeBtn);
     header.appendChild(title);
@@ -419,12 +456,22 @@ class ExtractionProgressPanel {
   }
 
   /**
-   * 记录日志
+   * 记录日志（统一高度）
    */
   log(message: string, type: 'info' | 'action' | 'error' | 'success' | 'warn' = 'info'): void {
     this.show();
     const line = document.createElement('div');
-    line.style.cssText = 'margin-top: 6px; word-wrap: break-word; white-space: pre-wrap;';
+    line.style.cssText = `
+      margin-top: 4px;
+      word-wrap: break-word;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      height: 22px;
+      line-height: 22px;
+      display: flex;
+      align-items: center;
+    `;
     
     const time = new Date().toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
     
@@ -453,15 +500,16 @@ class ExtractionProgressPanel {
     };
 
     line.style.background = bgColors[type];
-    line.style.padding = type !== 'info' ? '4px 8px' : '2px 0';
+    line.style.padding = '0 8px';
     line.style.borderRadius = '4px';
-    line.style.marginLeft = type !== 'info' ? '-8px' : '0';
-    line.style.marginRight = type !== 'info' ? '-8px' : '0';
+    line.style.marginLeft = '-8px';
+    line.style.marginRight = '-8px';
+    line.title = message; // 鼠标悬停显示完整内容
     
     line.innerHTML = `
-      <span style="color: #475569; font-size: 10px;">[${time}]</span>
-      <span style="margin: 0 4px;">${icons[type]}</span>
-      <span style="color: ${colors[type]};">${message}</span>
+      <span style="color: #475569; font-size: 10px; flex-shrink: 0;">[${time}]</span>
+      <span style="margin: 0 4px; flex-shrink: 0;">${icons[type]}</span>
+      <span style="color: ${colors[type]}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(message)}</span>
     `;
     
     this.logContent.appendChild(line);
@@ -469,28 +517,35 @@ class ExtractionProgressPanel {
   }
 
   /**
-   * 记录详细内容预览（带标题和内容的卡片样式）
+   * 记录详细内容预览（带标题和内容的卡片样式，统一高度）
    */
   logDetail(title: string, content: string): void {
     this.show();
     const line = document.createElement('div');
     line.style.cssText = `
-      margin-top: 6px;
+      margin-top: 4px;
       margin-left: 16px;
-      padding: 8px 10px;
+      padding: 6px 10px;
       background: rgba(30, 41, 59, 0.8);
       border-left: 3px solid #6366f1;
       border-radius: 0 6px 6px 0;
       word-wrap: break-word;
-      white-space: pre-wrap;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      height: 44px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     `;
     
     // 清理内容中的换行和多余空格
     const cleanContent = content.replace(/\s+/g, ' ').trim();
+    line.title = `${title}\n${cleanContent}`; // 鼠标悬停显示完整内容
     
     line.innerHTML = `
-      <div style="color: #a5b4fc; font-size: 11px; font-weight: 600; margin-bottom: 4px;">${title}</div>
-      <div style="color: #cbd5e1; font-size: 12px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis;">${this.escapeHtml(cleanContent)}</div>
+      <div style="color: #a5b4fc; font-size: 10px; font-weight: 600; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(title)}</div>
+      <div style="color: #cbd5e1; font-size: 11px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(cleanContent)}</div>
     `;
     
     this.logContent.appendChild(line);
@@ -509,12 +564,19 @@ class ExtractionProgressPanel {
   /**
    * 显示完成状态
    */
-  showComplete(): void {
+  showComplete(content?: string): void {
     // 立即停止计时器，确保耗时不再增加
     this.stopTimer();
     const elapsed = Math.round((Date.now() - this.startTime) / 1000);
     this.log(`抓取完成！耗时 ${elapsed} 秒`, 'success');
     this.hideStopButton();
+    
+    // 保存抓取的内容
+    if (content) {
+      this.extractedContent = content;
+      this.copyBtn.style.display = 'block'; // 显示复制按钮
+    }
+    
     // 最后更新一次显示（此时计时器已停止，不会再变化）
     this.updateStatsDisplay();
     
@@ -815,12 +877,20 @@ async function extractGenericPage(): Promise<ExtractionResult> {
   
   // 统计图片数量
   const images = document.querySelectorAll('img[src]');
+  console.log(`[Memoraid] 页面总图片数: ${images.length}`);
+  
   const validImages = Array.from(images).filter(img => {
     const src = img.getAttribute('src') || '';
     const width = (img as HTMLImageElement).naturalWidth || (img as HTMLImageElement).width;
     // 过滤掉小图标和占位图
-    return src && !src.includes('data:') && width > 50;
+    const isValid = src && !src.includes('data:') && width > 50;
+    if (!isValid) {
+      console.log(`[Memoraid] 过滤图片: src=${src.substring(0, 50)}, width=${width}`);
+    }
+    return isValid;
   });
+  
+  console.log(`[Memoraid] 有效图片数: ${validImages.length}`);
   panel.updateStats({ imagesCount: validImages.length });
   panel.log(`发现 ${validImages.length} 张图片`, 'info');
   const hostname = window.location.hostname;
@@ -944,15 +1014,26 @@ async function extractGenericPage(): Promise<ExtractionResult> {
   const mainImages = getMainImages(validImages as HTMLImageElement[], 5);
   const mediaAiSettings = await chrome.storage.sync.get(['enableMediaAi', 'enableImageOcr']);
   const mediaAiEnabled = mediaAiSettings.enableMediaAi === true || mediaAiSettings.enableImageOcr === true;
+  
+  console.log(`[Memoraid] 开始提取图片URL，有效图片数: ${validImages.length}`);
   let extractedImages = Array.from(new Set(
     getMainImages(validImages as HTMLImageElement[], 60)
       .filter(img => {
         const el = img as HTMLImageElement;
         const w = el.naturalWidth || el.width || el.clientWidth || 0;
         const h = el.naturalHeight || el.height || el.clientHeight || 0;
-        if (w <= 0 || h <= 0) return false;
-        if (w < 200 || h < 150) return false;
-        if (w * h < 60000) return false;
+        if (w <= 0 || h <= 0) {
+          console.log(`[Memoraid] 过滤图片(尺寸为0): ${el.src?.substring(0, 50)}`);
+          return false;
+        }
+        if (w < 200 || h < 150) {
+          console.log(`[Memoraid] 过滤图片(太小 ${w}x${h}): ${el.src?.substring(0, 50)}`);
+          return false;
+        }
+        if (w * h < 60000) {
+          console.log(`[Memoraid] 过滤图片(面积太小 ${w*h}): ${el.src?.substring(0, 50)}`);
+          return false;
+        }
         const metaText = `${el.getAttribute('alt') || ''} ${el.getAttribute('title') || ''}`.trim();
         if (metaText.includes('无障碍') || metaText.includes('适老化')) return false;
         const srcText = (el.currentSrc || el.src || '').toLowerCase();
@@ -973,9 +1054,21 @@ async function extractGenericPage(): Promise<ExtractionResult> {
         return bw * bh - aw * ah;
       })
       .slice(0, 12)
-      .map(img => getBestImageUrl(img as HTMLImageElement))
-      .filter(src => !!src)
+      .map(img => {
+        const url = getBestImageUrl(img as HTMLImageElement);
+        console.log(`[Memoraid] 提取图片URL: ${url.substring(0, 100)}`);
+        return url;
+      })
+      .filter(src => {
+        const isValid = !!src;
+        if (!isValid) {
+          console.log(`[Memoraid] 过滤空URL`);
+        }
+        return isValid;
+      })
   ));
+  
+  console.log(`[Memoraid] 最终提取到 ${extractedImages.length} 张图片URL`);
 
   if (paginationInfo.hasMorePages && paginationInfo.pageUrls.length > 0 && extractedImages.length < 12 && !isExtractionCancelled) {
     panel.log('图片数量不足，尝试从后续分页补充图片...', 'info');
@@ -1064,9 +1157,31 @@ async function extractGenericPage(): Promise<ExtractionResult> {
   // 更新总字数
   panel.updateStats({ totalChars: fullContent.length });
   
-  // 显示完成状态
-  panel.showComplete();
-  console.log(`[Memoraid] 抓取完成: 正文${mainContent.length}字, ${comments.length}条评论, ${linkContents.length}个链接内容, ${ocrTexts.length}张图片OCR`);
+  // 添加图片提取日志
+  panel.log(`提取到 ${extractedImages.length} 张素材图片`, extractedImages.length > 0 ? 'success' : 'info');
+  
+  // 组装完整的抓取信息（用于复制）
+  const extractionSummary = `
+【抓取摘要】
+标题: ${title}
+URL: ${window.location.href}
+页面类型: ${pageType}
+正文字数: ${mainContent.length}
+评论数: ${comments.length}
+链接数: ${links.length}
+图片数: ${extractedImages.length}
+文章列表: ${articleList.length}
+OCR识别: ${ocrTexts.length}
+
+${fullContent}
+
+【图片列表】（共${extractedImages.length}张）
+${extractedImages.map((url, idx) => `${idx + 1}. ${url}`).join('\n')}
+  `.trim();
+  
+  // 显示完成状态，传入完整内容
+  panel.showComplete(extractionSummary);
+  console.log(`[Memoraid] 抓取完成: 正文${mainContent.length}字, ${comments.length}条评论, ${linkContents.length}个链接内容, ${ocrTexts.length}张图片OCR, ${extractedImages.length}张素材图片`);
 
   return {
     title,

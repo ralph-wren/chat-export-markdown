@@ -66,6 +66,8 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   const [status, setStatus] = useState('Ready');
   const [result, setResult] = useState<string | null>(null);
   const [currentTitle, setCurrentTitle] = useState<string>(''); // Track current document title
+  const [currentSourceUrl, setCurrentSourceUrl] = useState<string>(''); // Track source URL
+  const [currentSourceImages, setCurrentSourceImages] = useState<string[]>([]); // Track source images
   const [isPreview, setIsPreview] = useState(true);
   const [t, setT] = useState<Translation>(getTranslation('zh-CN')); // 翻译
   
@@ -170,7 +172,9 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
         type: 'PUBLISH_TO_TOUTIAO',
         payload: {
           title: currentTitle || 'Untitled',
-          content: result
+          content: result,
+          sourceUrl: currentSourceUrl,
+          sourceImages: currentSourceImages
         }
       });
       
@@ -203,7 +207,9 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
         type: 'PUBLISH_TO_ZHIHU',
         payload: {
           title: currentTitle || 'Untitled',
-          content: result
+          content: result,
+          sourceUrl: currentSourceUrl,
+          sourceImages: currentSourceImages
         }
       });
       
@@ -583,6 +589,12 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
         setResult(task.result);
         if (task.title) {
           setCurrentTitle(task.title);
+        }
+        if (task.sourceUrl) {
+          setCurrentSourceUrl(task.sourceUrl);
+        }
+        if (task.sourceImages) {
+          setCurrentSourceImages(task.sourceImages);
         }
         // Only switch view if we are not already in result view (to avoid jumping if user is refining)
         // AND if the user hasn't explicitly closed the result view for this session

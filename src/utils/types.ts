@@ -24,4 +24,6 @@ export interface ActiveTask {
   error?: string;
   conversationHistory?: ChatMessage[]; // Persist chat history for refinement
   title?: string; // Title of the document being processed
+  sourceUrl?: string; // Source URL for the article
+  sourceImages?: string[]; // Source images from the original content
 }
