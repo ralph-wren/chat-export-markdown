@@ -99,11 +99,12 @@ window.addEventListener('pagehide', (event) => {
 interface ExtractionStats {
   totalChars: number;        // 总字数
   mainContentChars: number;  // 正文字数
-  linksCount: number;        // 链接数量
-  imagesCount: number;       // 图片数量
+  linksCount: number;        // 发现的链接总数
+  linksRead: number;         // 实际读取的链接数
+  imagesCount: number;       // 发现的图片总数
+  imagesProcessed: number;   // 实际处理的图片数（OCR等）
   commentsCount: number;     // 评论数量
   articlesCount: number;     // 文章列表数量（如果是列表页）
-  fetchedLinksCount: number; // 已获取链接内容数量
   expandedCount: number;     // 展开折叠次数
   loadedPages: number;       // 加载的评论页数
 }
@@ -127,6 +128,7 @@ class ExtractionProgressPanel {
   private startTime: number = 0;
   private timerInterval: number | null = null; // 定时器ID
   private extractedContent: string = ''; // 存储抓取的完整内容
+  private isCompleted: boolean = false; // 是否已完成抓取
 
   constructor() {
     // 初始化统计数据
@@ -134,15 +136,16 @@ class ExtractionProgressPanel {
       totalChars: 0,
       mainContentChars: 0,
       linksCount: 0,
+      linksRead: 0,
       imagesCount: 0,
+      imagesProcessed: 0,
       commentsCount: 0,
       articlesCount: 0,
-      fetchedLinksCount: 0,
       expandedCount: 0,
       loadedPages: 0
     };
 
-    // 创建悬浮窗容器
+    // 创建悬浮窗容器 - 统一官网风格
     this.container = document.createElement('div');
     this.container.id = 'memoraid-extraction-panel';
     // 悬浮窗放在左边，避免和右侧的文档面板重叠
@@ -152,8 +155,8 @@ class ExtractionProgressPanel {
       left: 20px;
       width: 360px;
       max-height: 520px;
-      background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%);
-      color: #e2e8f0;
+      background: #ffffff;
+      color: #1f2937;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       font-size: 13px;
       border-radius: 12px;
@@ -161,38 +164,37 @@ class ExtractionProgressPanel {
       z-index: 2147483647;
       display: none;
       flex-direction: column;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 0 0 1px #e5e7eb;
       overflow: hidden;
     `;
 
-    // 创建头部
+    // 创建头部 - 统一官网风格
     const header = document.createElement('div');
     header.style.cssText = `
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding: 12px 16px;
-      background: linear-gradient(90deg, rgba(59, 130, 246, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: #f9fafb;
+      border-bottom: 1px solid #e5e7eb;
     `;
     
     const title = document.createElement('div');
     title.style.cssText = 'display: flex; align-items: center; gap: 8px;';
     title.innerHTML = `
       <span style="font-size: 18px;">📄</span>
-      <span style="font-weight: 600; color: #fff;">Memoraid 内容抓取</span>
+      <span style="font-weight: 600; color: #1f2937;">Memoraid 内容抓取</span>
     `;
     
     const controls = document.createElement('div');
     controls.style.cssText = 'display: flex; gap: 8px; align-items: center;';
 
-    // 复制按钮
+    // 复制按钮 - 统一官网风格
     this.copyBtn = document.createElement('button');
     this.copyBtn.innerText = '📋';
     this.copyBtn.title = '复制所有抓取信息';
     this.copyBtn.style.cssText = `
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      background: #10b981;
       color: white;
       border: none;
       border-radius: 6px;
@@ -203,8 +205,8 @@ class ExtractionProgressPanel {
       display: none;
       transition: all 0.2s;
     `;
-    this.copyBtn.onmouseover = () => { this.copyBtn.style.transform = 'scale(1.05)'; };
-    this.copyBtn.onmouseout = () => { this.copyBtn.style.transform = 'scale(1)'; };
+    this.copyBtn.onmouseover = () => { this.copyBtn.style.background = '#059669'; this.copyBtn.style.transform = 'translateY(-1px)'; };
+    this.copyBtn.onmouseout = () => { this.copyBtn.style.background = '#10b981'; this.copyBtn.style.transform = 'translateY(0)'; };
     this.copyBtn.onclick = () => {
       if (this.extractedContent) {
         navigator.clipboard.writeText(this.extractedContent).then(() => {
@@ -221,11 +223,11 @@ class ExtractionProgressPanel {
       }
     };
 
-    // 停止按钮
+    // 停止按钮 - 统一官网风格
     this.stopBtn = document.createElement('button');
     this.stopBtn.innerText = '停止';
     this.stopBtn.style.cssText = `
-      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      background: #ef4444;
       color: white;
       border: none;
       border-radius: 6px;
@@ -236,27 +238,27 @@ class ExtractionProgressPanel {
       display: none;
       transition: all 0.2s;
     `;
-    this.stopBtn.onmouseover = () => { this.stopBtn.style.transform = 'scale(1.05)'; };
-    this.stopBtn.onmouseout = () => { this.stopBtn.style.transform = 'scale(1)'; };
+    this.stopBtn.onmouseover = () => { this.stopBtn.style.background = '#dc2626'; this.stopBtn.style.transform = 'translateY(-1px)'; };
+    this.stopBtn.onmouseout = () => { this.stopBtn.style.background = '#ef4444'; this.stopBtn.style.transform = 'translateY(0)'; };
     this.stopBtn.onclick = () => {
       if (this.onStop) this.onStop();
       this.log('🛑 用户停止抓取', 'error');
       this.stopBtn.style.display = 'none';
     };
 
-    // 关闭按钮
+    // 关闭按钮 - 统一官网风格
     const closeBtn = document.createElement('span');
     closeBtn.innerText = '✕';
     closeBtn.style.cssText = `
       cursor: pointer;
-      color: #94a3b8;
+      color: #6b7280;
       font-size: 18px;
       padding: 4px;
       border-radius: 4px;
       transition: all 0.2s;
     `;
-    closeBtn.onmouseover = () => { closeBtn.style.color = '#fff'; closeBtn.style.background = 'rgba(255,255,255,0.1)'; };
-    closeBtn.onmouseout = () => { closeBtn.style.color = '#94a3b8'; closeBtn.style.background = 'transparent'; };
+    closeBtn.onmouseover = () => { closeBtn.style.color = '#1f2937'; closeBtn.style.background = '#f3f4f6'; };
+    closeBtn.onmouseout = () => { closeBtn.style.color = '#6b7280'; closeBtn.style.background = 'transparent'; };
     closeBtn.onclick = () => {
       if (this.onStop) this.onStop();
       this.container.style.display = 'none';
@@ -268,16 +270,16 @@ class ExtractionProgressPanel {
     header.appendChild(title);
     header.appendChild(controls);
 
-    // 创建统计信息区域
+    // 创建统计信息区域 - 统一官网风格
     this.statsContent = document.createElement('div');
     this.statsContent.style.cssText = `
       padding: 12px 16px;
-      background: rgba(0, 0, 0, 0.2);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      background: #f9fafb;
+      border-bottom: 1px solid #e5e7eb;
     `;
     this.updateStatsDisplay();
 
-    // 创建日志区域
+    // 创建日志区域 - 统一官网风格
     this.logContent = document.createElement('div');
     this.logContent.style.cssText = `
       overflow-y: auto;
@@ -288,6 +290,7 @@ class ExtractionProgressPanel {
       font-family: 'SF Mono', Monaco, Consolas, monospace;
       font-size: 12px;
       line-height: 1.5;
+      background: #ffffff;
     `;
 
     // 组装悬浮窗
@@ -298,7 +301,7 @@ class ExtractionProgressPanel {
   }
 
   /**
-   * 更新统计信息显示
+   * 更新统计信息显示 - 统一官网风格（阅读/抓取格式）
    */
   private updateStatsDisplay(): void {
     const pageTypeLabels: Record<PageType, string> = {
@@ -311,42 +314,49 @@ class ExtractionProgressPanel {
 
     const elapsed = this.startTime > 0 ? Math.round((Date.now() - this.startTime) / 1000) : 0;
 
+    // 格式化"阅读/抓取"显示
+    const formatReadTotal = (read: number, total: number): string => {
+      if (total === 0) return '0';
+      if (read === total) return `${this.formatNumber(read)}`;
+      return `${this.formatNumber(read)}/${this.formatNumber(total)}`;
+    };
+
     this.statsContent.innerHTML = `
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px;">
-        <div style="background: rgba(59, 130, 246, 0.15); padding: 8px 10px; border-radius: 8px; text-align: center;">
-          <div style="font-size: 18px; font-weight: 700; color: #60a5fa;">${this.formatNumber(this.stats.mainContentChars)}</div>
-          <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">正文字数</div>
+        <div style="background: #eff6ff; padding: 8px 10px; border-radius: 8px; text-align: center; border: 1px solid #dbeafe;">
+          <div style="font-size: 18px; font-weight: 700; color: #2563eb;">${this.formatNumber(this.stats.mainContentChars)}</div>
+          <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">正文字数</div>
         </div>
-        <div style="background: rgba(34, 197, 94, 0.15); padding: 8px 10px; border-radius: 8px; text-align: center;">
-          <div style="font-size: 18px; font-weight: 700; color: #4ade80;">${this.stats.linksCount}</div>
-          <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">链接数</div>
+        <div style="background: #f0fdf4; padding: 8px 10px; border-radius: 8px; text-align: center; border: 1px solid #dcfce7;">
+          <div style="font-size: 18px; font-weight: 700; color: #16a34a;">${formatReadTotal(this.stats.linksRead, this.stats.linksCount)}</div>
+          <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">链接 ${this.stats.linksRead !== this.stats.linksCount ? '(阅读/抓取)' : ''}</div>
         </div>
-        <div style="background: rgba(168, 85, 247, 0.15); padding: 8px 10px; border-radius: 8px; text-align: center;">
-          <div style="font-size: 18px; font-weight: 700; color: #c084fc;">${this.stats.imagesCount}</div>
-          <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">图片数</div>
+        <div style="background: #faf5ff; padding: 8px 10px; border-radius: 8px; text-align: center; border: 1px solid #f3e8ff;">
+          <div style="font-size: 18px; font-weight: 700; color: #9333ea;">${formatReadTotal(this.stats.imagesProcessed, this.stats.imagesCount)}</div>
+          <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">图片 ${this.stats.imagesProcessed !== this.stats.imagesCount ? '(处理/抓取)' : ''}</div>
         </div>
       </div>
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
-        <div style="background: rgba(251, 191, 36, 0.1); padding: 6px 8px; border-radius: 6px; text-align: center;">
-          <div style="font-size: 14px; font-weight: 600; color: #fbbf24;">${this.stats.commentsCount}</div>
-          <div style="font-size: 10px; color: #94a3b8;">评论</div>
+        <div style="background: #fffbeb; padding: 6px 8px; border-radius: 6px; text-align: center; border: 1px solid #fef3c7;">
+          <div style="font-size: 14px; font-weight: 600; color: #d97706;">${this.stats.commentsCount}</div>
+          <div style="font-size: 10px; color: #6b7280;">评论</div>
         </div>
-        <div style="background: rgba(236, 72, 153, 0.1); padding: 6px 8px; border-radius: 6px; text-align: center;">
-          <div style="font-size: 14px; font-weight: 600; color: #f472b6;">${this.stats.articlesCount}</div>
-          <div style="font-size: 10px; color: #94a3b8;">文章</div>
+        <div style="background: #fdf4ff; padding: 6px 8px; border-radius: 6px; text-align: center; border: 1px solid #fae8ff;">
+          <div style="font-size: 14px; font-weight: 600; color: #c026d3;">${this.stats.articlesCount}</div>
+          <div style="font-size: 10px; color: #6b7280;">文章</div>
         </div>
-        <div style="background: rgba(20, 184, 166, 0.1); padding: 6px 8px; border-radius: 6px; text-align: center;">
-          <div style="font-size: 14px; font-weight: 600; color: #2dd4bf;">${this.stats.fetchedLinksCount}</div>
-          <div style="font-size: 10px; color: #94a3b8;">已获取</div>
+        <div style="background: #f0fdfa; padding: 6px 8px; border-radius: 6px; text-align: center; border: 1px solid #ccfbf1;">
+          <div style="font-size: 14px; font-weight: 600; color: #0d9488;">${this.stats.expandedCount}</div>
+          <div style="font-size: 10px; color: #6b7280;">展开</div>
         </div>
-        <div style="background: rgba(99, 102, 241, 0.1); padding: 6px 8px; border-radius: 6px; text-align: center;">
-          <div style="font-size: 14px; font-weight: 600; color: #818cf8;">${elapsed}s</div>
-          <div style="font-size: 10px; color: #94a3b8;">耗时</div>
+        <div style="background: #eef2ff; padding: 6px 8px; border-radius: 6px; text-align: center; border: 1px solid #e0e7ff;">
+          <div style="font-size: 14px; font-weight: 600; color: #4f46e5;">${elapsed}s</div>
+          <div style="font-size: 10px; color: #6b7280;">耗时</div>
         </div>
       </div>
-      <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;">
-        <span style="color: #64748b; font-size: 11px;">${pageTypeLabels[this.pageType]}</span>
-        <span style="color: #64748b; font-size: 11px;">总计 ${this.formatNumber(this.stats.totalChars)} 字</span>
+      <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+        <span style="color: #6b7280; font-size: 11px;">${pageTypeLabels[this.pageType]}</span>
+        <span style="color: #6b7280; font-size: 11px;">总计 ${this.formatNumber(this.stats.totalChars)} 字</span>
       </div>
     `;
   }
@@ -369,8 +379,8 @@ class ExtractionProgressPanel {
     if (this.startTime === 0) {
       this.startTime = Date.now();
     }
-    // 启动定时器，每秒更新耗时显示
-    if (!this.timerInterval) {
+    // 启动定时器，每秒更新耗时显示（只在未完成时启动）
+    if (!this.timerInterval && !this.isCompleted) {
       this.timerInterval = window.setInterval(() => {
         this.updateStatsDisplay();
       }, 1000);
@@ -423,15 +433,17 @@ class ExtractionProgressPanel {
       totalChars: 0,
       mainContentChars: 0,
       linksCount: 0,
+      linksRead: 0,
       imagesCount: 0,
+      imagesProcessed: 0,
       commentsCount: 0,
       articlesCount: 0,
-      fetchedLinksCount: 0,
       expandedCount: 0,
       loadedPages: 0
     };
-    // 重置计时
+    // 重置计时和完成标志
     this.startTime = 0;
+    this.isCompleted = false;
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
       this.timerInterval = null;
@@ -456,7 +468,7 @@ class ExtractionProgressPanel {
   }
 
   /**
-   * 记录日志（统一高度）
+   * 记录日志（统一高度）- 统一官网风格
    */
   log(message: string, type: 'info' | 'action' | 'error' | 'success' | 'warn' = 'info'): void {
     this.show();
@@ -476,11 +488,11 @@ class ExtractionProgressPanel {
     const time = new Date().toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
     
     const colors: Record<string, string> = {
-      info: '#94a3b8',
-      action: '#38bdf8',
-      error: '#f87171',
-      success: '#4ade80',
-      warn: '#fbbf24'
+      info: '#6b7280',
+      action: '#3b82f6',
+      error: '#ef4444',
+      success: '#10b981',
+      warn: '#f59e0b'
     };
     
     const icons: Record<string, string> = {
@@ -493,10 +505,10 @@ class ExtractionProgressPanel {
     
     const bgColors: Record<string, string> = {
       info: 'transparent',
-      action: 'rgba(56, 189, 248, 0.1)',
-      error: 'rgba(248, 113, 113, 0.1)',
-      success: 'rgba(74, 222, 128, 0.1)',
-      warn: 'rgba(251, 191, 36, 0.1)'
+      action: '#eff6ff',
+      error: '#fef2f2',
+      success: '#f0fdf4',
+      warn: '#fffbeb'
     };
 
     line.style.background = bgColors[type];
@@ -507,7 +519,7 @@ class ExtractionProgressPanel {
     line.title = message; // 鼠标悬停显示完整内容
     
     line.innerHTML = `
-      <span style="color: #475569; font-size: 10px; flex-shrink: 0;">[${time}]</span>
+      <span style="color: #9ca3af; font-size: 10px; flex-shrink: 0;">[${time}]</span>
       <span style="margin: 0 4px; flex-shrink: 0;">${icons[type]}</span>
       <span style="color: ${colors[type]}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(message)}</span>
     `;
@@ -517,7 +529,7 @@ class ExtractionProgressPanel {
   }
 
   /**
-   * 记录详细内容预览（带标题和内容的卡片样式，统一高度）
+   * 记录详细内容预览（带标题和内容的卡片样式，统一高度）- 统一官网风格
    */
   logDetail(title: string, content: string): void {
     this.show();
@@ -526,7 +538,7 @@ class ExtractionProgressPanel {
       margin-top: 4px;
       margin-left: 16px;
       padding: 6px 10px;
-      background: rgba(30, 41, 59, 0.8);
+      background: #f9fafb;
       border-left: 3px solid #6366f1;
       border-radius: 0 6px 6px 0;
       word-wrap: break-word;
@@ -544,8 +556,8 @@ class ExtractionProgressPanel {
     line.title = `${title}\n${cleanContent}`; // 鼠标悬停显示完整内容
     
     line.innerHTML = `
-      <div style="color: #a5b4fc; font-size: 10px; font-weight: 600; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(title)}</div>
-      <div style="color: #cbd5e1; font-size: 11px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(cleanContent)}</div>
+      <div style="color: #6366f1; font-size: 10px; font-weight: 600; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(title)}</div>
+      <div style="color: #4b5563; font-size: 11px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(cleanContent)}</div>
     `;
     
     this.logContent.appendChild(line);
@@ -565,8 +577,12 @@ class ExtractionProgressPanel {
    * 显示完成状态
    */
   showComplete(content?: string): void {
+    // 标记为已完成，防止定时器重新启动
+    this.isCompleted = true;
+    
     // 立即停止计时器，确保耗时不再增加
     this.stopTimer();
+    
     const elapsed = Math.round((Date.now() - this.startTime) / 1000);
     this.log(`抓取完成！耗时 ${elapsed} 秒`, 'success');
     this.hideStopButton();
@@ -1092,6 +1108,7 @@ async function extractGenericPage(): Promise<ExtractionResult> {
     );
     if (ocrTexts.length > 0) {
       panel.log(`成功识别 ${ocrTexts.length} 张图片的文字`, 'success');
+      panel.updateStats({ imagesProcessed: ocrTexts.length });
     }
   }
   
@@ -1111,7 +1128,7 @@ async function extractGenericPage(): Promise<ExtractionResult> {
   if (links.length > 0 && !isExtractionCancelled) {
     panel.log(`正在获取 ${Math.min(links.length, EXTRACTION_CONFIG.MAX_LINKS_TO_FETCH)} 个链接内容...`, 'action');
     linkContents = await fetchLinkContentsWithProgress(links, panel);
-    panel.updateStats({ fetchedLinksCount: linkContents.length });
+    panel.updateStats({ linksRead: linkContents.length });
     if (linkContents.length > 0) {
       panel.log(`成功获取 ${linkContents.length} 个链接内容`, 'success');
     }
@@ -1456,7 +1473,7 @@ async function fetchLinkContentsWithProgress(
         // 截取前2000字符，避免内容过长
         const content = response.content.substring(0, 2000);
         results.push({ url, content });
-        panel.updateStats({ fetchedLinksCount: results.length });
+        panel.updateStats({ linksRead: results.length });
         
         // 显示链接内容预览（更详细）
         const contentPreview = content.trim().substring(0, 80).replace(/\s+/g, ' ');

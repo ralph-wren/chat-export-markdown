@@ -1,6 +1,7 @@
-import { reportArticlePublish, reportError } from '../utils/debug';
+import { reportArticlePublish } from '../utils/debug';
 import { ImageHandler } from '../utils/imageHandler';
 import { DOMHelper } from '../utils/domHelper';
+import { UnifiedLogger } from '../utils/logger';
 
 // Toutiao Publish Content Script - 元素识别版
 // 完全通过 DOM 选择器操作，不依赖截图和 AI 对话
@@ -431,90 +432,13 @@ const findImagePlaceholders = (): { text: string; keyword: string; position: num
 };
 
 // ============================================
-// Logger UI
+// Logger UI - 使用统一样式
 // ============================================
-class AILogger {
-  private container: HTMLDivElement;
-  private logContent: HTMLDivElement;
-  private stopBtn: HTMLButtonElement;
-  private onStop?: () => void;
-
-  constructor() {
-    this.container = document.createElement('div');
-    this.container.id = 'memoraid-ai-logger';
-    // 移到左上角，避免遮挡右侧的图片选择区域和确定按钮
-    this.container.style.cssText = 'position:fixed;top:20px;left:20px;width:380px;max-height:500px;background:rgba(0,0,0,0.9);color:#0f0;font-family:Consolas,Monaco,monospace;font-size:12px;border-radius:8px;padding:12px;z-index:20000;display:none;flex-direction:column;box-shadow:0 4px 20px rgba(0,0,0,0.6);border:1px solid #333;';
-
-    const header = document.createElement('div');
-    header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #444;padding-bottom:8px;margin-bottom:8px;';
-    
-    const title = document.createElement('span');
-    title.innerHTML = '🤖 <span style="color:#fff;font-weight:bold;">Memoraid</span> 自动化';
-    
-    const controls = document.createElement('div');
-    controls.style.cssText = 'display:flex;gap:6px;';
-
-    this.stopBtn = document.createElement('button');
-    this.stopBtn.innerText = '停止';
-    this.stopBtn.style.cssText = 'background:#d32f2f;color:white;border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:11px;display:none;';
-    this.stopBtn.onclick = () => {
-      if (this.onStop) this.onStop();
-      this.log('🛑 已停止', 'error');
-      this.stopBtn.style.display = 'none';
-    };
-
-    const copyBtn = document.createElement('button');
-    copyBtn.innerText = '复制';
-    copyBtn.style.cssText = 'background:#1976d2;color:white;border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:11px;';
-    copyBtn.onclick = () => {
-      navigator.clipboard.writeText(this.logContent.innerText);
-      copyBtn.innerText = '已复制';
-      setTimeout(() => { copyBtn.innerText = '复制'; }, 1500);
-    };
-
-    const closeBtn = document.createElement('span');
-    closeBtn.innerText = '✕';
-    closeBtn.style.cssText = 'cursor:pointer;color:#888;font-size:16px;margin-left:8px;';
-    closeBtn.onclick = () => {
-      if (this.onStop) this.onStop();
-      this.container.style.display = 'none';
-    };
-
-    controls.appendChild(this.stopBtn);
-    controls.appendChild(copyBtn);
-    controls.appendChild(closeBtn);
-    header.appendChild(title);
-    header.appendChild(controls);
-
-    this.logContent = document.createElement('div');
-    this.logContent.style.cssText = 'overflow-y:auto;flex:1;min-height:100px;max-height:400px;';
-
-    this.container.appendChild(header);
-    this.container.appendChild(this.logContent);
-    document.body.appendChild(this.container);
-  }
-
-  show() { this.container.style.display = 'flex'; }
-  hide() { this.container.style.display = 'none'; }
-  setStopCallback(cb: () => void) { this.onStop = cb; this.stopBtn.style.display = 'block'; }
-  hideStopButton() { this.stopBtn.style.display = 'none'; }
-  clear() { this.logContent.innerHTML = ''; }
-
-  log(message: string, type: 'info' | 'action' | 'error' | 'success' | 'warn' = 'info') {
-    this.show();
-    const line = document.createElement('div');
-    line.style.cssText = 'margin-top:4px;word-wrap:break-word;white-space:pre-wrap;line-height:1.4;';
-    const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-    const colors: Record<string, string> = { info: '#aaa', action: '#0ff', error: '#f55', success: '#4f4', warn: '#fb0' };
-    const icons: Record<string, string> = { info: 'ℹ️', action: '▶️', error: '❌', success: '✅', warn: '⚠️' };
-    line.innerHTML = `<span style="color:#555">[${time}]</span> ${icons[type]} <span style="color:${colors[type]}">${message}</span>`;
-    this.logContent.appendChild(line);
-    this.logContent.scrollTop = this.logContent.scrollHeight;
-    if (type === 'error') { reportError(message, { type, context: 'ToutiaoContentScript' }); }
-  }
-}
-
-const logger = new AILogger();
+const logger = new UnifiedLogger({
+  title: 'Memoraid 头条助手',
+  icon: '📰',
+  position: 'top-left'
+});
 
 // ============================================
 // 图片操作核心功能 - 元素识别版
@@ -630,29 +554,58 @@ const openImageDialogFromCover = async (): Promise<boolean> => {
   // 关闭可能存在的抽屉遮罩
   await closeDrawerMask();
   
-  // 使用 Playwright 录制的选择器: .add-icon
-  let coverAddBtn = document.querySelector('.add-icon') as HTMLElement;
-  
-  // 备用方法：查找 .article-cover-add
-  if (!coverAddBtn) {
-    coverAddBtn = document.querySelector('.article-cover-add') as HTMLElement;
+  // 查找封面区域
+  const coverArea = document.querySelector('.article-cover, [class*="article-cover"]');
+  if (!coverArea) {
+    logger.log('未找到封面区域', 'error');
+    return false;
   }
   
-  // 备用方法：在封面区域内查找 SVG 或添加按钮
-  if (!coverAddBtn) {
-    const coverArea = document.querySelector('.article-cover, [class*="article-cover"]');
-    if (coverArea) {
-      coverAddBtn = coverArea.querySelector('.add-icon, svg, [class*="add"]') as HTMLElement;
+  // 方法1: 查找 .add-icon 元素（可能是 SVG 或其父元素）
+  let clickTarget: HTMLElement | null = null;
+  
+  const addIcon = coverArea.querySelector('.add-icon');
+  if (addIcon) {
+    // 如果是 SVG 元素，找到它的可点击父元素
+    if (addIcon instanceof SVGElement) {
+      clickTarget = addIcon.closest('div, button, a') as HTMLElement;
+      if (!clickTarget) {
+        clickTarget = addIcon.parentElement as HTMLElement;
+      }
+    } else {
+      clickTarget = addIcon as HTMLElement;
     }
   }
   
-  if (!coverAddBtn) {
+  // 方法2: 查找 .article-cover-add
+  if (!clickTarget) {
+    clickTarget = coverArea.querySelector('.article-cover-add') as HTMLElement;
+  }
+  
+  // 方法3: 查找任何包含 "add" 的可点击元素
+  if (!clickTarget) {
+    const candidates = coverArea.querySelectorAll('div, button, a, span');
+    for (const el of candidates) {
+      const className = (el as HTMLElement).className || '';
+      if (className.includes('add') && isElementVisible(el as HTMLElement)) {
+        clickTarget = el as HTMLElement;
+        break;
+      }
+    }
+  }
+  
+  // 方法4: 直接点击封面区域本身
+  if (!clickTarget) {
+    clickTarget = coverArea as HTMLElement;
+  }
+  
+  if (!clickTarget) {
     logger.log('未找到封面上传入口', 'error');
     return false;
   }
   
   logger.log('点击封面添加图标', 'action');
-  simulateClick(coverAddBtn);
+  simulateClick(clickTarget);
   
   // 等待对话框出现
   await new Promise(r => setTimeout(r, 500));
@@ -1231,15 +1184,47 @@ const insertSourceImageAtPlaceholder = async (placeholder: { text: string; keywo
     logger.log(`未找到占位符文本: ${placeholder.text}`, 'warn');
     return false;
   }
-  document.execCommand('delete');
-  await new Promise(r => setTimeout(r, 300));
-
-  // 直接复制粘贴图片，不需要打开对话框
+  
+  // 先不删除占位符，等图片插入成功后再删除
   const success = await insertImageFromUrl(imageUrl);
+  
   if (success) {
+    // 图片插入成功，删除占位符
+    if (selectTextInEditor(placeholder.text)) {
+      document.execCommand('delete');
+      await new Promise(r => setTimeout(r, 300));
+    }
     logger.log(`占位符 "${placeholder.text}" 已替换为来源图片`, 'success');
+    return true;
+  } else {
+    // 图片插入失败，保留占位符，尝试使用图库搜索
+    logger.log(`来源图片插入失败，尝试使用图库搜索: ${placeholder.keyword}`, 'warn');
+    
+    // 删除占位符
+    if (selectTextInEditor(placeholder.text)) {
+      document.execCommand('delete');
+      await new Promise(r => setTimeout(r, 300));
+    }
+    
+    // 尝试通过图库搜索插入
+    try {
+      if (!await openImageDialogFromToolbar()) {
+        logger.log('无法打开图片对话框', 'error');
+        return false;
+      }
+      if (isFlowCancelled) return false;
+      
+      const searchSuccess = await searchAndSelectImage(placeholder.keyword);
+      if (searchSuccess) {
+        logger.log(`占位符 "${placeholder.text}" 已通过图库搜索替换`, 'success');
+        return true;
+      }
+    } catch (error) {
+      logger.log(`图库搜索也失败: ${error}`, 'error');
+    }
+    
+    return false;
   }
-  return success;
 };
 
 /**

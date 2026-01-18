@@ -1,88 +1,84 @@
 /**
- * 通用Logger UI类
- * 提供统一的日志显示界面
+ * 统一的悬浮窗 Logger 工具类
+ * 与官网风格保持一致：白色背景、灰色边框、简洁设计
  */
 
+export type LogLevel = 'info' | 'action' | 'error' | 'success' | 'warn';
+
 export interface LoggerOptions {
-  id: string;
   title: string;
-  titleIcon?: string;
-  position?: 'left' | 'right';
-  color?: string;
+  icon?: string;
+  accentColor?: string;
+  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 }
 
-export class Logger {
+export class UnifiedLogger {
   private container: HTMLDivElement;
   private logContent: HTMLDivElement;
   private stopBtn: HTMLButtonElement;
-  private copyBtn: HTMLButtonElement;
   private onStop?: () => void;
+  private options: LoggerOptions;
 
   constructor(options: LoggerOptions) {
-    const {
-      id,
-      title,
-      titleIcon = '🤖',
-      position = 'left',
-      color = '#0af'
-    } = options;
-
+    this.options = options;
     this.container = document.createElement('div');
-    this.container.id = `memoraid-${id}-logger`;
+    this.container.id = `memoraid-logger-${Date.now()}`;
     
-    const left = position === 'left' ? '20px' : 'auto';
-    const right = position === 'right' ? '20px' : 'auto';
-    
+    // 统一样式：白色背景、灰色边框、简洁设计
+    const position = this.getPositionStyle(options.position || 'top-left');
     this.container.style.cssText = `
       position: fixed;
-      top: 20px;
-      left: ${left};
-      right: ${right};
-      width: 380px;
+      ${position}
+      width: 400px;
       max-height: 500px;
-      background: rgba(0, 0, 0, 0.9);
-      color: ${color};
-      font-family: Consolas, Monaco, monospace;
-      font-size: 12px;
+      background: white;
+      color: #374151;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
       border-radius: 8px;
-      padding: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      border: 1px solid #e5e7eb;
       z-index: 20000;
       display: none;
       flex-direction: column;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
-      border: 1px solid ${color};
+      overflow: hidden;
     `;
 
-    // 创建头部
+    // 头部
     const header = document.createElement('div');
     header.style.cssText = `
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid #444;
-      padding-bottom: 8px;
-      margin-bottom: 8px;
+      padding: 12px 16px;
+      border-bottom: 1px solid #e5e7eb;
+      background: #f9fafb;
     `;
     
-    const titleEl = document.createElement('span');
-    titleEl.innerHTML = `${titleIcon} <span style="color:#fff;font-weight:bold;">Memoraid</span> ${title}`;
+    const titleEl = document.createElement('div');
+    titleEl.style.cssText = 'display: flex; align-items: center; gap: 8px; font-weight: 600; color: #111827;';
+    titleEl.innerHTML = `${options.icon || '🤖'} <span>${options.title}</span>`;
     
     const controls = document.createElement('div');
-    controls.style.cssText = 'display: flex; gap: 6px;';
+    controls.style.cssText = 'display: flex; gap: 6px; align-items: center;';
 
     // 停止按钮
     this.stopBtn = document.createElement('button');
     this.stopBtn.innerText = '停止';
     this.stopBtn.style.cssText = `
-      background: #d32f2f;
+      background: #ef4444;
       color: white;
       border: none;
       border-radius: 4px;
-      padding: 3px 8px;
+      padding: 4px 12px;
       cursor: pointer;
-      font-size: 11px;
+      font-size: 12px;
+      font-weight: 500;
       display: none;
+      transition: background 0.2s;
     `;
+    this.stopBtn.onmouseover = () => { this.stopBtn.style.background = '#dc2626'; };
+    this.stopBtn.onmouseout = () => { this.stopBtn.style.background = '#ef4444'; };
     this.stopBtn.onclick = () => {
       if (this.onStop) this.onStop();
       this.log('🛑 已停止', 'error');
@@ -90,51 +86,71 @@ export class Logger {
     };
 
     // 复制按钮
-    this.copyBtn = document.createElement('button');
-    this.copyBtn.innerText = '复制';
-    this.copyBtn.style.cssText = `
-      background: #1976d2;
+    const copyBtn = document.createElement('button');
+    copyBtn.innerText = '复制';
+    copyBtn.style.cssText = `
+      background: #3b82f6;
       color: white;
       border: none;
       border-radius: 4px;
-      padding: 3px 8px;
+      padding: 4px 12px;
       cursor: pointer;
-      font-size: 11px;
+      font-size: 12px;
+      font-weight: 500;
+      transition: background 0.2s;
     `;
-    this.copyBtn.onclick = () => {
+    copyBtn.onmouseover = () => { copyBtn.style.background = '#2563eb'; };
+    copyBtn.onmouseout = () => { copyBtn.style.background = '#3b82f6'; };
+    copyBtn.onclick = () => {
       navigator.clipboard.writeText(this.logContent.innerText);
-      this.copyBtn.innerText = '已复制';
-      setTimeout(() => {
-        this.copyBtn.innerText = '复制';
-      }, 1500);
+      copyBtn.innerText = '已复制';
+      setTimeout(() => { copyBtn.innerText = '复制'; }, 1500);
     };
 
     // 关闭按钮
-    const closeBtn = document.createElement('span');
-    closeBtn.innerText = '✕';
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '✕';
     closeBtn.style.cssText = `
+      background: transparent;
+      color: #9ca3af;
+      border: none;
       cursor: pointer;
-      color: #888;
-      font-size: 16px;
-      margin-left: 8px;
+      font-size: 18px;
+      padding: 0;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: all 0.2s;
     `;
+    closeBtn.onmouseover = () => { 
+      closeBtn.style.background = '#f3f4f6'; 
+      closeBtn.style.color = '#111827';
+    };
+    closeBtn.onmouseout = () => { 
+      closeBtn.style.background = 'transparent'; 
+      closeBtn.style.color = '#9ca3af';
+    };
     closeBtn.onclick = () => {
       if (this.onStop) this.onStop();
       this.container.style.display = 'none';
     };
 
     controls.appendChild(this.stopBtn);
-    controls.appendChild(this.copyBtn);
+    controls.appendChild(copyBtn);
     controls.appendChild(closeBtn);
     header.appendChild(titleEl);
     header.appendChild(controls);
 
-    // 创建日志内容区域
+    // 日志内容区域
     this.logContent = document.createElement('div');
     this.logContent.style.cssText = `
       overflow-y: auto;
       flex: 1;
-      min-height: 100px;
+      padding: 12px 16px;
+      background: white;
       max-height: 400px;
     `;
 
@@ -143,71 +159,113 @@ export class Logger {
     document.body.appendChild(this.container);
   }
 
-  show(): void {
-    this.container.style.display = 'flex';
+  private getPositionStyle(position: string): string {
+    switch (position) {
+      case 'top-right':
+        return 'top: 20px; right: 20px;';
+      case 'bottom-left':
+        return 'bottom: 20px; left: 20px;';
+      case 'bottom-right':
+        return 'bottom: 20px; right: 20px;';
+      default: // top-left
+        return 'top: 20px; left: 20px;';
+    }
   }
 
-  hide(): void {
-    this.container.style.display = 'none';
+  show() { 
+    this.container.style.display = 'flex'; 
+  }
+  
+  hide() { 
+    this.container.style.display = 'none'; 
+  }
+  
+  setStopCallback(cb: () => void) { 
+    this.onStop = cb; 
+    this.stopBtn.style.display = 'block'; 
+  }
+  
+  hideStopButton() { 
+    this.stopBtn.style.display = 'none'; 
+  }
+  
+  clear() { 
+    this.logContent.innerHTML = ''; 
   }
 
-  setStopCallback(cb: () => void): void {
-    this.onStop = cb;
-    this.stopBtn.style.display = 'block';
-  }
-
-  hideStopButton(): void {
-    this.stopBtn.style.display = 'none';
-  }
-
-  clear(): void {
-    this.logContent.innerHTML = '';
-  }
-
-  log(
-    message: string,
-    type: 'info' | 'action' | 'error' | 'success' | 'warn' = 'info'
-  ): void {
+  log(message: string, type: LogLevel = 'info') {
     this.show();
     const line = document.createElement('div');
     line.style.cssText = `
-      margin-top: 4px;
-      word-wrap: break-word;
-      white-space: pre-wrap;
-      line-height: 1.4;
+      margin-bottom: 8px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      line-height: 1.5;
+      font-size: 13px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      ${this.getLogStyle(type)}
     `;
     
     const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-    
-    const colors: Record<string, string> = {
-      info: '#aaa',
-      action: '#0ff',
-      error: '#f55',
-      success: '#4f4',
-      warn: '#fb0'
-    };
-    
-    const icons: Record<string, string> = {
-      info: 'ℹ️',
-      action: '▶️',
-      error: '❌',
-      success: '✅',
-      warn: '⚠️'
-    };
+    const icon = this.getIcon(type);
     
     line.innerHTML = `
-      <span style="color:#555">[${time}]</span>
-      ${icons[type]}
-      <span style="color:${colors[type]}">${this.escapeHtml(message)}</span>
+      <span style="color: #9ca3af; font-size: 11px; flex-shrink: 0;">${time}</span>
+      <span style="flex-shrink: 0;">${icon}</span>
+      <span style="flex: 1; word-break: break-word;">${message}</span>
     `;
     
     this.logContent.appendChild(line);
     this.logContent.scrollTop = this.logContent.scrollHeight;
+    
+    // 错误上报
+    if (type === 'error') {
+      try {
+        chrome.runtime.sendMessage({
+          type: 'REPORT_ERROR',
+          payload: { message, context: this.options.title }
+        }).catch(() => {});
+      } catch (e) {
+        // Ignore
+      }
+    }
   }
 
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+  private getLogStyle(type: LogLevel): string {
+    switch (type) {
+      case 'error':
+        return 'background: #fef2f2; border: 1px solid #fecaca; color: #991b1b;';
+      case 'success':
+        return 'background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534;';
+      case 'warn':
+        return 'background: #fffbeb; border: 1px solid #fde68a; color: #92400e;';
+      case 'action':
+        return 'background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af;';
+      default: // info
+        return 'background: #f9fafb; border: 1px solid #e5e7eb; color: #374151;';
+    }
+  }
+
+  private getIcon(type: LogLevel): string {
+    switch (type) {
+      case 'error':
+        return '❌';
+      case 'success':
+        return '✅';
+      case 'warn':
+        return '⚠️';
+      case 'action':
+        return '▶️';
+      default:
+        return 'ℹ️';
+    }
+  }
+
+  destroy() {
+    if (this.container && this.container.parentNode) {
+      this.container.parentNode.removeChild(this.container);
+    }
   }
 }

@@ -5,7 +5,7 @@
 
 import { DOMHelper } from './domHelper';
 import { EditorHelper } from './editorHelper';
-import { Logger } from './logger';
+import { UnifiedLogger } from './logger';
 
 export interface PublishData {
   title: string;
@@ -21,7 +21,7 @@ export interface FillContentOptions {
   storageKey: string;
   titleSelectors: string[];
   editorSelectors: string[];
-  logger: Logger;
+  logger: UnifiedLogger;
   onFillComplete?: (data: PublishData, autoPublish: boolean) => void;
   maxAttempts?: number;
 }
