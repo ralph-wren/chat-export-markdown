@@ -191,6 +191,10 @@ const StyleSlider: React.FC<StyleSliderProps> = ({ label, leftLabel, rightLabel,
 
 const Settings: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const latestSettingsRef = React.useRef<AppSettings>(DEFAULT_SETTINGS);
+  const hasLoadedRef = React.useRef(false);
+  const isDirtyRef = React.useRef(false);
+  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string>('nvidia');
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showApiKey, setShowApiKey] = useState(false);
@@ -211,6 +215,16 @@ const Settings: React.FC = () => {
   
   const t = getTranslation(settings.language || 'zh-CN');
 
+  latestSettingsRef.current = settings;
+
+  useEffect(() => {
+    return () => {
+      if (!hasLoadedRef.current) return;
+      if (!isDirtyRef.current) return;
+      saveSettings(latestSettingsRef.current);
+    };
+  }, []);
+
   // 自动保存：当 settings 变化时自动保存（防抖）
   const isInitialMount = React.useRef(true);
   useEffect(() => {
@@ -219,9 +233,11 @@ const Settings: React.FC = () => {
       return;
     }
     
+    isDirtyRef.current = true;
     setAutoSaveStatus('saving');
     const timer = setTimeout(async () => {
       await saveSettings(settings);
+      isDirtyRef.current = false;
       setAutoSaveStatus('saved');
       // 2秒后恢复 idle 状态
       setTimeout(() => setAutoSaveStatus('idle'), 2000);
@@ -271,6 +287,10 @@ const Settings: React.FC = () => {
           }
           }
 
+          latestSettingsRef.current = initializedSettings;
+          hasLoadedRef.current = true;
+          isDirtyRef.current = false;
+          setIsSettingsLoaded(true);
           setSettings(initializedSettings);
           
           if (saved.provider && PROVIDERS[saved.provider]) {
@@ -774,6 +794,18 @@ const Settings: React.FC = () => {
 
   const currentModels = PROVIDERS[selectedProvider]?.models || [];
 
+  if (!isSettingsLoaded) {
+    return (
+      <div className="p-4 space-y-4">
+        <h2 className="text-xl font-bold mb-4">{t.settingsTitle}</h2>
+        <div className="text-sm text-gray-500 flex items-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          加载设置中...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 space-y-4">
       <h2 className="text-xl font-bold mb-4">{t.settingsTitle}</h2>
@@ -803,7 +835,7 @@ const Settings: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Image className={`w-5 h-5 ${settings.enableMediaAi ? 'text-purple-500' : 'text-gray-400'}`} />
+              <Image className={`w-5 h-5 ${(settings.enableMediaAi ?? true) ? 'text-purple-500' : 'text-gray-400'}`} />
               <div>
                 <span className="font-medium text-gray-800">{t.mediaEnhanceTitle}</span>
                 <p className="text-xs text-gray-500">{t.mediaEnhanceHint}</p>
@@ -813,8 +845,11 @@ const Settings: React.FC = () => {
               <input
                 type="checkbox"
                 className="sr-only peer"
-                checked={settings.enableMediaAi || false}
-                onChange={(e) => setSettings({ ...settings, enableMediaAi: e.target.checked })}
+                checked={settings.enableMediaAi ?? true}
+                onChange={(e) => {
+                  isDirtyRef.current = true;
+                  setSettings({ ...settings, enableMediaAi: e.target.checked });
+                }}
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
             </label>
@@ -824,7 +859,7 @@ const Settings: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Send className={`w-5 h-5 ${settings.autoPublishAll !== false ? 'text-green-500' : 'text-gray-400'}`} />
+              <Send className={`w-5 h-5 ${(settings.autoPublishAll ?? false) ? 'text-green-500' : 'text-gray-400'}`} />
               <div>
                 <span className="font-medium text-gray-800">{t.autoPublishAllTitle}</span>
                 <p className="text-xs text-gray-500">{t.autoPublishAllHint}</p>
@@ -834,8 +869,11 @@ const Settings: React.FC = () => {
               <input
                 type="checkbox"
                 className="sr-only peer"
-                checked={settings.autoPublishAll !== false}
-                onChange={(e) => setSettings({ ...settings, autoPublishAll: e.target.checked })}
+                checked={settings.autoPublishAll ?? false}
+                onChange={(e) => {
+                  isDirtyRef.current = true;
+                  setSettings({ ...settings, autoPublishAll: e.target.checked });
+                }}
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
             </label>
@@ -845,7 +883,7 @@ const Settings: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Image className={`w-5 h-5 ${settings.preferSourceImages !== false ? 'text-blue-500' : 'text-gray-400'}`} />
+              <Image className={`w-5 h-5 ${(settings.preferSourceImages ?? true) ? 'text-blue-500' : 'text-gray-400'}`} />
               <div>
                 <span className="font-medium text-gray-800">{t.preferSourceImagesTitle}</span>
                 <p className="text-xs text-gray-500">{t.preferSourceImagesHint}</p>
@@ -855,8 +893,11 @@ const Settings: React.FC = () => {
               <input
                 type="checkbox"
                 className="sr-only peer"
-                checked={settings.preferSourceImages !== false}
-                onChange={(e) => setSettings({ ...settings, preferSourceImages: e.target.checked })}
+                checked={settings.preferSourceImages ?? true}
+                onChange={(e) => {
+                  isDirtyRef.current = true;
+                  setSettings({ ...settings, preferSourceImages: e.target.checked });
+                }}
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
             </label>

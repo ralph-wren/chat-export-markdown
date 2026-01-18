@@ -242,6 +242,65 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  // 处理图片获取请求（用于绕过防盗链/CORS，返回 base64 data URL）
+  if (message.type === 'FETCH_IMAGE_DATA_URL') {
+    fetchImageAsDataUrl(message.payload.url, message.payload.referrer)
+      .then(({ dataUrl, mimeType }) => sendResponse({ success: true, dataUrl, mimeType }))
+      .catch(e => sendResponse({ success: false, error: e.message || String(e) }));
+    return true;
+  }
+
+  // 新增：下载图片为 Blob（用于上传）
+  if (message.type === 'DOWNLOAD_IMAGE_AS_BLOB') {
+    downloadImageAsBlob(message.payload.url, message.payload.referrer)
+      .then(({ blob, mimeType, filename }) => {
+        // 将 Blob 转换为 ArrayBuffer 以便传输
+        return blob.arrayBuffer().then(arrayBuffer => {
+          sendResponse({ 
+            success: true, 
+            arrayBuffer: Array.from(new Uint8Array(arrayBuffer)),
+            mimeType,
+            filename,
+            size: blob.size
+          });
+        });
+      })
+      .catch(e => sendResponse({ success: false, error: e.message || String(e) }));
+    return true;
+  }
+
+  // 新增：通过 R2 中转下载图片（绕过防盗链）
+  if (message.type === 'DOWNLOAD_IMAGE_VIA_R2') {
+    downloadImageViaR2(message.payload.url, message.payload.referrer)
+      .then(r2Url => sendResponse({ success: true, r2Url }))
+      .catch(e => sendResponse({ success: false, error: e.message || String(e) }));
+    return true;
+  }
+
+  // 处理分页图片获取请求（用于增强版内容抓取）
+  if (message.type === 'FETCH_PAGE_IMAGES') {
+    fetchPageImages(message.payload.url, message.payload.maxCount)
+      .then(images => sendResponse({ success: true, images }))
+      .catch(e => sendResponse({ success: false, error: e.message || String(e) }));
+    return true;
+  }
+
+  // 兼容旧消息：AI_RANK_IMAGES（内部复用 AI_MEDIA_ENHANCE 结果结构）
+  if (message.type === 'AI_RANK_IMAGES') {
+    handleAiMediaEnhance({
+      title: message.payload?.title,
+      context: message.payload?.context,
+      images: message.payload?.images,
+      maxPick: message.payload?.maxPick
+    })
+      .then(result => {
+        const orderedUrls = result?.inline?.orderedUrls || [];
+        sendResponse({ success: true, result: { orderedUrls } });
+      })
+      .catch(e => sendResponse({ success: false, error: e.message || String(e) }));
+    return true;
+  }
+
   // 处理图片 OCR 识别请求（使用 AI 视觉能力识别图片中的文字）
   if (message.type === 'OCR_IMAGE') {
     handleOcrImage(message.payload.imageUrl)
@@ -273,6 +332,7 @@ async function handleAiMediaEnhance(payload: {
   skipped?: { code: string };
   inline?: { orderedUrls: string[]; picked?: Array<{ url: string; reason?: string }> };
   cover?: { url: string; reason?: string };
+  images?: Array<{ url: string; ocrText?: string }>;
   error?: string;
 }> {
   try {
@@ -283,8 +343,68 @@ async function handleAiMediaEnhance(payload: {
     const apiyiKey = settings.apiKeys?.apiyi || '';
     if (!apiyiKey) return { skipped: { code: 'missing_apiyi_key' } };
 
-    const urls = Array.isArray(payload.images) ? payload.images.map(i => String(i.url || '')).filter(Boolean) : [];
+    const imagesInput = Array.isArray(payload.images) ? payload.images : [];
+    const urls = imagesInput.map(i => String(i.url || '')).filter(Boolean);
     if (urls.length === 0) return { skipped: { code: 'no_images' } };
+
+    const ocrEnabled = settings.enableMediaAi === true || settings.enableImageOcr === true;
+    const needOcr = ocrEnabled && imagesInput.some(i => (i.thumbDataUrl || '').startsWith('data:'));
+    const openai = new OpenAI({
+      apiKey: apiyiKey,
+      baseURL: 'https://api.apiyi.com/v1',
+    });
+
+    const ocrOne = async (img: { url: string; thumbDataUrl: string }): Promise<{ url: string; ocrText?: string }> => {
+      const dataUrl = (img.thumbDataUrl || '').startsWith('data:') ? img.thumbDataUrl : '';
+      const finalImageUrl = dataUrl || (await fetchImageAsDataUrl(img.url, 'https://weibo.com/').then(r => r.dataUrl).catch(() => ''));
+      if (!finalImageUrl) return { url: img.url, ocrText: '无文字内容' };
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: '请识别这张图片中的所有文字内容，直接输出文字，不要添加任何解释或描述。如果图片中没有文字，请回复"无文字内容"。',
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: finalImageUrl,
+                  detail: 'high',
+                },
+              },
+            ],
+          } as any,
+        ],
+        max_tokens: 1200,
+      });
+
+      const text = response.choices[0]?.message?.content?.trim() || '';
+      return { url: img.url, ocrText: text || '无文字内容' };
+    };
+
+    const ocrResults: Array<{ url: string; ocrText?: string }> = [];
+    if (needOcr) {
+      const queue = imagesInput.slice(0, 10).map(i => ({ url: String(i.url || ''), thumbDataUrl: String(i.thumbDataUrl || '') })).filter(i => !!i.url);
+      const concurrency = 2;
+      let idx = 0;
+      const workers = Array.from({ length: Math.min(concurrency, queue.length) }).map(async () => {
+        while (idx < queue.length) {
+          const current = queue[idx++];
+          try {
+            const r = await ocrOne(current);
+            ocrResults.push(r);
+          } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : String(e);
+            ocrResults.push({ url: current.url, ocrText: `（图片识别失败: ${msg || '未知错误'}）` });
+          }
+        }
+      });
+      await Promise.all(workers);
+    }
 
     const coverUrl = urls[0];
     const orderedUrls = urls;
@@ -296,7 +416,8 @@ async function handleAiMediaEnhance(payload: {
 
     return {
       cover: { url: coverUrl, reason: '按规则固定使用正文第 1 张图片作为封面' },
-      inline: { orderedUrls, picked }
+      inline: { orderedUrls, picked },
+      images: ocrResults.length > 0 ? ocrResults : undefined
     };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -348,6 +469,345 @@ async function fetchLinkContent(url: string, timeout: number = 5000): Promise<st
   }
 }
 
+async function fetchImageAsDataUrl(url: string, referrer?: string): Promise<{ dataUrl: string; mimeType: string }> {
+  const u = new URL(url);
+  const host = u.hostname.toLowerCase();
+  
+  // 策略 1: 尝试使用图片代理服务（绕过防盗链）
+  if (host.endsWith('sinaimg.cn')) {
+    console.log(`[fetchImageAsDataUrl] 检测到微博图片，尝试使用代理服务`);
+    
+    // 尝试多个图片代理服务
+    const proxyServices = [
+      // 方案 1: 直接尝试（可能失败）
+      { url: url, name: '直接访问' },
+      // 方案 2: 使用 images.weserv.nl 代理
+      { url: `https://images.weserv.nl/?url=${encodeURIComponent(url.replace(/^https?:\/\//, ''))}`, name: 'weserv.nl' },
+      // 方案 3: 使用 imageproxy.pimg.tw 代理
+      { url: `https://imageproxy.pimg.tw/resize?url=${encodeURIComponent(url)}`, name: 'pimg.tw' },
+    ];
+    
+    for (const proxy of proxyServices) {
+      try {
+        console.log(`[fetchImageAsDataUrl] 尝试代理: ${proxy.name}`);
+        const response = await fetch(proxy.url, {
+          cache: 'no-store',
+          credentials: 'omit',
+          headers: {
+            'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+        });
+        
+        console.log(`[fetchImageAsDataUrl] ${proxy.name} 响应: ${response.status}`);
+        
+        if (response.ok) {
+          const blob = await response.blob();
+          if (blob.size >= 1024) {
+            const mimeType = (blob.type || 'image/jpeg').split(';')[0].trim() || 'image/jpeg';
+            const arrayBuffer = await blob.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = '';
+            const chunkSize = 0x8000;
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+              binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+            }
+            const base64 = btoa(binary);
+            const dataUrl = `data:${mimeType};base64,${base64}`;
+            console.log(`[fetchImageAsDataUrl] ✅ ${proxy.name} 成功，大小: ${(blob.size / 1024).toFixed(1)} KB`);
+            return { dataUrl, mimeType };
+          }
+        }
+      } catch (e) {
+        console.log(`[fetchImageAsDataUrl] ${proxy.name} 失败:`, e);
+      }
+    }
+  }
+  
+  // 策略 2: 传统的 referrer 策略（作为后备）
+  const fallbackReferrers = [
+    referrer,
+    host.endsWith('sinaimg.cn') ? 'https://weibo.com/' : undefined,
+    host.endsWith('sinaimg.cn') ? 'https://m.weibo.cn/' : undefined,
+    host.endsWith('sinaimg.cn') ? 'https://s.weibo.com/' : undefined,
+    host.endsWith('sinaimg.cn') ? 'https://www.weibo.com/' : undefined,
+  ].filter(Boolean) as string[];
+
+  let lastErr: unknown = null;
+  const attempts = fallbackReferrers.length ? fallbackReferrers : [undefined];
+  
+  for (let i = 0; i < attempts.length; i++) {
+    const r = attempts[i];
+    try {
+      console.log(`[fetchImageAsDataUrl] 尝试 referrer ${i + 1}/${attempts.length}: ${r || 'none'}`);
+      
+      const response = await fetch(url, {
+        cache: 'no-store',
+        credentials: 'omit',
+        referrer: r,
+        referrerPolicy: r ? 'unsafe-url' : 'no-referrer',
+        headers: {
+          'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          ...(r ? { 'Referer': r } as any : {}),
+        },
+      });
+      
+      console.log(`[fetchImageAsDataUrl] 响应状态: ${response.status} ${response.statusText}`);
+      
+      if (!response.ok) {
+        lastErr = new Error(`HTTP ${response.status} ${response.statusText}`);
+        console.log(`[fetchImageAsDataUrl] 请求失败: ${lastErr}`);
+        continue;
+      }
+      
+      const ct = (response.headers.get('content-type') || '').toLowerCase();
+      console.log(`[fetchImageAsDataUrl] Content-Type: ${ct}`);
+      
+      if (ct && !ct.startsWith('image/')) {
+        lastErr = new Error(`Unexpected content-type: ${ct}`);
+        console.log(`[fetchImageAsDataUrl] 内容类型错误: ${lastErr}`);
+        continue;
+      }
+      
+      const blob = await response.blob();
+      console.log(`[fetchImageAsDataUrl] Blob 大小: ${blob.size} bytes, 类型: ${blob.type}`);
+      
+      if (blob.size < 1024) {
+        lastErr = new Error(`图片太小 (${blob.size} bytes)，可能是错误页面`);
+        console.log(`[fetchImageAsDataUrl] ${lastErr}`);
+        continue;
+      }
+      
+      const mimeType = (blob.type || response.headers.get('content-type') || 'image/jpeg').split(';')[0].trim() || 'image/jpeg';
+      const arrayBuffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+      }
+      const base64 = btoa(binary);
+      const dataUrl = `data:${mimeType};base64,${base64}`;
+      
+      console.log(`[fetchImageAsDataUrl] 成功获取图片，base64 长度: ${dataUrl.length}`);
+      return { dataUrl, mimeType };
+    } catch (e) {
+      lastErr = e;
+      console.error(`[fetchImageAsDataUrl] 异常:`, e);
+    }
+  }
+  
+  const msg = lastErr instanceof Error ? lastErr.message : String(lastErr || 'unknown');
+  console.error(`[fetchImageAsDataUrl] 所有尝试均失败: ${msg}`);
+  throw new Error(`Failed to fetch image: ${msg}`);
+}
+
+/**
+ * 通过 R2 中转下载图片（绕过防盗链）
+ * 1. 调用后端 API，让后端下载图片
+ * 2. 后端上传到 R2
+ * 3. 返回 R2 的公开 URL
+ */
+async function downloadImageViaR2(url: string, _referrer?: string): Promise<string> {
+  console.log(`[downloadImageViaR2] 开始处理: ${url}`);
+  
+  try {
+    const settings = await getSettings();
+    const backendUrl = settings.sync?.backendUrl || DEFAULT_SETTINGS.sync!.backendUrl;
+    
+    console.log(`[downloadImageViaR2] 调用后端 API: ${backendUrl}/api/upload-from-url`);
+    
+    const uploadResponse = await fetch(`${backendUrl}/api/upload-from-url`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url }),
+    });
+    
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      throw new Error(`后端 API 失败: HTTP ${uploadResponse.status} - ${errorText}`);
+    }
+    
+    const result = await uploadResponse.json();
+    
+    if (!result.success || !result.url) {
+      throw new Error(`后端 API 失败: ${result.error || '未知错误'}`);
+    }
+    
+    console.log(`[downloadImageViaR2] ✅ 成功，R2 URL: ${result.url}`);
+    return result.url;
+    
+  } catch (error: any) {
+    console.error(`[downloadImageViaR2] 失败:`, error);
+    throw new Error(`通过 R2 中转失败: ${error.message || String(error)}`);
+  }
+}
+
+/**
+ * 下载图片为 Blob（用于文件上传）
+ */
+async function downloadImageAsBlob(url: string, referrer?: string): Promise<{ blob: Blob; mimeType: string; filename: string }> {
+  console.log(`[downloadImageAsBlob] 开始下载: ${url}`);
+  
+  const u = new URL(url);
+  const host = u.hostname.toLowerCase();
+  
+  // 生成文件名
+  const generateFilename = (mimeType: string): string => {
+    const ext = mimeType.split('/')[1] || 'jpg';
+    return `weibo-image-${Date.now()}.${ext}`;
+  };
+  
+  // 策略 1: 尝试使用图片代理服务
+  if (host.endsWith('sinaimg.cn')) {
+    console.log(`[downloadImageAsBlob] 检测到微博图片，尝试使用代理服务`);
+    
+    // 尝试将 URL 转换为更通用的格式
+    const cleanUrl = url.replace(/^https?:\/\//, '');
+    
+    const proxyServices = [
+      // 方案 1: 使用 wsrv.nl (weserv.nl 的短域名)
+      { url: `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}`, name: 'wsrv.nl' },
+      // 方案 2: 使用 images.weserv.nl
+      { url: `https://images.weserv.nl/?url=${encodeURIComponent(cleanUrl)}`, name: 'weserv.nl' },
+      // 方案 3: 使用 imageproxy.pimg.tw
+      { url: `https://imageproxy.pimg.tw/resize?url=${encodeURIComponent(url)}`, name: 'pimg.tw' },
+      // 方案 4: 使用 img.shields.io (可能不支持，但值得一试)
+      { url: `https://img.shields.io/badge/dynamic/json?url=${encodeURIComponent(url)}`, name: 'shields.io' },
+      // 方案 5: 直接访问（带完整 headers）
+      { url: url, name: '直接访问(完整headers)', headers: {
+        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://weibo.com/',
+        'Origin': 'https://weibo.com',
+        'Sec-Fetch-Dest': 'image',
+        'Sec-Fetch-Mode': 'no-cors',
+        'Sec-Fetch-Site': 'cross-site',
+      }},
+    ];
+    
+    for (const proxy of proxyServices) {
+      try {
+        console.log(`[downloadImageAsBlob] 尝试代理: ${proxy.name}`);
+        const response = await fetch(proxy.url, {
+          cache: 'no-store',
+          credentials: 'omit',
+          mode: 'cors',
+          headers: proxy.headers || {
+            'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+        });
+        
+        console.log(`[downloadImageAsBlob] ${proxy.name} 响应: ${response.status}`);
+        
+        if (response.ok) {
+          const blob = await response.blob();
+          console.log(`[downloadImageAsBlob] ${proxy.name} Blob大小: ${blob.size} bytes, 类型: ${blob.type}`);
+          
+          // 检查是否是有效的图片
+          const mimeType = (blob.type || '').toLowerCase();
+          const isValidImage = mimeType.startsWith('image/') && 
+                              !mimeType.includes('svg') && 
+                              blob.size >= 10240; // 至少 10KB
+          
+          if (isValidImage) {
+            const cleanMimeType = (blob.type || 'image/jpeg').split(';')[0].trim() || 'image/jpeg';
+            const filename = generateFilename(cleanMimeType);
+            console.log(`[downloadImageAsBlob] ✅ ${proxy.name} 成功，大小: ${(blob.size / 1024).toFixed(1)} KB`);
+            return { blob, mimeType: cleanMimeType, filename };
+          } else {
+            console.log(`[downloadImageAsBlob] ${proxy.name} 无效图片: 类型=${mimeType}, 大小=${blob.size} bytes`);
+          }
+        }
+      } catch (e) {
+        console.log(`[downloadImageAsBlob] ${proxy.name} 失败:`, e);
+      }
+    }
+  }
+  
+  // 策略 2: 传统的 referrer 策略
+  const fallbackReferrers = [
+    referrer,
+    host.endsWith('sinaimg.cn') ? 'https://weibo.com/' : undefined,
+    host.endsWith('sinaimg.cn') ? 'https://m.weibo.cn/' : undefined,
+    host.endsWith('sinaimg.cn') ? 'https://s.weibo.com/' : undefined,
+    host.endsWith('sinaimg.cn') ? 'https://www.weibo.com/' : undefined,
+  ].filter(Boolean) as string[];
+
+  let lastErr: unknown = null;
+  const attempts = fallbackReferrers.length ? fallbackReferrers : [undefined];
+  
+  for (let i = 0; i < attempts.length; i++) {
+    const r = attempts[i];
+    try {
+      console.log(`[downloadImageAsBlob] 尝试 referrer ${i + 1}/${attempts.length}: ${r || 'none'}`);
+      
+      const response = await fetch(url, {
+        cache: 'no-store',
+        credentials: 'omit',
+        referrer: r,
+        referrerPolicy: r ? 'unsafe-url' : 'no-referrer',
+        headers: {
+          'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          ...(r ? { 'Referer': r } as any : {}),
+        },
+      });
+      
+      console.log(`[downloadImageAsBlob] 响应状态: ${response.status} ${response.statusText}`);
+      
+      if (!response.ok) {
+        lastErr = new Error(`HTTP ${response.status} ${response.statusText}`);
+        continue;
+      }
+      
+      const blob = await response.blob();
+      console.log(`[downloadImageAsBlob] Blob 大小: ${blob.size} bytes`);
+      
+      if (blob.size < 1024) {
+        lastErr = new Error(`图片太小 (${blob.size} bytes)`);
+        continue;
+      }
+      
+      const mimeType = (blob.type || response.headers.get('content-type') || 'image/jpeg').split(';')[0].trim() || 'image/jpeg';
+      const filename = generateFilename(mimeType);
+      
+      console.log(`[downloadImageAsBlob] 成功下载图片: ${filename}, ${(blob.size / 1024).toFixed(1)} KB`);
+      return { blob, mimeType, filename };
+    } catch (e) {
+      lastErr = e;
+      console.error(`[downloadImageAsBlob] 异常:`, e);
+    }
+  }
+  
+  const msg = lastErr instanceof Error ? lastErr.message : String(lastErr || 'unknown');
+  console.error(`[downloadImageAsBlob] 所有尝试均失败: ${msg}`);
+  throw new Error(`Failed to download image: ${msg}`);
+}
+
+async function fetchPageImages(url: string, maxCount = 40): Promise<string[]> {
+  const response = await fetch(url, {
+    cache: 'no-store',
+    credentials: 'omit',
+    headers: {
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    },
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+  const html = await response.text();
+  const matches = html.match(/https?:\/\/(?:wx\d|tvax\d)\.sinaimg\.cn\/[a-zA-Z0-9/_\-.]+?\.(?:jpg|jpeg|png|webp|gif)(?:\?[^\s"'<>]*)?/g) || [];
+  const cleaned = matches
+    .map(u => u.split('"')[0].split("'")[0].trim())
+    .filter(Boolean)
+    .filter(u => !new URL(u).hostname.toLowerCase().startsWith('tvax'));
+  const uniq = Array.from(new Set(cleaned));
+  return uniq.slice(0, Math.max(1, Number(maxCount) || 40));
+}
+
 /**
  * 图片文字识别（OCR）功能
  * 使用 apiyi 的 GPT-4o-mini 模型进行图片文字识别
@@ -376,20 +836,8 @@ async function handleOcrImage(imageUrl: string): Promise<string> {
     let finalImageUrl = imageUrl;
     if (!imageUrl.startsWith('data:')) {
       try {
-        console.log('[Background] Fetching image to convert to base64...');
-        const response = await fetch(imageUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          }
-        });
-        if (response.ok) {
-          const blob = await response.blob();
-          const arrayBuffer = await blob.arrayBuffer();
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-          const mimeType = blob.type || 'image/jpeg';
-          finalImageUrl = `data:${mimeType};base64,${base64}`;
-          console.log('[Background] Image converted to base64 successfully');
-        }
+        const { dataUrl } = await fetchImageAsDataUrl(imageUrl, 'https://weibo.com/');
+        finalImageUrl = dataUrl;
       } catch (e) {
         console.warn('[Background] Failed to fetch image, using original URL:', e);
         // 继续使用原始 URL
@@ -1184,7 +1632,7 @@ async function handlePublishToZhihu(payload: { title: string; content: string })
   }
 }
 
-async function handlePublishToWeixin(payload: { title: string; content: string }) {
+async function handlePublishToWeixin(payload: { title: string; content: string; sourceUrl?: string; sourceImages?: string[] }) {
   try {
     const settings = await getSettings();
     const cookieStr = settings.weixin?.cookie;
@@ -1262,6 +1710,8 @@ async function handlePublishToWeixin(payload: { title: string; content: string }
         title: articleTitle,
         content: cleanedContent,
         htmlContent: htmlContent,
+        sourceUrl: payload.sourceUrl,
+        sourceImages: Array.isArray(payload.sourceImages) ? payload.sourceImages.filter(u => typeof u === 'string' && u.trim()) : undefined,
         timestamp: Date.now()
       }
     });
@@ -1702,7 +2152,9 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
     } else if (platform === 'weixin') {
       await handlePublishToWeixin({
         title: finalTitle,
-        content: summary
+        content: summary,
+        sourceUrl: extraction.url,
+        sourceImages: extraction.images
       });
     }
 

@@ -66,9 +66,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   model: 'deepseek-ai/deepseek-r1',
   provider: 'nvidia',
   language: 'zh-CN',
-  enableMediaAi: false,
-  autoPublishAll: undefined,
-  preferSourceImages: undefined,
+  enableMediaAi: true,
+  autoPublishAll: false,
+  preferSourceImages: true,
   github: {
     token: '',
     owner: '',

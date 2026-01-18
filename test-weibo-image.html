@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微博图片获取测试工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        textarea {
+            min-height: 120px;
+            font-family: monospace;
+            resize: vertical;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        .log-container {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .log-entry {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin-bottom: 8px;
+            padding: 6px 10px;
+            border-radius: 4px;
+            line-height: 1.5;
+        }
+        
+        .log-info {
+            color: #61dafb;
+            background: rgba(97, 218, 251, 0.1);
+        }
+        
+        .log-success {
+            color: #4caf50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+        
+        .log-warn {
+            color: #ff9800;
+            background: rgba(255, 152, 0, 0.1);
+        }
+        
+        .log-error {
+            color: #f44336;
+            background: rgba(244, 67, 54, 0.1);
+        }
+        
+        .result-container {
+            margin-top: 20px;
+        }
+        
+        .result-image {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-top: 10px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .example-urls {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .example-urls h3 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .example-url {
+            font-family: monospace;
+            font-size: 12px;
+            color: #667eea;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        
+        .example-url:hover {
+            background: #e8eaf6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖼️ 微博图片获取测试工具</h1>
+        <p class="subtitle">用于测试和诊断微博图片获取功能</p>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="successCount">0</div>
+                <div class="stat-label">成功</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="failCount">0</div>
+                <div class="stat-label">失败</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalTime">0s</div>
+                <div class="stat-label">总耗时</div>
+            </div>
+        </div>
+        
+        <div class="example-urls">
+            <h3>示例图片 URL（点击使用）：</h3>
+            <div class="example-url" onclick="useExampleUrl(this)">https://wx3.sinaimg.cn/large/008nU6aaly8i9cwu6zcasj30u00u040q.jpg</div>
+            <div class="example-url" onclick="useExampleUrl(this)">https://wx4.sinaimg.cn/middle/008crF7Zly1i9dusvs8vtj30k00tu3zo.jpg</div>
+            <div class="example-url" onclick="useExampleUrl(this)">https://wx1.sinaimg.cn/bmiddle/008nU6aaly1i9cwsu22lhj30u01hcwhj.jpg</div>
+        </div>
+        
+        <div class="input-group">
+            <label for="imageUrl">图片 URL：</label>
+            <input type="text" id="imageUrl" placeholder="输入微博图片 URL，例如：https://wx3.sinaimg.cn/large/...">
+        </div>
+        
+        <div class="input-group">
+            <label for="referrer">Referrer（可选）：</label>
+            <input type="text" id="referrer" placeholder="默认：https://weibo.com/" value="https://weibo.com/">
+        </div>
+        
+        <div class="button-group">
+            <button class="btn-primary" onclick="testFetch()">🚀 测试获取</button>
+            <button class="btn-secondary" onclick="clearLogs()">🗑️ 清空日志</button>
+        </div>
+        
+        <div class="log-container" id="logContainer">
+            <div class="log-entry log-info">等待测试...</div>
+        </div>
+        
+        <div class="result-container" id="resultContainer"></div>
+    </div>
+    
+    <script>
+        let successCount = 0;
+        let failCount = 0;
+        
+        function useExampleUrl(element) {
+            document.getElementById('imageUrl').value = element.textContent;
+            addLog('已填充示例 URL', 'info');
+        }
+        
+        function addLog(message, type = 'info') {
+            const logContainer = document.getElementById('logContainer');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        function clearLogs() {
+            document.getElementById('logContainer').innerHTML = '<div class="log-entry log-info">日志已清空</div>';
+            document.getElementById('resultContainer').innerHTML = '';
+            successCount = 0;
+            failCount = 0;
+            updateStats();
+        }
+        
+        function updateStats() {
+            document.getElementById('successCount').textContent = successCount;
+            document.getElementById('failCount').textContent = failCount;
+        }
+        
+        async function testFetch() {
+            const imageUrl = document.getElementById('imageUrl').value.trim();
+            const referrer = document.getElementById('referrer').value.trim();
+            
+            if (!imageUrl) {
+                addLog('请输入图片 URL', 'error');
+                return;
+            }
+            
+            addLog('开始测试...', 'info');
+            addLog(`图片 URL: ${imageUrl}`, 'info');
+            addLog(`Referrer: ${referrer || '(无)'}`, 'info');
+            
+            const startTime = Date.now();
+            
+            try {
+                // 方法 1: 直接 fetch（会被 CORS 阻止，但可以看到网络请求）
+                addLog('方法 1: 尝试直接 fetch...', 'info');
+                try {
+                    const response = await fetch(imageUrl, {
+                        mode: 'no-cors',
+                        referrer: referrer || 'https://weibo.com/',
+                        referrerPolicy: 'unsafe-url'
+                    });
+                    addLog(`直接 fetch 响应: ${response.type}`, 'warn');
+                } catch (e) {
+                    addLog(`直接 fetch 失败: ${e.message}`, 'warn');
+                }
+                
+                // 方法 2: 使用 Image 对象加载
+                addLog('方法 2: 尝试使用 Image 对象加载...', 'info');
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                
+                const loadPromise = new Promise((resolve, reject) => {
+                    img.onload = () => {
+                        addLog(`图片加载成功: ${img.width}x${img.height}`, 'success');
+                        resolve(img);
+                    };
+                    img.onerror = (e) => {
+                        addLog(`图片加载失败`, 'error');
+                        reject(new Error('Image load failed'));
+                    };
+                });
+                
+                img.src = imageUrl;
+                
+                try {
+                    await Promise.race([
+                        loadPromise,
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
+                    ]);
+                    
+                    // 尝试转换为 canvas
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                    const sizeKB = (dataUrl.length / 1024).toFixed(1);
+                    
+                    addLog(`成功转换为 base64: ${sizeKB} KB`, 'success');
+                    
+                    // 显示结果
+                    const resultContainer = document.getElementById('resultContainer');
+                    resultContainer.innerHTML = `
+                        <h3>✅ 获取成功</h3>
+                        <p>图片尺寸: ${img.width}x${img.height}</p>
+                        <p>Base64 大小: ${sizeKB} KB</p>
+                        <img src="${dataUrl}" class="result-image" alt="Result">
+                    `;
+                    
+                    successCount++;
+                    
+                } catch (e) {
+                    addLog(`Image 方法失败: ${e.message}`, 'error');
+                    failCount++;
+                }
+                
+            } catch (error) {
+                addLog(`测试失败: ${error.message}`, 'error');
+                failCount++;
+            }
+            
+            const endTime = Date.now();
+            const duration = ((endTime - startTime) / 1000).toFixed(2);
+            document.getElementById('totalTime').textContent = `${duration}s`;
+            updateStats();
+            
+            addLog(`测试完成，耗时: ${duration}s`, 'info');
+        }
+        
+        // 监听回车键
+        document.getElementById('imageUrl').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                testFetch();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片代理服务测试</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .test-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            background: #f9f9f9;
+        }
+        
+        .test-card h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+        
+        .status.loading {
+            background: #ff9800;
+            animation: pulse 1s infinite;
+        }
+        
+        .status.success {
+            background: #4caf50;
+        }
+        
+        .status.error {
+            background: #f44336;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .test-image {
+            width: 100%;
+            max-height: 200px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        .test-image.show {
+            display: block;
+        }
+        
+        .test-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            font-family: monospace;
+        }
+        
+        .test-url {
+            font-size: 11px;
+            color: #999;
+            word-break: break-all;
+            margin-top: 5px;
+        }
+        
+        button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transition: transform 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .summary {
+            background: #f0f0f0;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .summary.show {
+            display: block;
+        }
+        
+        .summary h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        
+        .summary-stats {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+        }
+        
+        .summary-stat {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖼️ 图片代理服务测试</h1>
+        <p class="subtitle">测试不同的代理服务获取微博图片的效果</p>
+        
+        <button onclick="runTests()" id="testBtn">🚀 开始测试</button>
+        
+        <div class="summary" id="summary">
+            <h2>测试结果</h2>
+            <div class="summary-stats">
+                <div class="summary-stat">
+                    <span>✅ 成功:</span>
+                    <strong id="successCount">0</strong>
+                </div>
+                <div class="summary-stat">
+                    <span>❌ 失败:</span>
+                    <strong id="failCount">0</strong>
+                </div>
+                <div class="summary-stat">
+                    <span>⏱️ 总耗时:</span>
+                    <strong id="totalTime">0s</strong>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-grid" id="testGrid"></div>
+    </div>
+    
+    <script>
+        const testUrl = 'https://wx3.sinaimg.cn/large/460462c1ly1i9dj5x93lvj20u01xkths.jpg';
+        
+        const tests = [
+            {
+                name: '直接访问（预期失败）',
+                url: testUrl,
+                description: '不使用任何代理，直接访问微博图片'
+            },
+            {
+                name: 'images.weserv.nl 代理',
+                url: `https://images.weserv.nl/?url=${encodeURIComponent(testUrl.replace(/^https?:\/\//, ''))}`,
+                description: '使用 weserv.nl 图片代理服务'
+            },
+            {
+                name: 'imageproxy.pimg.tw 代理',
+                url: `https://imageproxy.pimg.tw/resize?url=${encodeURIComponent(testUrl)}`,
+                description: '使用 pimg.tw 图片代理服务'
+            }
+        ];
+        
+        function createTestCard(test, index) {
+            return `
+                <div class="test-card" id="card-${index}">
+                    <h3>
+                        <span class="status" id="status-${index}"></span>
+                        ${test.name}
+                    </h3>
+                    <p style="font-size: 13px; color: #666; margin-bottom: 10px;">${test.description}</p>
+                    <img class="test-image" id="img-${index}" alt="Test Image">
+                    <div class="test-info" id="info-${index}">等待测试...</div>
+                    <div class="test-url">${test.url.substring(0, 80)}...</div>
+                </div>
+            `;
+        }
+        
+        async function testImage(test, index) {
+            const statusEl = document.getElementById(`status-${index}`);
+            const imgEl = document.getElementById(`img-${index}`);
+            const infoEl = document.getElementById(`info-${index}`);
+            
+            statusEl.className = 'status loading';
+            infoEl.textContent = '测试中...';
+            
+            const startTime = Date.now();
+            
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                
+                const timeout = setTimeout(() => {
+                    statusEl.className = 'status error';
+                    infoEl.textContent = '❌ 超时（10秒）';
+                    resolve(false);
+                }, 10000);
+                
+                img.onload = () => {
+                    clearTimeout(timeout);
+                    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+                    statusEl.className = 'status success';
+                    infoEl.textContent = `✅ 成功 | ${img.width}x${img.height} | ${duration}s`;
+                    imgEl.src = img.src;
+                    imgEl.classList.add('show');
+                    resolve(true);
+                };
+                
+                img.onerror = () => {
+                    clearTimeout(timeout);
+                    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+                    statusEl.className = 'status error';
+                    infoEl.textContent = `❌ 加载失败 | ${duration}s`;
+                    resolve(false);
+                };
+                
+                img.src = test.url;
+            });
+        }
+        
+        async function runTests() {
+            const btn = document.getElementById('testBtn');
+            const grid = document.getElementById('testGrid');
+            const summary = document.getElementById('summary');
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ 测试中...';
+            grid.innerHTML = tests.map((test, i) => createTestCard(test, i)).join('');
+            summary.classList.remove('show');
+            
+            const startTime = Date.now();
+            let successCount = 0;
+            let failCount = 0;
+            
+            for (let i = 0; i < tests.length; i++) {
+                const success = await testImage(tests[i], i);
+                if (success) {
+                    successCount++;
+                } else {
+                    failCount++;
+                }
+                
+                // 等待一下再测试下一个
+                if (i < tests.length - 1) {
+                    await new Promise(r => setTimeout(r, 500));
+                }
+            }
+            
+            const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
+            
+            document.getElementById('successCount').textContent = successCount;
+            document.getElementById('failCount').textContent = failCount;
+            document.getElementById('totalTime').textContent = totalTime + 's';
+            summary.classList.add('show');
+            
+            btn.disabled = false;
+            btn.textContent = '🔄 重新测试';
+        }
+        
+        // 自动运行测试
+        window.addEventListener('load', () => {
+            setTimeout(runTests, 500);
+        });
+    </script>
+</body>
+</html>

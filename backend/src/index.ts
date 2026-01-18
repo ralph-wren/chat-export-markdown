@@ -1222,6 +1222,67 @@ export default {
       }
     }
 
+    // R2 图片代理上传（从 URL 下载并上传到 R2）
+    if (url.pathname === '/api/upload-from-url' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const imageUrl = body.url;
+        
+        if (!imageUrl) {
+          return new Response(JSON.stringify({ error: 'No URL provided' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        console.log(`[R2 Proxy] Downloading image from: ${imageUrl}`);
+
+        // 后端下载图片（带完整 headers）
+        const imageResponse = await fetch(imageUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://weibo.com/',
+            'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+          }
+        });
+
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to download image: HTTP ${imageResponse.status}`);
+        }
+
+        const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+        const blob = await imageResponse.blob();
+
+        if (blob.size < 1024) {
+          throw new Error(`Image too small: ${blob.size} bytes`);
+        }
+
+        // 生成文件名
+        const ext = contentType.split('/')[1] || 'jpg';
+        const filename = `weibo-${Date.now()}.${ext}`;
+        const key = 'memoraid/' + filename;
+
+        // 上传到 R2
+        await env.R2.put(key, blob.stream(), {
+          httpMetadata: { contentType }
+        });
+
+        const r2Url = effectiveOrigin + '/assets/' + key;
+        console.log(`[R2 Proxy] Upload success: ${r2Url}`);
+
+        return new Response(JSON.stringify({
+          success: true,
+          url: r2Url
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (e: any) {
+        console.error(`[R2 Proxy] Error:`, e);
+        return new Response(JSON.stringify({ error: e.message }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     // 插件官网（marketing pages）- 参考 maxai.co 的信息结构重新设计
     if (request.method === 'GET' && (url.pathname === '/' || url.pathname === '')) {
       return buildHtmlResponse(renderMarketingHome(effectiveOrigin));
