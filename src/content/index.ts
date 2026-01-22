@@ -732,6 +732,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'EXTRACT_CONTENT') {
     (async () => {
       try {
+        // 检查扩展连接是否有效
+        if (!isExtensionConnected()) {
+          console.warn('[Memoraid] 扩展连接已断开，无法处理 EXTRACT_CONTENT 请求');
+          sendResponse({ type: 'ERROR', payload: '扩展连接已断开，请刷新页面后重试' });
+          return;
+        }
+        
         const hostname = window.location.hostname;
         const isWeiboPage = hostname === 's.weibo.com' || hostname.endsWith('weibo.com') || hostname.endsWith('weibo.cn');
         const timeoutMs = isWeiboPage ? 80000 : 25000;
@@ -745,10 +752,24 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
         const data = await Promise.race([extractContent(), timeoutPromise]);
         if (timeoutId) window.clearTimeout(timeoutId);
+        
+        // 再次检查连接状态，防止在异步操作期间连接断开
+        if (!isExtensionConnected()) {
+          console.warn('[Memoraid] 扩展连接在内容提取期间断开');
+          sendResponse({ type: 'ERROR', payload: '扩展连接在操作期间断开，请刷新页面后重试' });
+          return;
+        }
+        
         sendResponse({ type: 'CONTENT_EXTRACTED', payload: data });
       } catch (err: any) {
         console.error('[Memoraid] 内容提取错误:', err);
-        sendResponse({ type: 'ERROR', payload: err?.message || '未知错误' });
+        
+        // 检查连接状态，如果连接断开则提供更明确的错误信息
+        if (!isExtensionConnected()) {
+          sendResponse({ type: 'ERROR', payload: '扩展连接已断开，请刷新页面后重试' });
+        } else {
+          sendResponse({ type: 'ERROR', payload: err?.message || '未知错误' });
+        }
       }
     })();
     return true; // 异步响应

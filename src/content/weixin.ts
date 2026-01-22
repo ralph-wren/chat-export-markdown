@@ -750,18 +750,35 @@ const generateAIImage = async (prompt: string, setRatio: boolean = true): Promis
     }
     
     // 检查4: 检测"换风格"或"插入"按钮是否出现（这是图片生成完成的明确信号）
-    const hasInsertButton = document.querySelector('.ai-image-operation-group') !== null;
+    // 只检查最新生成的图片列表中的按钮，避免误判历史图片
+    const allImageListsForButtonCheck = document.querySelectorAll('.ai-image-list');
+    let hasNewInsertButton = false;
     
-    // 完成条件：没有加载中的进度 且 (有完成的图片 或 有插入按钮)
-    if (!hasLoadingProgress && !hasLoadingSpinner && (hasCompletedImages || hasInsertButton)) {
+    if (allImageListsForButtonCheck.length > 0) {
+      // 只检查最后一个图片列表（最新生成的）
+      const latestImageList = allImageListsForButtonCheck[allImageListsForButtonCheck.length - 1];
+      const insertButtons = latestImageList.querySelectorAll('.ai-image-operation-group');
+      
+      // 检查是否有可见的操作按钮
+      for (const btn of insertButtons) {
+        const style = window.getComputedStyle(btn);
+        if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+          hasNewInsertButton = true;
+          break;
+        }
+      }
+    }
+    
+    // 完成条件：没有加载中的进度 且 (有完成的图片 或 有新生成的插入按钮)
+    if (!hasLoadingProgress && !hasLoadingSpinner && (hasCompletedImages || hasNewInsertButton)) {
       logger.log(`✅ 图片生成完成！(${completedCount} 张已完成，耗时 ${elapsed} 秒)`, 'success');
       generationComplete = true;
       break;
     }
     
-    // 备用完成条件：如果已经等待超过10秒，且有插入按钮出现，直接认为完成
-    if (elapsed > 10 && hasInsertButton) {
-      logger.log(`✅ 检测到插入按钮，图片已生成完成 (耗时 ${elapsed} 秒)`, 'success');
+    // 备用完成条件：如果已经等待超过10秒，且有新生成的插入按钮出现，直接认为完成
+    if (elapsed > 10 && hasNewInsertButton) {
+      logger.log(`✅ 检测到新图片的插入按钮，图片已生成完成 (耗时 ${elapsed} 秒)`, 'success');
       generationComplete = true;
       break;
     }
@@ -870,14 +887,27 @@ const insertAIImage = async (): Promise<boolean> => {
     }
   }
   
-  // 方法4：最后的备选方案 - 查找页面上所有 ai-image-list，选择最后一个
+  // 方法4：查找新生成的图片列表（基于 DOM 结构判断）
   if (!imageList) {
     const allImageLists = document.querySelectorAll('.ai-image-list');
     logger.log(`页面上共有 ${allImageLists.length} 个 ai-image-list`, 'info');
     
-    if (allImageLists.length > 0) {
+    // 优先选择包含可见操作按钮的图片列表
+    let foundVisibleList = false;
+    for (const list of allImageLists) {
+      const hasVisibleOperation = list.querySelector('.ai-image-operation-group');
+      if (hasVisibleOperation) {
+        imageList = list;
+        logger.log('找到包含操作按钮的图片列表', 'info');
+        foundVisibleList = true;
+        break;
+      }
+    }
+    
+    // 如果没有找到包含操作按钮的列表，选择最后一个列表
+    if (!foundVisibleList && allImageLists.length > 0) {
       imageList = allImageLists[allImageLists.length - 1];
-      logger.log('使用页面上最后一个 ai-image-list（备选方案）', 'warn');
+      logger.log('使用页面上最后一个 ai-image-list', 'info');
     }
   }
   
@@ -895,25 +925,48 @@ const insertAIImage = async (): Promise<boolean> => {
     return false;
   }
   
-  // 优先选择已经有 operation-group 的图片项（说明已经生成完成）
+  // 优先选择新生成的图片项（基于图片加载状态和生成时间判断）
   let targetItem: HTMLElement | null = null;
+  let newestItem: HTMLElement | null = null;
   
   for (const item of items) {
+    const img = item.querySelector('img');
     const opGroup = item.querySelector('.ai-image-operation-group');
     const itemText = (item as HTMLElement).innerText || '';
     const isNotLoading = !/\d+%/.test(itemText) || itemText.includes('100%');
     
-    if (opGroup && isNotLoading) {
+    // 检查图片是否已加载完成
+    const isImageLoaded = img && img.complete && img.naturalWidth > 0;
+    
+    // 优先选择已完成的图片（有操作按钮且图片已加载）
+    if (opGroup && isNotLoading && isImageLoaded) {
       targetItem = item as HTMLElement;
-      logger.log('找到已完成的图片项（有 operation-group）', 'info');
+      logger.log('找到已完成的图片项（有 operation-group 且图片已加载）', 'info');
       break;
+    }
+    
+    // 记录最新的图片项（即使还在加载中）
+    if (!newestItem) {
+      newestItem = item as HTMLElement;
     }
   }
   
-  // 如果没找到有 operation-group 的，选择第一个
-  if (!targetItem) {
+  // 如果没有找到已完成的图片，选择最新的图片项（通常是第一个）
+  if (!targetItem && newestItem) {
+    targetItem = newestItem;
+    logger.log('选择最新的图片项（可能还在生成中）', 'info');
+  }
+  
+  // 最后的备选方案：选择第一个
+  if (!targetItem && items.length > 0) {
     targetItem = items[0] as HTMLElement;
-    logger.log('选择第一个图片项', 'info');
+    logger.log('选择第一个图片项（备选方案）', 'warn');
+  }
+  
+  // 检查 targetItem 是否为 null
+  if (!targetItem) {
+    logger.log('未找到任何可用的图片项，无法继续插入操作', 'error');
+    return false;
   }
   
   // 关键步骤：模拟鼠标悬浮在图片上，让"插入"按钮显示出来
