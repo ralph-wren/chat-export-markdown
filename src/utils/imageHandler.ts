@@ -317,132 +317,28 @@ export class ImageHandler {
 
   /**
    * 检查是否启用了AI图文增强
+   * @deprecated AI图文增强功能已移除，此方法始终返回false
    */
   static async isMediaAiEnabled(): Promise<boolean> {
-    try {
-      const settings = await chrome.storage.sync.get(['enableMediaAi', 'enableImageOcr']);
-      return settings.enableMediaAi === true || settings.enableImageOcr === true;
-    } catch {
-      return false;
-    }
+    return false;
   }
 
   /**
    * AI智能选图
+   * @deprecated AI图文增强功能已移除，此方法始终返回null
    * @param keyword 搜索关键词
    * @param candidates 候选图片列表
    * @param title 文章标题
    * @param context 文章上下文
    */
   static async pickBestImageWithAI(
-    keyword: string,
-    candidates: ImageCandidate[],
-    title?: string,
-    context?: string
+    _keyword: string,
+    _candidates: ImageCandidate[],
+    _title?: string,
+    _context?: string
   ): Promise<number | null> {
-    try {
-      const enabled = await this.isMediaAiEnabled();
-      if (!enabled) {
-        console.log('[ImageHandler] AI图文增强未启用');
-        return null;
-      }
-
-      if (candidates.length <= 1) {
-        console.log('[ImageHandler] 候选图片不足，跳过AI选图');
-        return null;
-      }
-
-      console.log(`[ImageHandler] 开始AI选图，候选数: ${candidates.length}`);
-
-      // 准备图片数据
-      const images: Array<{
-        url: string;
-        thumbDataUrl: string;
-        width?: number;
-        height?: number;
-        aspect?: number;
-      }> = [];
-
-      for (const candidate of candidates) {
-        const dataUrl = await this.fetchImageDataUrl(candidate.url);
-        if (!dataUrl) continue;
-
-        const meta = await this.getImageMetaFromDataUrl(dataUrl);
-        const thumb = await this.createThumbnailDataUrl(dataUrl, 512);
-        if (!thumb) continue;
-
-        images.push({
-          url: candidate.url,
-          thumbDataUrl: thumb,
-          width: meta?.width,
-          height: meta?.height,
-          aspect: meta?.aspect
-        });
-      }
-
-      if (images.length <= 1) {
-        console.log('[ImageHandler] 有效图片不足，跳过AI选图');
-        return null;
-      }
-
-      // 调用AI选图
-      const response = await chrome.runtime.sendMessage({
-        type: 'AI_RANK_IMAGES',
-        payload: {
-          title: title || '',
-          context: [
-            keyword ? `关键词：${keyword}` : '',
-            context ? `正文片段：${context}` : ''
-          ].filter(Boolean).join('\n'),
-          images,
-          maxPick: Math.min(10, images.length)
-        }
-      });
-
-      // 检查是否跳过
-      const skippedCode = response?.success
-        ? (response.result?.skipped?.code as string | undefined)
-        : undefined;
-
-      if (skippedCode) {
-        console.log(`[ImageHandler] AI选图已跳过: ${skippedCode}`);
-        return null;
-      }
-
-      // 检查错误
-      const errorMsg = response?.success
-        ? (response.result?.error as string | undefined)
-        : undefined;
-
-      if (errorMsg) {
-        console.error(`[ImageHandler] AI选图失败: ${errorMsg}`);
-        return null;
-      }
-
-      // 获取结果
-      const orderedUrls = response?.success
-        ? (response.result?.orderedUrls as string[] | undefined)
-        : undefined;
-
-      const reason = response?.success
-        ? (response.result?.picked?.[0]?.reason as string | undefined)
-        : undefined;
-
-      const bestUrl = orderedUrls?.[0];
-      if (!bestUrl) {
-        console.log('[ImageHandler] AI未返回推荐图片');
-        return null;
-      }
-
-      console.log(`[ImageHandler] AI推荐图片: ${bestUrl}${reason ? ` (${reason})` : ''}`);
-
-      // 找到对应的索引
-      const matchedCandidate = candidates.find(c => c.url === bestUrl);
-      return matchedCandidate ? matchedCandidate.index : null;
-    } catch (error) {
-      console.error('[ImageHandler] AI选图异常:', error);
-      return null;
-    }
+    console.warn('ImageHandler: AI选图功能已移除');
+    return null;
   }
 
   /**

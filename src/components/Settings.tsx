@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AppSettings, DEFAULT_SETTINGS, getSettings, saveSettings, syncSettings, restoreSettings, ArticleStyleSettings } from '../utils/storage';
 import { SYSTEM_PROMPTS, TOUTIAO_DEFAULT_PROMPT, ZHIHU_DEFAULT_PROMPT, WEIXIN_DEFAULT_PROMPT } from '../utils/prompts';
 import { getTranslation } from '../utils/i18n';
-import { Eye, EyeOff, Loader2, CheckCircle, XCircle, Newspaper, RefreshCw, Cloud, Lock, Key, Palette, Send, BookOpen, RotateCcw, FileText, MessageCircle, Image, BarChart3, Github } from 'lucide-react';
+import { Eye, EyeOff, Loader2, CheckCircle, XCircle, Newspaper, RefreshCw, Cloud, Lock, Key, Palette, Send, BookOpen, RotateCcw, FileText, MessageCircle, BarChart3, Github } from 'lucide-react';
 import { validateGitHubConnection } from '../utils/github';
 import { generateRandomString } from '../utils/crypto';
 
@@ -842,30 +842,6 @@ const Settings: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Image className={`w-5 h-5 ${(settings.enableMediaAi ?? true) ? 'text-purple-500' : 'text-gray-400'}`} />
-              <div>
-                <span className="font-medium text-gray-800">{t.mediaEnhanceTitle}</span>
-                <p className="text-xs text-gray-500">{t.mediaEnhanceHint}</p>
-              </div>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                className="sr-only peer"
-                checked={settings.enableMediaAi ?? true}
-                onChange={(e) => {
-                  isDirtyRef.current = true;
-                  setSettings({ ...settings, enableMediaAi: e.target.checked });
-                }}
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
-            </label>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
               <Send className={`w-5 h-5 ${(settings.autoPublishAll ?? false) ? 'text-green-500' : 'text-gray-400'}`} />
               <div>
                 <span className="font-medium text-gray-800">{t.autoPublishAllTitle}</span>
@@ -883,30 +859,6 @@ const Settings: React.FC = () => {
                 }}
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-            </label>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Image className={`w-5 h-5 ${(settings.preferSourceImages ?? true) ? 'text-blue-500' : 'text-gray-400'}`} />
-              <div>
-                <span className="font-medium text-gray-800">{t.preferSourceImagesTitle}</span>
-                <p className="text-xs text-gray-500">{t.preferSourceImagesHint}</p>
-              </div>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                className="sr-only peer"
-                checked={settings.preferSourceImages ?? true}
-                onChange={(e) => {
-                  isDirtyRef.current = true;
-                  setSettings({ ...settings, preferSourceImages: e.target.checked });
-                }}
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
             </label>
           </div>
         </div>

@@ -4486,20 +4486,15 @@ const autoFillContent = async () => {
       return;
     }
 
-    const settings = await chrome.storage.sync.get(['autoPublishAll', 'preferSourceImages', 'weixin']);
+    const settings = await chrome.storage.sync.get(['autoPublishAll', 'weixin']);
     const authorName = settings.weixin?.authorName || '';
     const autoPublish = settings.autoPublishAll === true
       ? true
       : settings.autoPublishAll === false
       ? false
       : settings.weixin?.autoPublish !== false;
-    const imageSource: 'source' | 'platform' = settings.preferSourceImages === true
-      ? 'source'
-      : settings.preferSourceImages === false
-      ? 'platform'
-      : settings.weixin?.imageSource === 'platform'
-      ? 'platform'
-      : 'source';
+    // 默认不优先使用素材来源图片，使用平台图片
+    const imageSource: 'source' | 'platform' = 'platform';
 
     logger.log(`📄 准备填充内容: ${payload.title}`, 'info');
     logger.log('⏳ 检测页面状态...', 'info');

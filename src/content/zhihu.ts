@@ -1683,8 +1683,8 @@ const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
   logger.log('🚀 开始知乎图片处理...', 'info');
   
   try {
-    const s = await chrome.storage.sync.get(['preferSourceImages']);
-    const preferSourceImages = s.preferSourceImages !== false;
+    // 默认不优先使用素材来源图片
+    const preferSourceImages = false;
 
     // 先取消任何选中状态，避免干扰
     const selection = window.getSelection();

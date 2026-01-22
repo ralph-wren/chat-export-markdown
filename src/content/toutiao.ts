@@ -1262,11 +1262,7 @@ const replaceAllImagePlaceholders = async (): Promise<number> => {
   
   logger.log(`找到 ${placeholders.length} 个图片占位符`, 'info');
   
-  const s = await chrome.storage.sync.get(['preferSourceImages']);
-  const preferSourceImages = s.preferSourceImages !== false;
-
   // 调试日志
-  logger.log(`优先使用素材来源图片: ${preferSourceImages}`, 'info');
   logger.log(`可用素材图片数量: ${pendingSourceImages.length}`, 'info');
   if (pendingSourceImages.length > 0) {
     logger.log(`素材图片列表: ${pendingSourceImages.slice(0, 3).join(', ')}...`, 'info');
@@ -1278,8 +1274,9 @@ const replaceAllImagePlaceholders = async (): Promise<number> => {
     if (isFlowCancelled) break;
 
     const placeholder = placeholders[i];
-    // 修复：检查数组边界，确保有足够的素材图片
-    const sourceUrl = (preferSourceImages && i < pendingSourceImages.length) ? pendingSourceImages[i] : undefined;
+    
+    // 默认不优先使用素材来源图片
+    const sourceUrl = undefined;
     
     if (sourceUrl) {
       logger.log(`占位符 ${i + 1}: 使用素材来源图片 ${sourceUrl}`, 'info');

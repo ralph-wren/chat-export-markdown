@@ -287,32 +287,21 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   // 兼容旧消息：AI_RANK_IMAGES（内部复用 AI_MEDIA_ENHANCE 结果结构）
   if (message.type === 'AI_RANK_IMAGES') {
-    handleAiMediaEnhance({
-      title: message.payload?.title,
-      context: message.payload?.context,
-      images: message.payload?.images,
-      maxPick: message.payload?.maxPick
-    })
-      .then(result => {
-        const orderedUrls = result?.inline?.orderedUrls || [];
-        sendResponse({ success: true, result: { orderedUrls } });
-      })
-      .catch(e => sendResponse({ success: false, error: e.message || String(e) }));
+    // 功能已移除，直接返回空结果
+    sendResponse({ success: true, result: { orderedUrls: [] } });
     return true;
   }
 
   // 处理图片 OCR 识别请求（使用 AI 视觉能力识别图片中的文字）
   if (message.type === 'OCR_IMAGE') {
-    handleOcrImage(message.payload.imageUrl)
-      .then(text => sendResponse({ success: true, text }))
-      .catch(e => sendResponse({ success: false, error: e.message || String(e) }));
+    // 功能已移除，直接返回提示信息
+    sendResponse({ success: false, error: '图片文字识别功能已移除' });
     return true;
   }
 
   if (message.type === 'AI_MEDIA_ENHANCE') {
-    handleAiMediaEnhance(message.payload)
-      .then(result => sendResponse({ success: true, result }))
-      .catch(e => sendResponse({ success: false, error: e.message || String(e) }));
+    // 功能已移除，直接返回空结果
+    sendResponse({ success: true, result: {} });
     return true;
   }
 
@@ -323,107 +312,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 });
 
-async function handleAiMediaEnhance(payload: {
-  title?: string;
-  context?: string;
-  images?: Array<{ url: string; thumbDataUrl: string; width?: number; height?: number; aspect?: number }>;
-  maxPick?: number;
-}): Promise<{
-  skipped?: { code: string };
-  inline?: { orderedUrls: string[]; picked?: Array<{ url: string; reason?: string }> };
-  cover?: { url: string; reason?: string };
-  images?: Array<{ url: string; ocrText?: string }>;
-  error?: string;
-}> {
-  try {
-    const settings = await getSettings();
-    const enabled = settings.enableMediaAi === true || settings.enableImageOcr === true;
-    if (!enabled) return { skipped: { code: 'media_ai_disabled' } };
-
-    const apiyiKey = settings.apiKeys?.apiyi || '';
-    if (!apiyiKey) return { skipped: { code: 'missing_apiyi_key' } };
-
-    const imagesInput = Array.isArray(payload.images) ? payload.images : [];
-    const urls = imagesInput.map(i => String(i.url || '')).filter(Boolean);
-    if (urls.length === 0) return { skipped: { code: 'no_images' } };
-
-    const ocrEnabled = settings.enableMediaAi === true || settings.enableImageOcr === true;
-    const needOcr = ocrEnabled && imagesInput.some(i => (i.thumbDataUrl || '').startsWith('data:'));
-    const openai = new OpenAI({
-      apiKey: apiyiKey,
-      baseURL: 'https://api.apiyi.com/v1',
-    });
-
-    const ocrOne = async (img: { url: string; thumbDataUrl: string }): Promise<{ url: string; ocrText?: string }> => {
-      const dataUrl = (img.thumbDataUrl || '').startsWith('data:') ? img.thumbDataUrl : '';
-      const finalImageUrl = dataUrl || (await fetchImageAsDataUrl(img.url, 'https://weibo.com/').then(r => r.dataUrl).catch(() => ''));
-      if (!finalImageUrl) return { url: img.url, ocrText: '无文字内容' };
-
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: '请识别这张图片中的所有文字内容，直接输出文字，不要添加任何解释或描述。如果图片中没有文字，请回复"无文字内容"。',
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: finalImageUrl,
-                  detail: 'high',
-                },
-              },
-            ],
-          } as any,
-        ],
-        max_tokens: 1200,
-      });
-
-      const text = response.choices[0]?.message?.content?.trim() || '';
-      return { url: img.url, ocrText: text || '无文字内容' };
-    };
-
-    const ocrResults: Array<{ url: string; ocrText?: string }> = [];
-    if (needOcr) {
-      const queue = imagesInput.slice(0, 10).map(i => ({ url: String(i.url || ''), thumbDataUrl: String(i.thumbDataUrl || '') })).filter(i => !!i.url);
-      const concurrency = 2;
-      let idx = 0;
-      const workers = Array.from({ length: Math.min(concurrency, queue.length) }).map(async () => {
-        while (idx < queue.length) {
-          const current = queue[idx++];
-          try {
-            const r = await ocrOne(current);
-            ocrResults.push(r);
-          } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : String(e);
-            ocrResults.push({ url: current.url, ocrText: `（图片识别失败: ${msg || '未知错误'}）` });
-          }
-        }
-      });
-      await Promise.all(workers);
-    }
-
-    const coverUrl = urls[0];
-    const orderedUrls = urls;
-    const maxPick = Math.max(1, Math.min(Number(payload.maxPick || 1), urls.length));
-    const picked = orderedUrls.slice(0, maxPick).map((url, idx) => ({
-      url,
-      reason: idx === 0 ? '按规则固定选择第 1 张图片' : '按原始顺序'
-    }));
-
-    return {
-      cover: { url: coverUrl, reason: '按规则固定使用正文第 1 张图片作为封面' },
-      inline: { orderedUrls, picked },
-      images: ocrResults.length > 0 ? ocrResults : undefined
-    };
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { error: msg };
-  }
-}
+// 已移除 handleAiMediaEnhance 和 handleOcrImage 函数
 
 /**
  * 获取链接页面的文本内容
@@ -808,89 +697,7 @@ async function fetchPageImages(url: string, maxCount = 40): Promise<string[]> {
   return uniq.slice(0, Math.max(1, Number(maxCount) || 40));
 }
 
-/**
- * 图片文字识别（OCR）功能
- * 使用 apiyi 的 GPT-4o-mini 模型进行图片文字识别
- * 
- * @param imageUrl 图片的 URL 或 base64 data URL
- */
-async function handleOcrImage(imageUrl: string): Promise<string> {
-  console.log(`[Background] OCR image: ${imageUrl.substring(0, 100)}...`);
-  
-  // 检查是否启用了图片 OCR 功能
-  const settings = await getSettings();
-  if (!settings.enableImageOcr) {
-    console.log('[Background] Image OCR is disabled in settings');
-    return '（图片文字识别功能未启用）';
-  }
-  
-  // 检查是否配置了 apiyi 的 API Key
-  const apiyiApiKey = settings.apiKeys?.['apiyi'];
-  if (!apiyiApiKey) {
-    console.warn('[Background] apiyi API key not configured for OCR');
-    return '（未配置 apiyi API Key，无法进行图片识别）';
-  }
-  
-  try {
-    // 如果是普通 URL，先获取图片并转换为 base64
-    let finalImageUrl = imageUrl;
-    if (!imageUrl.startsWith('data:')) {
-      try {
-        const { dataUrl } = await fetchImageAsDataUrl(imageUrl, 'https://weibo.com/');
-        finalImageUrl = dataUrl;
-      } catch (e) {
-        console.warn('[Background] Failed to fetch image, using original URL:', e);
-        // 继续使用原始 URL
-      }
-    }
-
-    console.log('[Background] Calling GPT-4o-mini for OCR...');
-    
-    // 使用 apiyi 的 GPT-4o-mini 模型
-    const openai = new OpenAI({
-      apiKey: apiyiApiKey,
-      baseURL: 'https://api.apiyi.com/v1',
-    });
-
-    // 使用视觉模型识别图片中的文字
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { 
-              type: 'text', 
-              text: '请识别这张图片中的所有文字内容，直接输出文字，不要添加任何解释或描述。如果图片中没有文字，请回复"无文字内容"。' 
-            },
-            { 
-              type: 'image_url', 
-              image_url: { 
-                url: finalImageUrl,
-                detail: 'high' // 使用高清晰度以获得更好的 OCR 效果
-              } 
-            }
-          ]
-        } as any
-      ],
-      max_tokens: 2000
-    });
-
-    const text = response.choices[0]?.message?.content?.trim() || '';
-    console.log(`[Background] OCR result: ${text.substring(0, 100)}...`);
-    
-    if (!text || text.length === 0) {
-      return '无文字内容';
-    }
-    
-    return text;
-    
-  } catch (error: any) {
-    console.error('[Background] OCR failed:', error);
-    // 返回错误信息但不抛出异常，避免阻塞整个抓取流程
-    return `（图片识别失败: ${error.message || '未知错误'}）`;
-  }
-}
+// 已移除 handleOcrImage 函数
 
 /**
  * 从HTML中提取纯文本内容

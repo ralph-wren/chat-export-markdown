@@ -26,9 +26,7 @@ export interface AppSettings {
   language: string;
   systemPrompt: string;
   provider: string;
-  enableMediaAi?: boolean; // AI 图文增强（识图 + 选图）
   autoPublishAll?: boolean; // 自动发布（对所有平台生效）
-  preferSourceImages?: boolean; // 优先使用素材来源图片
   github?: GitHubSettings;
   toutiao?: {
     cookie: string;
@@ -56,7 +54,6 @@ export interface AppSettings {
   };
   debugMode?: boolean;
   articleStyle?: ArticleStyleSettings; // 文章风格设置
-  enableImageOcr?: boolean; // 是否启用 AI 图片文字识别（使用 GPT-4o-mini）
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -66,9 +63,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   model: 'deepseek-ai/deepseek-r1',
   provider: 'nvidia',
   language: 'zh-CN',
-  enableMediaAi: true,
   autoPublishAll: false,
-  preferSourceImages: true,
   github: {
     token: '',
     owner: '',
@@ -105,8 +100,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     politeness: 60,    // 略微礼貌
     formality: 30,     // 偏口语化
     humor: 40          // 略微轻松
-  },
-  enableImageOcr: false // 默认关闭图片文字识别
+  }
 };
 
 export const getSettings = async (): Promise<AppSettings> => {
