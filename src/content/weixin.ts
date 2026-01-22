@@ -1047,8 +1047,19 @@ const insertAIImage = async (): Promise<boolean> => {
   insertBtn.scrollIntoView({ behavior: 'instant', block: 'center' });
   await new Promise(r => setTimeout(r, 200));
   
+  // 修复2：防止重复插入 - 标记按钮已点击
+  const alreadyClicked = insertBtn.getAttribute('data-memoraid-clicked');
+  if (alreadyClicked === 'true') {
+    logger.log('⚠️ 此插入按钮已被点击过，跳过以防止重复插入', 'warn');
+    return true;
+  }
+  
+  // 标记按钮为已点击
+  insertBtn.setAttribute('data-memoraid-clicked', 'true');
+  
   // 点击插入按钮
-  simulateClick(insertBtn);
+  // 修复：使用原生 click 避免重复触发事件导致插入两次
+  insertBtn.click();
   
   // 等待图片插入完成
   await new Promise(r => setTimeout(r, 1000));
@@ -1772,15 +1783,27 @@ const setCoverWithAI = async (title?: string, content?: string): Promise<boolean
  * - 弹出菜单: <div class="pop-opr__group pop-opr__group-select-cover js_cover_null_pop js_cover_opr">
  * - 从正文选择链接: <a class="pop-opr__button js_selectCoverFromContent">从正文选择</a>
  */
+// 全局变量：防止封面设置重复执行
+let isCoverBeingSet = false;
+
 const setCoverFromContent = async (options?: { preferredIndex?: number }): Promise<boolean> => {
   logger.log('设置封面图片（从正文选择）...', 'info');
   
-  const preferredIndex = options?.preferredIndex;
-  const targetIndex = typeof preferredIndex === 'number' && Number.isFinite(preferredIndex) && preferredIndex >= 0 ? preferredIndex : 0;
+  // 修复4：防止封面设置流程重复执行
+  if (isCoverBeingSet) {
+    logger.log('⚠️ 封面设置流程正在执行中，跳过重复调用', 'warn');
+    return false;
+  }
+  
+  isCoverBeingSet = true;
+  
+  try {
+    const preferredIndex = options?.preferredIndex;
+    const targetIndex = typeof preferredIndex === 'number' && Number.isFinite(preferredIndex) && preferredIndex >= 0 ? preferredIndex : 0;
 
-  // 滚动到页面底部，确保封面区域可见
-  window.scrollTo(0, document.body.scrollHeight);
-  await new Promise(r => setTimeout(r, 500));
+    // 滚动到页面底部，确保封面区域可见
+    window.scrollTo(0, document.body.scrollHeight);
+    await new Promise(r => setTimeout(r, 500));
   
   // 查找封面区域 - 使用精确的选择器
   let coverArea: HTMLElement | null = null;
@@ -1969,29 +1992,23 @@ const setCoverFromContent = async (options?: { preferredIndex?: number }): Promi
         null;
       if (!currentDialog) { await new Promise(r => setTimeout(r, 250)); continue; }
 
-      const icons = Array.from(currentDialog.querySelectorAll('.icon_card_selected_global')) as HTMLElement[];
-      if (icons.length > 0) {
-        const i = Math.max(0, Math.min(index, icons.length - 1));
-        const target = icons[i];
-        target.scrollIntoView({ behavior: 'instant', block: 'center' });
-        await new Promise(r => setTimeout(r, 150));
-        logger.log(`选择封面图片：图标第 ${i + 1}/${icons.length} 张`, 'action');
-        simulateClick(target);
-        await new Promise(r => setTimeout(r, 800));
-        return true;
-      }
-
+      // 修复1：优先查找图片容器，而不是选中图标
+      // 先尝试找到所有图片容器
       const candidates: HTMLElement[] = [];
 
+      // 1. 查找 img 标签的容器
       const imgs = Array.from(currentDialog.querySelectorAll('img')) as HTMLImageElement[];
       for (const img of imgs) {
         const imgStyle = window.getComputedStyle(img);
         if (imgStyle.display === 'none' || imgStyle.visibility === 'hidden' || imgStyle.opacity === '0') continue;
-        const c = (img.closest('label, li, [role="option"], .cover-image-item, .image-item, [class*="cover"], [class*="card"]') as HTMLElement | null) || img;
+        // 查找图片的可点击容器（通常是父元素）
+        // 增加 .weui-desktop-img-picker__item, .weui-desktop-card__bd 等微信特定类名
+        const c = (img.closest('label, li, [role="option"], .cover-image-item, .image-item, [class*="cover"], [class*="card"], .weui-desktop-img-picker__item, .weui-desktop-card__bd') as HTMLElement | null) || img.parentElement || img;
         candidates.push(c);
       }
 
-      const bgEls = Array.from(currentDialog.querySelectorAll('li, [role="option"], div')) as HTMLElement[];
+      // 2. 查找背景图片的容器
+      const bgEls = Array.from(currentDialog.querySelectorAll('li, [role="option"], div, .weui-desktop-img-picker__item')) as HTMLElement[];
       for (const el of bgEls) {
         const style = window.getComputedStyle(el);
         if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') continue;
@@ -2001,17 +2018,79 @@ const setCoverFromContent = async (options?: { preferredIndex?: number }): Promi
         if (bg && bg !== 'none') candidates.push(el);
       }
 
-      const uniq = Array.from(new Set(candidates));
-      if (uniq.length === 0) { await new Promise(r => setTimeout(r, 250)); continue; }
+      // 3. 查找选中图标的容器（作为最后的补充）
+      const icons = Array.from(currentDialog.querySelectorAll('.icon_card_selected_global, .weui-desktop-icon-checkbox')) as HTMLElement[];
+      if (candidates.length === 0 && icons.length > 0) {
+        for (const icon of icons) {
+           // 尝试找到包含此 icon 的容器
+           const c = (icon.closest('label, li, [role="option"], .cover-image-item, .image-item, [class*="cover"], [class*="card"], .weui-desktop-img-picker__item, .weui-desktop-card__bd') as HTMLElement | null) || icon.parentElement;
+           if (c) candidates.push(c);
+        }
+      }
 
-      const i = Math.max(0, Math.min(index, uniq.length - 1));
-      const target = uniq[i];
-      target.scrollIntoView({ behavior: 'instant', block: 'center' });
-      await new Promise(r => setTimeout(r, 150));
-      logger.log(`选择封面图片：弹窗第 ${i + 1}/${uniq.length} 张`, 'action');
-      simulateClick(target);
-      await new Promise(r => setTimeout(r, 800));
-      return true;
+      const uniq = Array.from(new Set(candidates));
+      
+      // 如果找到了图片容器，点击容器而不是图标
+      if (uniq.length > 0) {
+        const i = Math.max(0, Math.min(index, uniq.length - 1));
+        const target = uniq[i];
+        target.scrollIntoView({ behavior: 'instant', block: 'center' });
+        await new Promise(r => setTimeout(r, 150));
+        logger.log(`选择封面图片：点击图片容器第 ${i + 1}/${uniq.length} 张`, 'action');
+        
+        // 优先使用 click()
+        target.click();
+        await new Promise(r => setTimeout(r, 200));
+        
+        // 验证是否选中成功（检查是否有选中状态）
+        const checkSelected = () => {
+             return target.classList.contains('selected') || 
+                   target.querySelector('.icon_card_selected_global') !== null ||
+                   target.querySelector('.weui-desktop-icon-checkbox-checked') !== null ||
+                   target.getAttribute('aria-selected') === 'true' ||
+                   !!target.querySelector('.selected');
+        };
+
+        if (!checkSelected()) {
+             // 如果没选中，尝试 simulateClick
+             simulateClick(target);
+             await new Promise(r => setTimeout(r, 800));
+        } else {
+             await new Promise(r => setTimeout(r, 600));
+        }
+        
+        if (checkSelected()) {
+          logger.log('图片已成功选中', 'success');
+        } else {
+          logger.log('图片可能未选中，尝试再次点击图标（如果存在）', 'warn');
+          // 尝试点击内部的图标或 input
+          const innerIcon = target.querySelector('.icon_card_selected_global, .weui-desktop-icon-checkbox, input[type="checkbox"], input[type="radio"]') as HTMLElement;
+          if (innerIcon) {
+              simulateClick(innerIcon);
+              await new Promise(r => setTimeout(r, 500));
+          } else {
+              // 再次点击容器
+              simulateClick(target);
+              await new Promise(r => setTimeout(r, 500));
+          }
+        }
+        
+        return true;
+      }
+
+      // 备用方案：如果没找到图片容器，尝试点击选中图标
+      if (icons.length > 0) {
+        const i = Math.max(0, Math.min(index, icons.length - 1));
+        const target = icons[i];
+        target.scrollIntoView({ behavior: 'instant', block: 'center' });
+        await new Promise(r => setTimeout(r, 150));
+        logger.log(`选择封面图片：点击图标第 ${i + 1}/${icons.length} 张（备用方案）`, 'action');
+        simulateClick(target);
+        await new Promise(r => setTimeout(r, 800));
+        return true;
+      }
+
+      await new Promise(r => setTimeout(r, 250));
     }
     return false;
   };
@@ -2038,6 +2117,17 @@ const setCoverFromContent = async (options?: { preferredIndex?: number }): Promi
     if (!btn) return false;
     const style = window.getComputedStyle(btn);
     if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+    
+    // 修复3：防止重复点击按钮
+    const alreadyClicked = btn.getAttribute('data-memoraid-clicked');
+    if (alreadyClicked === 'true') {
+      logger.log(`⚠️ "${text}"按钮已被点击过，跳过以防止重复操作`, 'warn');
+      return false;
+    }
+    
+    // 标记按钮为已点击
+    btn.setAttribute('data-memoraid-clicked', 'true');
+    
     simulateClick(btn);
     return true;
   };
@@ -2082,6 +2172,14 @@ const setCoverFromContent = async (options?: { preferredIndex?: number }): Promi
   
   logger.log('封面设置流程结束', 'success');
   return true;
+  
+  } catch (error) {
+    logger.log(`封面设置出错: ${error}`, 'error');
+    return false;
+  } finally {
+    // 重置标志，允许下次调用
+    isCoverBeingSet = false;
+  }
 };
 
 /**
