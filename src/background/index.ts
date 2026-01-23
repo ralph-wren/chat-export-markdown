@@ -1527,14 +1527,36 @@ async function handlePublishToWeixin(payload: { title: string; content: string; 
       }
     });
 
-    // 打开微信公众号首页
-    // 内容脚本会检测登录状态并自动导航到图文编辑页面
-    const tab = await chrome.tabs.create({
-      url: 'https://mp.weixin.qq.com/',
-      active: true
-    });
+    // 打开或激活微信公众号页面
+    const mpUrl = 'https://mp.weixin.qq.com/';
+    
+    // 优先查找编辑器页面
+    const editorTabs = await chrome.tabs.query({ url: '*://mp.weixin.qq.com/*appmsg_edit*' });
+    // 其次查找所有微信页面
+    const allTabs = await chrome.tabs.query({ url: '*://mp.weixin.qq.com/*' });
+    
+    let tab: chrome.tabs.Tab;
+    
+    if (editorTabs.length > 0) {
+      // 找到编辑器页面，复用它
+      tab = editorTabs[0];
+      await chrome.tabs.update(tab.id!, { active: true });
+      // 重新加载页面以触发 content script
+      await chrome.tabs.reload(tab.id!);
+    } else if (allTabs.length > 0) {
+      // 如果已有其他微信页面（如首页），复用第一个
+      tab = allTabs[0];
+      await chrome.tabs.update(tab.id!, { active: true });
+      await chrome.tabs.reload(tab.id!);
+    } else {
+      // 否则创建新标签页
+      tab = await chrome.tabs.create({
+        url: mpUrl,
+        active: true
+      });
+    }
 
-    if (!tab.id) throw new Error('Failed to create tab');
+    if (!tab.id) throw new Error('Failed to create or find tab');
 
     // The content script (src/content/weixin.ts) will handle the rest
     console.log('Opened Weixin publish page, waiting for content script to fill...');
