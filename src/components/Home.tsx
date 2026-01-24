@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, FileText, Settings as SettingsIcon, Loader2, Copy, Eye, Code, Send, History, Trash2, ArrowLeft, X, Square, Github, Folder, UploadCloud, Check, Newspaper, BookOpen, MessageCircle } from 'lucide-react';
+import { Download, FileText, Settings as SettingsIcon, Loader2, Copy, Eye, Code, Send, History, Trash2, ArrowLeft, X, Square, Github, Folder, UploadCloud, Check, Newspaper, BookOpen, MessageCircle, BookHeart } from 'lucide-react';
 import { getHistory, deleteHistoryItem, HistoryItem, clearHistory, getSettings } from '../utils/storage';
 import { getDirectories, pushToGitHub } from '../utils/github';
 import { ExtractionResult } from '../utils/types';
@@ -257,6 +257,114 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       alert(`${t.publishFailed}: ${e.message}`);
     }
   };
+
+  // 从已有结果发布到小红书
+  const handlePublishToXiaohongshu = async () => {
+    const settings = await getSettings();
+    if (!settings.xiaohongshu?.cookie) {
+      if (confirm(t.cookieMissing)) {
+        onOpenSettings();
+      }
+      return;
+    }
+
+    setStatus(t.publishingToXiaohongshu || '正在发布到小红书...');
+    try {
+      // Send to background
+      const response = await chrome.runtime.sendMessage({
+        type: 'PUBLISH_TO_XIAOHONGSHU',
+        payload: {
+          title: currentTitle || 'Untitled',
+          content: result,
+          sourceUrl: currentSourceUrl,
+          sourceImages: currentSourceImages
+        }
+      });
+
+      if (response && response.success) {
+        setStatus(t.publishSuccess);
+      } else {
+        throw new Error(response?.error || 'Unknown error');
+      }
+    } catch (e: any) {
+      console.error(e);
+      setStatus(t.publishFailed);
+      alert(`${t.publishFailed}: ${e.message}`);
+    }
+  };
+
+  // 一键生成文章并发布到小红书
+  const handleGenerateAndPublishToXiaohongshu = async () => {
+    const settings = await getSettings();
+    if (!settings.xiaohongshu?.cookie) {
+      if (confirm(t.cookieMissing)) {
+        onOpenSettings();
+      }
+      return;
+    }
+
+    setLoading(true);
+    setProgress(5);
+    setStatus(t.extractingContent);
+    setLogMessage(t.extractingContent);
+    setResult(null);
+    setErrorMessage(null);
+    setConversationHistory([]);
+    setUserClosedResult(false);
+
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab.id) throw new Error('No active tab');
+
+      // 将抓取和生成逻辑移至 background，避免关闭 popup 中断任务
+      const response = await chrome.runtime.sendMessage({
+        type: 'INITIATE_GENERATE_AND_PUBLISH',
+        payload: {
+          platform: 'xiaohongshu',
+          tabId: tab.id
+        }
+      });
+
+      if (!response?.success) {
+        throw new Error(response?.error || '无法启动后台任务');
+      }
+
+    } catch (error: any) {
+      console.error(error);
+      let errorMsg = error.message;
+
+      if (
+        errorMsg.includes('Could not establish connection') ||
+        errorMsg.includes('Receiving end does not exist') ||
+        errorMsg.includes('message channel closed') ||
+        errorMsg.includes('asynchronous response')
+      ) {
+        setErrorMessage(
+          <div className="flex flex-col gap-2">
+            <span>{t.connectionFailed}</span>
+            <button
+              onClick={async () => {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (tab?.id) {
+                  chrome.tabs.reload(tab.id);
+                  window.close();
+                }
+              }}
+              className="text-xs bg-red-100 hover:bg-red-200 text-red-800 py-1 px-2 rounded font-medium transition w-fit"
+            >
+              {t.refreshPage}
+            </button>
+          </div> as any
+        );
+      } else {
+        setErrorMessage(errorMsg);
+      }
+
+      setStatus('Error');
+      setLoading(false);
+    }
+  };
+
 
   // 一键生成文章并发布到头条
   const handleGenerateAndPublishToToutiao = async () => {
@@ -844,14 +952,14 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
               {!loading ? (
                 <div className="flex flex-col gap-3 w-full items-center">
                   {/* 四个主要功能按钮放在一起 - 公众号放最前，写文档放最后 */}
-                  <div className="flex gap-2 w-80">
+                  <div className="flex gap-2 w-96">
                     <button
                       onClick={handleGenerateAndPublishToWeixin}
                       className="flex-1 bg-green-500 text-white px-2 py-3 rounded-lg flex items-center gap-1 hover:bg-green-600 transition justify-center"
                       title={t.publishToWeixin || '发公众号'}
                     >
                       <MessageCircle className="w-4 h-4" />
-                      <span className="text-xs font-medium">{t.publishToWeixin || '公众号'}</span>
+                      <span className="text-xs font-medium whitespace-nowrap">{t.publishToWeixin || '公众号'}</span>
                     </button>
                     <button
                       onClick={handleGenerateAndPublishToToutiao}
@@ -859,7 +967,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                       title={t.publishToToutiao}
                     >
                       <Newspaper className="w-4 h-4" />
-                      <span className="text-xs font-medium">{t.publishToToutiao}</span>
+                      <span className="text-xs font-medium whitespace-nowrap">{t.publishToToutiao}</span>
                     </button>
                     <button
                       onClick={handleGenerateAndPublishToZhihu}
@@ -867,7 +975,15 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                       title={t.publishToZhihu}
                     >
                       <BookOpen className="w-4 h-4" />
-                      <span className="text-xs font-medium">{t.publishToZhihu}</span>
+                      <span className="text-xs font-medium whitespace-nowrap">{t.publishToZhihu}</span>
+                    </button>
+                    <button
+                      onClick={handleGenerateAndPublishToXiaohongshu}
+                      className="flex-1 bg-pink-500 text-white px-2 py-3 rounded-lg flex items-center gap-1 hover:bg-pink-600 transition justify-center"
+                      title={t.publishToXiaohongshu}
+                    >
+                      <BookHeart className="w-4 h-4" />
+                      <span className="text-xs font-medium whitespace-nowrap">{t.publishToXiaohongshu}</span>
                     </button>
                     <button
                       onClick={handleSummarize}
@@ -875,7 +991,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                       title={t.generateTechDoc}
                     >
                       <FileText className="w-4 h-4" />
-                      <span className="text-xs font-medium">{t.generateTechDoc}</span>
+                      <span className="text-xs font-medium whitespace-nowrap">{t.generateTechDoc}</span>
                     </button>
                   </div>
                 </div>
@@ -1108,6 +1224,14 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                 <BookOpen className="w-4 h-4" />
                 <span className="text-xs">{t.zhihu}</span>
               </button>
+              <button
+                onClick={handlePublishToXiaohongshu}
+                className="flex-1 bg-pink-500 text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-pink-600 transition"
+                title={t.xiaohongshu}
+              >
+                <BookHeart className="w-4 h-4" />
+                <span className="text-xs">{t.xiaohongshu}</span>
+              </button>
             </div>
 
             <div className="pt-2 border-t mt-2 shrink-0 flex flex-col gap-2">
@@ -1117,8 +1241,8 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                   {conversationHistory.filter(msg => msg.role !== 'system' && !(msg.role === 'user' && msg.content.includes('Please summarize'))).map((msg, idx) => (
                     <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[85%] p-2 rounded-lg ${msg.role === 'user'
-                          ? 'bg-blue-100 text-blue-900 rounded-br-none'
-                          : 'bg-white border text-gray-800 rounded-bl-none shadow-sm'
+                        ? 'bg-blue-100 text-blue-900 rounded-br-none'
+                        : 'bg-white border text-gray-800 rounded-bl-none shadow-sm'
                         }`}>
                         {msg.role === 'assistant' ? 'AI: ' : 'You: '}
                         {msg.content.length > 60 && msg.role === 'assistant' ? msg.content.substring(0, 60) + '...' : msg.content}

@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { marked } from 'marked';
 import { getSettings, saveSettings, DEFAULT_SETTINGS, addHistoryItem } from '../utils/storage';
 import { ExtractionResult, ActiveTask, ChatMessage } from '../utils/types';
-import { generateArticlePrompt, TOUTIAO_DEFAULT_PROMPT, WEIXIN_DEFAULT_PROMPT, ZHIHU_DEFAULT_PROMPT } from '../utils/prompts';
+import { generateArticlePrompt, TOUTIAO_DEFAULT_PROMPT, WEIXIN_DEFAULT_PROMPT, ZHIHU_DEFAULT_PROMPT, XIAOHONGSHU_DEFAULT_PROMPT } from '../utils/prompts';
 import { generateRandomString } from '../utils/crypto';
 
 console.log('Background service worker started');
@@ -195,8 +195,21 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  // 一键生成文章并发布到小红书
+  if (message.type === 'GENERATE_AND_PUBLISH_XIAOHONGSHU') {
+    startArticleGenerationAndPublish(message.payload, 'xiaohongshu');
+    sendResponse({ success: true });
+    return true;
+  }
+
   if (message.type === 'PUBLISH_TO_WEIXIN') {
     handlePublishToWeixin(message.payload);
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (message.type === 'PUBLISH_TO_XIAOHONGSHU') {
+    handlePublishToXiaohongshu(message.payload);
     sendResponse({ success: true });
     return true;
   }
@@ -324,8 +337,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 // 已移除 handleAiMediaEnhance 和 handleOcrImage 函数
 
-async function handleInitiateProcess(platform: 'toutiao' | 'zhihu' | 'weixin', tabId: number) {
-  const platformName = platform === 'toutiao' ? '头条' : platform === 'zhihu' ? '知乎' : '公众号';
+async function handleInitiateProcess(platform: 'toutiao' | 'zhihu' | 'weixin' | 'xiaohongshu', tabId: number) {
+  const platformName = platform === 'toutiao' ? '头条' :
+    platform === 'zhihu' ? '知乎' :
+      platform === 'xiaohongshu' ? '小红书' : '公众号';
 
   // 1. 设置初始状态，让用户立即看到反馈
   currentTask = {
@@ -1644,6 +1659,119 @@ async function handlePublishToWeixin(payload: { title: string; content: string; 
   }
 }
 
+async function handlePublishToXiaohongshu(payload: { title: string, content: string, sourceUrl?: string, sourceImages?: string[] }) {
+  try {
+    console.log('Handling publish to Xiaohongshu:', payload.title);
+
+    // 1. 设置 Cookie (如果需要)
+    const settings = await getSettings();
+    if (settings.xiaohongshu?.cookie) {
+      const cookieStr = settings.xiaohongshu.cookie;
+      const cookies = cookieStr.split(';').map(c => c.trim()).filter(Boolean);
+
+      for (const cookie of cookies) {
+        const [name, value] = cookie.split('=');
+        if (name && value) {
+          try {
+            await chrome.cookies.set({
+              url: 'https://creator.xiaohongshu.com',
+              domain: '.xiaohongshu.com',
+              name,
+              value,
+              path: '/',
+              secure: true,
+              sameSite: 'no_restriction'
+            });
+          } catch (e) {
+            console.error(`Failed to set Xiaohongshu cookie ${name}`, e);
+          }
+        }
+      }
+    }
+
+    // 2. 清理文章内容
+    let cleanedContent = payload.content;
+
+    // 移除可能存在的元数据和标题建议
+    cleanedContent = cleanedContent.replace(/^#{1,3}\s*封面图建议[：:].*/gm, '');
+    cleanedContent = cleanedContent.replace(/^\*?\*?封面图建议\*?\*?[：:][^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
+    cleanedContent = cleanedContent.replace(/^封面图建议[：:][^\n]*\n?/gm, '');
+    cleanedContent = cleanedContent.replace(/^#{1,3}\s*其他备选标题[：:]?.*(\n(?!#)[^\n]*)*/gm, '');
+    cleanedContent = cleanedContent.replace(/^#{1,3}\s*备选标题[：:]?.*(\n(?!#)[^\n]*)*/gm, '');
+    cleanedContent = cleanedContent.replace(/^\*?\*?其他备选标题\*?\*?[：:]?[^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
+    cleanedContent = cleanedContent.replace(/^\*?\*?备选标题\*?\*?[：:]?[^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
+    cleanedContent = cleanedContent.trim();
+
+    // 提取标题 (虽然小红书标题在 prompt 中已经要求不要单独一行，但为了保险起见处理一下)
+    let articleTitle = payload.title;
+
+    // 如果内容第一行是 H1 标题，尝试使用它作为标题并从正文中移除
+    const h1Match = cleanedContent.match(/^#\s+(.+)$/m);
+    if (h1Match && h1Match[1]) {
+      const extractedTitle = h1Match[1].trim();
+      // 如果原来的标题比较通用，使用提取的标题
+      const genericTitles = ['微博搜索', 'Weibo Search', '搜索', 'Search', '主页', 'Home', 'Untitled'];
+      const isGeneric = genericTitles.some(t => payload.title?.includes(t));
+      if (isGeneric || !payload.title || payload.title.length < 3) {
+        articleTitle = extractedTitle;
+      }
+    }
+
+    // 从正文中移除 H1 标题，因为小红书有专门的标题输入框
+    cleanedContent = cleanedContent.replace(/^#\s+.+\n+/, '');
+
+    // 3. 将数据保存到 Storage，供 Content Script 读取
+    // 注意：pending_xiaohongshu_publish
+    const publishData = {
+      title: articleTitle,
+      content: cleanedContent,
+      sourceUrl: payload.sourceUrl,
+      sourceImages: Array.isArray(payload.sourceImages) ? payload.sourceImages.filter(u => typeof u === 'string' && u.trim()) : undefined,
+      timestamp: Date.now()
+    };
+
+    await chrome.storage.local.set({
+      pending_xiaohongshu_publish: publishData
+    });
+
+    console.log('[Background] Xiaohongshu publish data saved:', publishData);
+
+    // 4. 打开或激活小红书发布页面
+    const publishUrl = 'https://creator.xiaohongshu.com/publish/publish';
+
+    // 查找已有的小红书页面
+    const existingTabs = await chrome.tabs.query({ url: '*://creator.xiaohongshu.com/*' });
+    let tab: chrome.tabs.Tab;
+
+    if (existingTabs.length > 0) {
+      // 如果有发布页面，优先使用
+      const publishTab = existingTabs.find(t => t.url && t.url.includes('/publish/publish'));
+      if (publishTab) {
+        tab = publishTab;
+      } else {
+        tab = existingTabs[0];
+      }
+
+      await chrome.tabs.update(tab.id!, { active: true, url: publishUrl });
+      // 给一点时间让 url 更新，然后刷新触发 content script
+      setTimeout(() => {
+        chrome.tabs.reload(tab.id!);
+      }, 500);
+    } else {
+      // 创建新标签页
+      tab = await chrome.tabs.create({
+        url: publishUrl,
+        active: true
+      });
+    }
+
+    console.log('Opened Xiaohongshu publish page, waiting for content script...');
+
+  } catch (error) {
+    console.error('Xiaohongshu publish failed', error);
+  }
+}
+
 async function startArticleGeneration(extraction: ExtractionResult) {
   try {
     abortController = new AbortController();
@@ -1859,7 +1987,7 @@ async function startArticleGeneration(extraction: ExtractionResult) {
 }
 
 // 一键生成文章并发布到指定平台
-async function startArticleGenerationAndPublish(extraction: ExtractionResult, platform: 'toutiao' | 'zhihu' | 'weixin') {
+async function startArticleGenerationAndPublish(extraction: ExtractionResult, platform: 'toutiao' | 'zhihu' | 'weixin' | 'xiaohongshu') {
   try {
     abortController = new AbortController();
 
@@ -1911,6 +2039,9 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
     } else if (platform === 'weixin') {
       // 公众号：使用用户自定义提示词或默认公众号提示词
       platformPrompt = settings.weixin?.customPrompt || WEIXIN_DEFAULT_PROMPT;
+    } else if (platform === 'xiaohongshu') {
+      // 小红书：使用用户自定义提示词或默认小红书提示词
+      platformPrompt = settings.xiaohongshu?.customPrompt || XIAOHONGSHU_DEFAULT_PROMPT;
     }
 
     // ========== 组合完整提示词 ==========
@@ -1946,7 +2077,7 @@ ${platformPrompt}
       platformReminder = `\n\n⚠️ 重要提醒：${platformName}平台的图片提示词需要15-50字的详细场景描述，用于AI生成配图。文章最后必须包含[封面: xxx]和[摘要: xxx]。`;
     } else if (platform === 'xiaohongshu') {
       // 小红书不需要封面和摘要，但需要Emoji和话题
-      platformReminder = `\n\n⚠️ 重要提醒：小红书平台必须大量使用Emoji，分段要短，结尾必须包含至少5个话题标签（格式：#标签名）。不需要生成图片占位符。`;
+      platformReminder = `\n\n⚠️ 重要提醒（CRITICAL）：小红书平台必须使用【纯文本格式】！严禁使用Markdown标题、加粗或HTML标签。必须大量使用Emoji，分段要短，结尾必须包含至少5个话题标签。`;
     }
 
     const initialMessages = [
@@ -2097,6 +2228,13 @@ ${platformPrompt}
       });
     } else if (platform === 'weixin') {
       await handlePublishToWeixin({
+        title: finalTitle,
+        content: summary,
+        sourceUrl: extraction.url,
+        sourceImages: extraction.images
+      });
+    } else if (platform === 'xiaohongshu') {
+      await handlePublishToXiaohongshu({
         title: finalTitle,
         content: summary,
         sourceUrl: extraction.url,

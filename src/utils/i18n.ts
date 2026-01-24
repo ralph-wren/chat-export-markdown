@@ -28,13 +28,14 @@ export interface Translation {
   saveButton: string;
   savedButton: string;
   savedMessage: string;
-  
+
   // Home page
   slogan: string;
   homeDescription: string;
   publishToToutiao: string;
   publishToZhihu: string;
   publishToWeixin: string;
+  publishToXiaohongshu: string;
   orSeparator: string;
   generateArticleOnly: string;
   generateSummary: string;
@@ -55,15 +56,17 @@ export interface Translation {
   toutiao: string;
   zhihu: string;
   weixin: string;
+  xiaohongshu: string;
   refinePromptPlaceholder: string;
   status: string;
-  
+
   // Messages
   extractingContent: string;
   contentExtracted: string;
   publishingToToutiao: string;
   publishingToZhihu: string;
   publishingToWeixin: string;
+  publishingToXiaohongshu: string;
   publishSuccess: string;
   publishFailed: string;
   connectionFailed: string;
@@ -73,7 +76,7 @@ export interface Translation {
   copiedToClipboard: string;
   pushedToGithub: string;
   confirmClearHistory: string;
-  
+
   // GitHub Modal
   saveToGithub: string;
   fileName: string;
@@ -85,7 +88,7 @@ export interface Translation {
   successfullyPushed: string;
   viewOnGithub: string;
   githubNotConfigured: string;
-  
+
   // Settings page - additional
   syncBackupTitle: string;
   syncDescription: string;
@@ -100,7 +103,7 @@ export interface Translation {
   syncUp: string;
   restore: string;
   lastSynced: string;
-  
+
   // Toutiao config
   toutiaoConfigTitle: string;
   cookieLabel: string;
@@ -109,19 +112,19 @@ export interface Translation {
   autoPublish: string;
   autoPublishHintToutiao: string;
   noToutiaoCookie: string;
-  
+
   // Zhihu config
   zhihuConfigTitle: string;
   autoPublishHintZhihu: string;
   noZhihuCookie: string;
-  
+
   // Weixin config
   weixinConfigTitle: string;
   authorNameLabel: string;
   authorNameHint: string;
   autoPublishHintWeixin: string;
   noWeixinCookie: string;
-  
+
   // Article style
   articleStyleTitle: string;
   articleStyleHint: string;
@@ -144,20 +147,20 @@ export interface Translation {
   styleHumorLeft: string;
   styleHumorRight: string;
   resetToDefaultStyle: string;
-  
+
   // Debug mode
   debugModeTitle: string;
   debugModeHint: string;
-  
+
   // Misc
   downloadMarkdown: string;
-  
+
   // Custom prompts for platforms
   customPromptLabel: string;
   customPromptHint: string;
   customPromptPlaceholder: string;
   resetToDefault: string;
-  
+
   // Auto save
   autoSaving: string;
   autoSaved: string;
@@ -195,13 +198,14 @@ export const TRANSLATIONS: Record<string, Translation> = {
     saveButton: 'Save Settings',
     savedButton: 'Saved Successfully!',
     savedMessage: 'Saved!',
-    
+
     // Home page
     slogan: 'Empower everyone to share ideas, publish to all platforms with one click',
     homeDescription: 'Browse any webpage, click the button below to generate and publish articles',
     publishToToutiao: 'Toutiao',
     publishToZhihu: 'Zhihu',
     publishToWeixin: 'WeChat',
+    publishToXiaohongshu: 'REDnote',
     orSeparator: 'or',
     generateArticleOnly: 'Generate Article Only',
     generateSummary: 'Generate Summary',
@@ -222,15 +226,17 @@ export const TRANSLATIONS: Record<string, Translation> = {
     toutiao: 'Toutiao',
     zhihu: 'Zhihu',
     weixin: 'WeChat',
+    xiaohongshu: 'REDnote',
     refinePromptPlaceholder: "Ask AI to refine (e.g. 'Make it shorter')...",
     status: 'Status',
-    
+
     // Messages
     extractingContent: 'Extracting content from page...',
     contentExtracted: 'Content extracted! Starting generation...',
     publishingToToutiao: 'Publishing to Toutiao...',
     publishingToZhihu: 'Publishing to Zhihu...',
     publishingToWeixin: 'Publishing to WeChat...',
+    publishingToXiaohongshu: 'Publishing to REDnote...',
     publishSuccess: 'Published successfully!',
     publishFailed: 'Publish Failed',
     connectionFailed: 'Connection failed. The page might need a refresh.',
@@ -240,7 +246,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     copiedToClipboard: 'Copied to clipboard!',
     pushedToGithub: 'Pushed to GitHub!',
     confirmClearHistory: 'Are you sure you want to clear all history?',
-    
+
     // GitHub Modal
     saveToGithub: 'Save to GitHub',
     fileName: 'File Name',
@@ -252,7 +258,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     successfullyPushed: 'Successfully Pushed!',
     viewOnGithub: 'View on GitHub',
     githubNotConfigured: 'GitHub Integration is not configured. Go to settings?',
-    
+
     // Settings page - additional
     syncBackupTitle: 'Sync & Backup (Encrypted)',
     syncDescription: 'Sign in to sync your settings across devices. All critical data (API Keys) is encrypted client-side before upload.',
@@ -267,7 +273,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     syncUp: 'Sync Up',
     restore: 'Restore',
     lastSynced: 'Last Synced',
-    
+
     // Toutiao config
     toutiaoConfigTitle: 'Toutiao Configuration',
     cookieLabel: 'Cookie (Required for Publishing)',
@@ -276,19 +282,19 @@ export const TRANSLATIONS: Record<string, Translation> = {
     autoPublish: 'Auto Publish',
     autoPublishHintToutiao: 'Automatically publish to Toutiao after article generation and navigate to publish page',
     noToutiaoCookie: 'No Toutiao login cookies found. Would you like to open the Toutiao login page?',
-    
+
     // Zhihu config
     zhihuConfigTitle: 'Zhihu Column Configuration',
     autoPublishHintZhihu: 'Automatically publish to Zhihu column after article generation',
     noZhihuCookie: 'No Zhihu login cookies found. Would you like to open the Zhihu login page?',
-    
+
     // Weixin config
     weixinConfigTitle: 'WeChat Official Account Configuration',
     authorNameLabel: 'Author Name (for Original Declaration)',
     authorNameHint: 'Fill in your author name for original content declaration',
     autoPublishHintWeixin: 'Automatically publish after content is ready',
     noWeixinCookie: 'No WeChat login cookies found. Would you like to open the WeChat Official Account login page?',
-    
+
     // Article style
     articleStyleTitle: 'Article Style Settings',
     articleStyleHint: 'Adjust the sliders to control the AI-generated article style',
@@ -311,20 +317,20 @@ export const TRANSLATIONS: Record<string, Translation> = {
     styleHumorLeft: 'Serious',
     styleHumorRight: 'Humorous',
     resetToDefaultStyle: 'Reset to default style',
-    
+
     // Debug mode
     debugModeTitle: 'Debug Mode',
     debugModeHint: 'Automatically upload error logs to server for analysis',
-    
+
     // Misc
     downloadMarkdown: 'Download',
-    
+
     // Custom prompts for platforms
     customPromptLabel: 'Custom Prompt',
     customPromptHint: 'Customize the AI generation prompt for this platform. Leave empty to use default.',
     customPromptPlaceholder: 'Enter custom prompt for article generation...',
     resetToDefault: 'Reset to Default',
-    
+
     // Auto save
     autoSaving: 'Auto saving...',
     autoSaved: 'Auto saved',
@@ -360,13 +366,14 @@ export const TRANSLATIONS: Record<string, Translation> = {
     saveButton: '保存设置',
     savedButton: '保存成功!',
     savedMessage: '已保存!',
-    
+
     // Home page
     slogan: '让每个人都能轻松发声，一键发布到全平台',
     homeDescription: '浏览任意网页，点击下方按钮即可生成文章并一键发布',
     publishToToutiao: '发头条',
     publishToZhihu: '发知乎',
     publishToWeixin: '公众号',
+    publishToXiaohongshu: '小红书',
     orSeparator: '或',
     generateArticleOnly: '仅生成文章',
     generateSummary: '生成摘要',
@@ -387,15 +394,17 @@ export const TRANSLATIONS: Record<string, Translation> = {
     toutiao: '头条',
     zhihu: '知乎',
     weixin: '公众号',
+    xiaohongshu: '小红书',
     refinePromptPlaceholder: '让 AI 优化文章（如"写短一点"）...',
     status: '状态',
-    
+
     // Messages
     extractingContent: '正在提取页面内容...',
     contentExtracted: '内容提取成功！开始生成...',
     publishingToToutiao: '正在发布到头条...',
     publishingToZhihu: '正在发布到知乎...',
     publishingToWeixin: '正在发布到公众号...',
+    publishingToXiaohongshu: '正在发布到小红书...',
     publishSuccess: '发布成功！',
     publishFailed: '发布失败',
     connectionFailed: '连接失败，请刷新页面后重试。',
@@ -405,7 +414,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     copiedToClipboard: '已复制到剪贴板！',
     pushedToGithub: '已推送到 GitHub！',
     confirmClearHistory: '确定要清空所有历史记录吗？',
-    
+
     // GitHub Modal
     saveToGithub: '保存到 GitHub',
     fileName: '文件名',
@@ -417,7 +426,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     successfullyPushed: '推送成功！',
     viewOnGithub: '在 GitHub 上查看',
     githubNotConfigured: 'GitHub 集成未配置，是否前往设置？',
-    
+
     // Settings page - additional
     syncBackupTitle: '同步与备份（加密）',
     syncDescription: '登录以在多设备间同步设置。所有关键数据（API Key）在上传前会在客户端加密。',
@@ -432,7 +441,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     syncUp: '同步上传',
     restore: '恢复',
     lastSynced: '上次同步',
-    
+
     // Toutiao config
     toutiaoConfigTitle: '头条配置',
     cookieLabel: 'Cookie（发布文章需要）',
@@ -441,19 +450,19 @@ export const TRANSLATIONS: Record<string, Translation> = {
     autoPublish: '自动发布',
     autoPublishHintToutiao: '生成文章后自动发布到头条并跳转到发布页面',
     noToutiaoCookie: '未找到头条登录 Cookie。是否打开头条登录页面？',
-    
+
     // Zhihu config
     zhihuConfigTitle: '知乎专栏配置',
     autoPublishHintZhihu: '生成文章后自动发布到知乎专栏',
     noZhihuCookie: '未找到知乎登录 Cookie。是否打开知乎登录页面？',
-    
+
     // Weixin config
     weixinConfigTitle: '微信公众号配置',
     authorNameLabel: '作者名称（原创声明用）',
     authorNameHint: '填写原创声明时显示的作者名',
     autoPublishHintWeixin: '内容准备好后自动发布文章',
     noWeixinCookie: '未找到微信公众号登录 Cookie。是否打开公众号登录页面？',
-    
+
     // Article style
     articleStyleTitle: '文章风格设置',
     articleStyleHint: '调整滑动条来控制 AI 生成文章的风格倾向',
@@ -476,20 +485,20 @@ export const TRANSLATIONS: Record<string, Translation> = {
     styleHumorLeft: '严肃认真',
     styleHumorRight: '幽默搞笑',
     resetToDefaultStyle: '重置为默认风格',
-    
+
     // Debug mode
     debugModeTitle: '调试模式',
     debugModeHint: '自动上传错误日志到服务器进行分析',
-    
+
     // Misc
     downloadMarkdown: '下载',
-    
+
     // Custom prompts for platforms
     customPromptLabel: '自定义提示词',
     customPromptHint: '自定义该平台的 AI 生成提示词，留空则使用默认提示词。',
     customPromptPlaceholder: '输入文章生成的自定义提示词...',
     resetToDefault: '恢复默认',
-    
+
     // Auto save
     autoSaving: '自动保存中...',
     autoSaved: '已自动保存',
@@ -525,13 +534,14 @@ export const TRANSLATIONS: Record<string, Translation> = {
     saveButton: '設定を保存',
     savedButton: '保存しました！',
     savedMessage: '保存しました！',
-    
+
     // Home page
     slogan: '誰でも簡単に発信、ワンクリックで全プラットフォームに公開',
     homeDescription: 'ChatGPTまたはGeminiのチャットページを開き、下のボタンをクリックして公開',
     publishToToutiao: '头条',
     publishToZhihu: '知乎',
     publishToWeixin: 'WeChat',
+    publishToXiaohongshu: '小红书',
     orSeparator: 'または',
     generateArticleOnly: '記事のみ生成',
     generateSummary: '要約を生成',
@@ -552,15 +562,17 @@ export const TRANSLATIONS: Record<string, Translation> = {
     toutiao: '頭条',
     zhihu: '知乎',
     weixin: 'WeChat',
+    xiaohongshu: '小紅書',
     refinePromptPlaceholder: 'AIに改善を依頼（例：「短くして」）...',
     status: 'ステータス',
-    
+
     // Messages
     extractingContent: 'ページからコンテンツを抽出中...',
     contentExtracted: 'コンテンツ抽出完了！生成を開始...',
     publishingToToutiao: '頭条に公開中...',
     publishingToZhihu: '知乎に公開中...',
     publishingToWeixin: 'WeChatに公開中...',
+    publishingToXiaohongshu: '小红书に公開中...',
     publishSuccess: '公開成功！',
     publishFailed: '公開失敗',
     connectionFailed: '接続に失敗しました。ページを更新してください。',
@@ -570,7 +582,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     copiedToClipboard: 'クリップボードにコピーしました！',
     pushedToGithub: 'GitHubにプッシュしました！',
     confirmClearHistory: 'すべての履歴をクリアしてもよろしいですか？',
-    
+
     // GitHub Modal
     saveToGithub: 'GitHubに保存',
     fileName: 'ファイル名',
@@ -582,7 +594,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     successfullyPushed: 'プッシュ成功！',
     viewOnGithub: 'GitHubで表示',
     githubNotConfigured: 'GitHub連携が設定されていません。設定に移動しますか？',
-    
+
     // Settings page - additional
     syncBackupTitle: '同期とバックアップ（暗号化）',
     syncDescription: 'ログインしてデバイス間で設定を同期します。すべての重要なデータ（APIキー）はアップロード前にクライアント側で暗号化されます。',
@@ -597,7 +609,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     syncUp: '同期アップロード',
     restore: '復元',
     lastSynced: '最終同期',
-    
+
     // Toutiao config
     toutiaoConfigTitle: '頭条設定',
     cookieLabel: 'Cookie（公開に必要）',
@@ -606,19 +618,19 @@ export const TRANSLATIONS: Record<string, Translation> = {
     autoPublish: '自動公開',
     autoPublishHintToutiao: '記事生成後、自動的に頭条に公開し、公開ページに移動します',
     noToutiaoCookie: '頭条のログインCookieが見つかりません。頭条のログインページを開きますか？',
-    
+
     // Zhihu config
     zhihuConfigTitle: '知乎コラム設定',
     autoPublishHintZhihu: '記事生成後、自動的に知乎コラムに公開します',
     noZhihuCookie: '知乎のログインCookieが見つかりません。知乎のログインページを開きますか？',
-    
+
     // Weixin config
     weixinConfigTitle: 'WeChat公式アカウント設定',
     authorNameLabel: '著者名（オリジナル宣言用）',
     authorNameHint: 'オリジナルコンテンツ宣言に表示される著者名を入力してください',
     autoPublishHintWeixin: 'コンテンツの準備ができたら自動的に公開します',
     noWeixinCookie: 'WeChatのログインCookieが見つかりません。WeChat公式アカウントのログインページを開きますか？',
-    
+
     // Article style
     articleStyleTitle: '記事スタイル設定',
     articleStyleHint: 'スライダーを調整してAI生成記事のスタイルを制御します',
@@ -641,20 +653,20 @@ export const TRANSLATIONS: Record<string, Translation> = {
     styleHumorLeft: '真面目',
     styleHumorRight: 'ユーモラス',
     resetToDefaultStyle: 'デフォルトスタイルにリセット',
-    
+
     // Debug mode
     debugModeTitle: 'デバッグモード',
     debugModeHint: 'エラーログを自動的にサーバーにアップロードして分析します',
-    
+
     // Misc
     downloadMarkdown: 'ダウンロード',
-    
+
     // Custom prompts for platforms
     customPromptLabel: 'カスタムプロンプト',
     customPromptHint: 'このプラットフォーム用のAI生成プロンプトをカスタマイズします。空のままにするとデフォルトが使用されます。',
     customPromptPlaceholder: '記事生成用のカスタムプロンプトを入力...',
     resetToDefault: 'デフォルトに戻す',
-    
+
     // Auto save
     autoSaving: '自動保存中...',
     autoSaved: '自動保存しました',
@@ -690,13 +702,14 @@ export const TRANSLATIONS: Record<string, Translation> = {
     saveButton: '설정 저장',
     savedButton: '저장되었습니다!',
     savedMessage: '저장됨!',
-    
+
     // Home page
     slogan: '누구나 쉽게 목소리를 내고, 원클릭으로 모든 플랫폼에 게시',
     homeDescription: 'ChatGPT 또는 Gemini 채팅 페이지를 열고 아래 버튼을 클릭하여 게시',
     publishToToutiao: '头条',
     publishToZhihu: '知乎',
     publishToWeixin: 'WeChat',
+    publishToXiaohongshu: '小红书',
     orSeparator: '또는',
     generateArticleOnly: '기사만 생성',
     generateSummary: '요약 생성',
@@ -717,15 +730,17 @@ export const TRANSLATIONS: Record<string, Translation> = {
     toutiao: '头条',
     zhihu: '知乎',
     weixin: 'WeChat',
+    xiaohongshu: '小红书',
     refinePromptPlaceholder: 'AI에게 개선 요청 (예: "짧게 해줘")...',
     status: '상태',
-    
+
     // Messages
     extractingContent: '페이지에서 콘텐츠 추출 중...',
     contentExtracted: '콘텐츠 추출 완료! 생성 시작...',
     publishingToToutiao: '头条에 게시 중...',
     publishingToZhihu: '知乎에 게시 중...',
     publishingToWeixin: 'WeChat에 게시 중...',
+    publishingToXiaohongshu: '小红书에 게시 중...',
     publishSuccess: '게시 성공!',
     publishFailed: '게시 실패',
     connectionFailed: '연결 실패. 페이지를 새로고침하세요.',
@@ -735,7 +750,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     copiedToClipboard: '클립보드에 복사됨!',
     pushedToGithub: 'GitHub에 푸시됨!',
     confirmClearHistory: '모든 기록을 지우시겠습니까?',
-    
+
     // GitHub Modal
     saveToGithub: 'GitHub에 저장',
     fileName: '파일 이름',
@@ -747,7 +762,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     successfullyPushed: '푸시 성공!',
     viewOnGithub: 'GitHub에서 보기',
     githubNotConfigured: 'GitHub 연동이 설정되지 않았습니다. 설정으로 이동하시겠습니까?',
-    
+
     // Settings page - additional
     syncBackupTitle: '동기화 및 백업 (암호화)',
     syncDescription: '로그인하여 여러 기기에서 설정을 동기화하세요. 모든 중요 데이터(API 키)는 업로드 전에 클라이언트 측에서 암호화됩니다.',
@@ -762,7 +777,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     syncUp: '동기화 업로드',
     restore: '복원',
     lastSynced: '마지막 동기화',
-    
+
     // Toutiao config
     toutiaoConfigTitle: '头条 설정',
     cookieLabel: 'Cookie (게시에 필요)',
@@ -771,19 +786,19 @@ export const TRANSLATIONS: Record<string, Translation> = {
     autoPublish: '자동 게시',
     autoPublishHintToutiao: '기사 생성 후 자동으로 头条에 게시하고 게시 페이지로 이동합니다',
     noToutiaoCookie: '头条 로그인 쿠키를 찾을 수 없습니다. 头条 로그인 페이지를 여시겠습니까?',
-    
+
     // Zhihu config
     zhihuConfigTitle: '知乎 칼럼 설정',
     autoPublishHintZhihu: '기사 생성 후 자동으로 知乎 칼럼에 게시합니다',
     noZhihuCookie: '知乎 로그인 쿠키를 찾을 수 없습니다. 知乎 로그인 페이지를 여시겠습니까?',
-    
+
     // Weixin config
     weixinConfigTitle: 'WeChat 공식 계정 설정',
     authorNameLabel: '작성자 이름 (원본 선언용)',
     authorNameHint: '원본 콘텐츠 선언에 표시될 작성자 이름을 입력하세요',
     autoPublishHintWeixin: '콘텐츠가 준비되면 자동으로 게시합니다',
     noWeixinCookie: 'WeChat 로그인 쿠키를 찾을 수 없습니다. WeChat 공식 계정 로그인 페이지를 여시겠습니까?',
-    
+
     // Article style
     articleStyleTitle: '기사 스타일 설정',
     articleStyleHint: '슬라이더를 조정하여 AI 생성 기사의 스타일을 제어하세요',
@@ -806,20 +821,20 @@ export const TRANSLATIONS: Record<string, Translation> = {
     styleHumorLeft: '진지한',
     styleHumorRight: '유머러스',
     resetToDefaultStyle: '기본 스타일로 재설정',
-    
+
     // Debug mode
     debugModeTitle: '디버그 모드',
     debugModeHint: '분석을 위해 오류 로그를 서버에 자동 업로드합니다',
-    
+
     // Misc
     downloadMarkdown: '다운로드',
-    
+
     // Custom prompts for platforms
     customPromptLabel: '사용자 정의 프롬프트',
     customPromptHint: '이 플랫폼의 AI 생성 프롬프트를 사용자 정의합니다. 비워두면 기본값이 사용됩니다.',
     customPromptPlaceholder: '기사 생성을 위한 사용자 정의 프롬프트 입력...',
     resetToDefault: '기본값으로 복원',
-    
+
     // Auto save
     autoSaving: '자동 저장 중...',
     autoSaved: '자동 저장됨',
@@ -855,13 +870,14 @@ export const TRANSLATIONS: Record<string, Translation> = {
     saveButton: 'Einstellungen speichern',
     savedButton: 'Erfolgreich gespeichert!',
     savedMessage: 'Gespeichert!',
-    
+
     // Home page
     slogan: 'Jeder kann sich leicht äußern, mit einem Klick auf allen Plattformen veröffentlichen',
     homeDescription: 'Öffnen Sie eine ChatGPT- oder Gemini-Chatseite und klicken Sie auf die Schaltfläche unten',
     publishToToutiao: 'Toutiao',
     publishToZhihu: 'Zhihu',
     publishToWeixin: 'WeChat',
+    publishToXiaohongshu: 'Xiaohongshu',
     orSeparator: 'oder',
     generateArticleOnly: 'Nur Artikel generieren',
     generateSummary: 'Zusammenfassung generieren',
@@ -882,15 +898,17 @@ export const TRANSLATIONS: Record<string, Translation> = {
     toutiao: 'Toutiao',
     zhihu: 'Zhihu',
     weixin: 'WeChat',
+    xiaohongshu: 'Xiaohongshu',
     refinePromptPlaceholder: 'KI um Verbesserung bitten (z.B. "Kürzer machen")...',
     status: 'Status',
-    
+
     // Messages
     extractingContent: 'Inhalt von Seite extrahieren...',
     contentExtracted: 'Inhalt extrahiert! Generierung starten...',
     publishingToToutiao: 'Veröffentlichung auf Toutiao...',
     publishingToZhihu: 'Veröffentlichung auf Zhihu...',
     publishingToWeixin: 'Veröffentlichung auf WeChat...',
+    publishingToXiaohongshu: 'Veröffentlichung auf Xiaohongshu...',
     publishSuccess: 'Erfolgreich veröffentlicht!',
     publishFailed: 'Veröffentlichung fehlgeschlagen',
     connectionFailed: 'Verbindung fehlgeschlagen. Bitte Seite aktualisieren.',
@@ -900,7 +918,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     copiedToClipboard: 'In Zwischenablage kopiert!',
     pushedToGithub: 'Zu GitHub gepusht!',
     confirmClearHistory: 'Möchten Sie wirklich den gesamten Verlauf löschen?',
-    
+
     // GitHub Modal
     saveToGithub: 'Auf GitHub speichern',
     fileName: 'Dateiname',
@@ -912,7 +930,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     successfullyPushed: 'Erfolgreich gepusht!',
     viewOnGithub: 'Auf GitHub anzeigen',
     githubNotConfigured: 'GitHub-Integration ist nicht konfiguriert. Zu Einstellungen gehen?',
-    
+
     // Settings page - additional
     syncBackupTitle: 'Synchronisierung & Backup (Verschlüsselt)',
     syncDescription: 'Melden Sie sich an, um Ihre Einstellungen geräteübergreifend zu synchronisieren. Alle kritischen Daten (API-Schlüssel) werden vor dem Upload clientseitig verschlüsselt.',
@@ -927,7 +945,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     syncUp: 'Hochladen',
     restore: 'Wiederherstellen',
     lastSynced: 'Zuletzt synchronisiert',
-    
+
     // Toutiao config
     toutiaoConfigTitle: 'Toutiao-Konfiguration',
     cookieLabel: 'Cookie (Erforderlich zum Veröffentlichen)',
@@ -936,19 +954,19 @@ export const TRANSLATIONS: Record<string, Translation> = {
     autoPublish: 'Automatisch veröffentlichen',
     autoPublishHintToutiao: 'Nach der Artikelgenerierung automatisch auf Toutiao veröffentlichen und zur Veröffentlichungsseite navigieren',
     noToutiaoCookie: 'Keine Toutiao-Login-Cookies gefunden. Möchten Sie die Toutiao-Anmeldeseite öffnen?',
-    
+
     // Zhihu config
     zhihuConfigTitle: 'Zhihu-Spalten-Konfiguration',
     autoPublishHintZhihu: 'Nach der Artikelgenerierung automatisch in der Zhihu-Spalte veröffentlichen',
     noZhihuCookie: 'Keine Zhihu-Login-Cookies gefunden. Möchten Sie die Zhihu-Anmeldeseite öffnen?',
-    
+
     // Weixin config
     weixinConfigTitle: 'WeChat Offizielles Konto Konfiguration',
     authorNameLabel: 'Autorenname (für Originalerklärung)',
     authorNameHint: 'Geben Sie Ihren Autorennamen für die Originalinhaltserklärung ein',
     autoPublishHintWeixin: 'Automatisch veröffentlichen, wenn der Inhalt bereit ist',
     noWeixinCookie: 'Keine WeChat-Login-Cookies gefunden. Möchten Sie die WeChat-Anmeldeseite öffnen?',
-    
+
     // Article style
     articleStyleTitle: 'Artikelstil-Einstellungen',
     articleStyleHint: 'Passen Sie die Schieberegler an, um den Stil des KI-generierten Artikels zu steuern',
@@ -971,20 +989,20 @@ export const TRANSLATIONS: Record<string, Translation> = {
     styleHumorLeft: 'Ernst',
     styleHumorRight: 'Humorvoll',
     resetToDefaultStyle: 'Auf Standardstil zurücksetzen',
-    
+
     // Debug mode
     debugModeTitle: 'Debug-Modus',
     debugModeHint: 'Fehlerprotokolle automatisch zur Analyse auf den Server hochladen',
-    
+
     // Misc
     downloadMarkdown: 'Herunterladen',
-    
+
     // Custom prompts for platforms
     customPromptLabel: 'Benutzerdefinierter Prompt',
     customPromptHint: 'Passen Sie den KI-Generierungsprompt für diese Plattform an. Leer lassen für Standard.',
     customPromptPlaceholder: 'Benutzerdefinierten Prompt für Artikelgenerierung eingeben...',
     resetToDefault: 'Standard wiederherstellen',
-    
+
     // Auto save
     autoSaving: 'Automatisch speichern...',
     autoSaved: 'Automatisch gespeichert',
@@ -1020,13 +1038,14 @@ export const TRANSLATIONS: Record<string, Translation> = {
     saveButton: 'Enregistrer les paramètres',
     savedButton: 'Enregistré avec succès !',
     savedMessage: 'Enregistré !',
-    
+
     // Home page
     slogan: 'Permettre à chacun de s\'exprimer facilement, publier sur toutes les plateformes en un clic',
     homeDescription: 'Ouvrez une page de chat ChatGPT ou Gemini et cliquez sur le bouton ci-dessous',
     publishToToutiao: 'Toutiao',
     publishToZhihu: 'Zhihu',
     publishToWeixin: 'WeChat',
+    publishToXiaohongshu: 'Xiaohongshu',
     orSeparator: 'ou',
     generateArticleOnly: 'Générer article uniquement',
     generateSummary: 'Générer résumé',
@@ -1047,15 +1066,17 @@ export const TRANSLATIONS: Record<string, Translation> = {
     toutiao: 'Toutiao',
     zhihu: 'Zhihu',
     weixin: 'WeChat',
+    xiaohongshu: 'Xiaohongshu',
     refinePromptPlaceholder: 'Demander à l\'IA d\'améliorer (ex: "Raccourcir")...',
     status: 'Statut',
-    
+
     // Messages
     extractingContent: 'Extraction du contenu de la page...',
     contentExtracted: 'Contenu extrait ! Démarrage de la génération...',
     publishingToToutiao: 'Publication sur Toutiao...',
     publishingToZhihu: 'Publication sur Zhihu...',
     publishingToWeixin: 'Publication sur WeChat...',
+    publishingToXiaohongshu: 'Publication sur Xiaohongshu...',
     publishSuccess: 'Publié avec succès !',
     publishFailed: 'Échec de la publication',
     connectionFailed: 'Connexion échouée. Veuillez rafraîchir la page.',
@@ -1065,7 +1086,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     copiedToClipboard: 'Copié dans le presse-papiers !',
     pushedToGithub: 'Poussé vers GitHub !',
     confirmClearHistory: 'Êtes-vous sûr de vouloir effacer tout l\'historique ?',
-    
+
     // GitHub Modal
     saveToGithub: 'Enregistrer sur GitHub',
     fileName: 'Nom du fichier',
@@ -1077,7 +1098,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     successfullyPushed: 'Poussé avec succès !',
     viewOnGithub: 'Voir sur GitHub',
     githubNotConfigured: 'L\'intégration GitHub n\'est pas configurée. Aller aux paramètres ?',
-    
+
     // Settings page - additional
     syncBackupTitle: 'Synchronisation et sauvegarde (Chiffré)',
     syncDescription: 'Connectez-vous pour synchroniser vos paramètres sur tous vos appareils. Toutes les données critiques (clés API) sont chiffrées côté client avant l\'envoi.',
@@ -1092,7 +1113,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     syncUp: 'Synchroniser',
     restore: 'Restaurer',
     lastSynced: 'Dernière synchronisation',
-    
+
     // Toutiao config
     toutiaoConfigTitle: 'Configuration Toutiao',
     cookieLabel: 'Cookie (Requis pour publier)',
@@ -1101,19 +1122,19 @@ export const TRANSLATIONS: Record<string, Translation> = {
     autoPublish: 'Publication automatique',
     autoPublishHintToutiao: 'Publier automatiquement sur Toutiao après la génération de l\'article et naviguer vers la page de publication',
     noToutiaoCookie: 'Aucun cookie de connexion Toutiao trouvé. Voulez-vous ouvrir la page de connexion Toutiao ?',
-    
+
     // Zhihu config
     zhihuConfigTitle: 'Configuration de la colonne Zhihu',
     autoPublishHintZhihu: 'Publier automatiquement dans la colonne Zhihu après la génération de l\'article',
     noZhihuCookie: 'Aucun cookie de connexion Zhihu trouvé. Voulez-vous ouvrir la page de connexion Zhihu ?',
-    
+
     // Weixin config
     weixinConfigTitle: 'Configuration du compte officiel WeChat',
     authorNameLabel: 'Nom de l\'auteur (pour la déclaration d\'originalité)',
     authorNameHint: 'Entrez votre nom d\'auteur pour la déclaration de contenu original',
     autoPublishHintWeixin: 'Publier automatiquement lorsque le contenu est prêt',
     noWeixinCookie: 'Aucun cookie de connexion WeChat trouvé. Voulez-vous ouvrir la page de connexion WeChat ?',
-    
+
     // Article style
     articleStyleTitle: 'Paramètres de style d\'article',
     articleStyleHint: 'Ajustez les curseurs pour contrôler le style de l\'article généré par l\'IA',
@@ -1136,20 +1157,20 @@ export const TRANSLATIONS: Record<string, Translation> = {
     styleHumorLeft: 'Sérieux',
     styleHumorRight: 'Humoristique',
     resetToDefaultStyle: 'Réinitialiser au style par défaut',
-    
+
     // Debug mode
     debugModeTitle: 'Mode débogage',
     debugModeHint: 'Télécharger automatiquement les journaux d\'erreurs sur le serveur pour analyse',
-    
+
     // Misc
     downloadMarkdown: 'Télécharger',
-    
+
     // Custom prompts for platforms
     customPromptLabel: 'Prompt personnalisé',
     customPromptHint: 'Personnalisez le prompt de génération IA pour cette plateforme. Laissez vide pour utiliser le défaut.',
     customPromptPlaceholder: 'Entrez un prompt personnalisé pour la génération d\'articles...',
     resetToDefault: 'Restaurer par défaut',
-    
+
     // Auto save
     autoSaving: 'Sauvegarde automatique...',
     autoSaved: 'Sauvegardé automatiquement',
@@ -1185,13 +1206,14 @@ export const TRANSLATIONS: Record<string, Translation> = {
     saveButton: 'Guardar configuración',
     savedButton: '¡Guardado exitosamente!',
     savedMessage: '¡Guardado!',
-    
+
     // Home page
     slogan: 'Permitir que todos se expresen fácilmente, publicar en todas las plataformas con un clic',
     homeDescription: 'Abra una página de chat de ChatGPT o Gemini y haga clic en el botón de abajo',
     publishToToutiao: 'Toutiao',
     publishToZhihu: 'Zhihu',
     publishToWeixin: 'WeChat',
+    publishToXiaohongshu: 'Xiaohongshu',
     orSeparator: 'o',
     generateArticleOnly: 'Solo generar artículo',
     generateSummary: 'Generar resumen',
@@ -1212,15 +1234,17 @@ export const TRANSLATIONS: Record<string, Translation> = {
     toutiao: 'Toutiao',
     zhihu: 'Zhihu',
     weixin: 'WeChat',
+    xiaohongshu: 'Xiaohongshu',
     refinePromptPlaceholder: 'Pedir a la IA que mejore (ej: "Hazlo más corto")...',
     status: 'Estado',
-    
+
     // Messages
     extractingContent: 'Extrayendo contenido de la página...',
     contentExtracted: '¡Contenido extraído! Iniciando generación...',
     publishingToToutiao: 'Publicando en Toutiao...',
     publishingToZhihu: 'Publicando en Zhihu...',
     publishingToWeixin: 'Publicando en WeChat...',
+    publishingToXiaohongshu: 'Publicando en Xiaohongshu...',
     publishSuccess: '¡Publicado exitosamente!',
     publishFailed: 'Error al publicar',
     connectionFailed: 'Conexión fallida. Por favor actualice la página.',
@@ -1230,7 +1254,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     copiedToClipboard: '¡Copiado al portapapeles!',
     pushedToGithub: '¡Enviado a GitHub!',
     confirmClearHistory: '¿Está seguro de que desea borrar todo el historial?',
-    
+
     // GitHub Modal
     saveToGithub: 'Guardar en GitHub',
     fileName: 'Nombre del archivo',
@@ -1242,7 +1266,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     successfullyPushed: '¡Enviado exitosamente!',
     viewOnGithub: 'Ver en GitHub',
     githubNotConfigured: 'La integración de GitHub no está configurada. ¿Ir a configuración?',
-    
+
     // Settings page - additional
     syncBackupTitle: 'Sincronización y copia de seguridad (Cifrado)',
     syncDescription: 'Inicie sesión para sincronizar su configuración entre dispositivos. Todos los datos críticos (claves API) se cifran en el cliente antes de cargarlos.',
@@ -1257,7 +1281,7 @@ export const TRANSLATIONS: Record<string, Translation> = {
     syncUp: 'Sincronizar',
     restore: 'Restaurar',
     lastSynced: 'Última sincronización',
-    
+
     // Toutiao config
     toutiaoConfigTitle: 'Configuración de Toutiao',
     cookieLabel: 'Cookie (Requerido para publicar)',
@@ -1266,19 +1290,19 @@ export const TRANSLATIONS: Record<string, Translation> = {
     autoPublish: 'Publicación automática',
     autoPublishHintToutiao: 'Publicar automáticamente en Toutiao después de generar el artículo y navegar a la página de publicación',
     noToutiaoCookie: 'No se encontraron cookies de inicio de sesión de Toutiao. ¿Desea abrir la página de inicio de sesión de Toutiao?',
-    
+
     // Zhihu config
     zhihuConfigTitle: 'Configuración de columna Zhihu',
     autoPublishHintZhihu: 'Publicar automáticamente en la columna Zhihu después de generar el artículo',
     noZhihuCookie: 'No se encontraron cookies de inicio de sesión de Zhihu. ¿Desea abrir la página de inicio de sesión de Zhihu?',
-    
+
     // Weixin config
     weixinConfigTitle: 'Configuración de cuenta oficial de WeChat',
     authorNameLabel: 'Nombre del autor (para declaración de originalidad)',
     authorNameHint: 'Ingrese su nombre de autor para la declaración de contenido original',
     autoPublishHintWeixin: 'Publicar automáticamente cuando el contenido esté listo',
     noWeixinCookie: 'No se encontraron cookies de inicio de sesión de WeChat. ¿Desea abrir la página de inicio de sesión de WeChat?',
-    
+
     // Article style
     articleStyleTitle: 'Configuración de estilo de artículo',
     articleStyleHint: 'Ajuste los controles deslizantes para controlar el estilo del artículo generado por IA',
@@ -1301,20 +1325,20 @@ export const TRANSLATIONS: Record<string, Translation> = {
     styleHumorLeft: 'Serio',
     styleHumorRight: 'Humorístico',
     resetToDefaultStyle: 'Restablecer al estilo predeterminado',
-    
+
     // Debug mode
     debugModeTitle: 'Modo de depuración',
     debugModeHint: 'Cargar automáticamente registros de errores al servidor para análisis',
-    
+
     // Misc
     downloadMarkdown: 'Descargar',
-    
+
     // Custom prompts for platforms
     customPromptLabel: 'Prompt personalizado',
     customPromptHint: 'Personalice el prompt de generación de IA para esta plataforma. Deje vacío para usar el predeterminado.',
     customPromptPlaceholder: 'Ingrese un prompt personalizado para la generación de artículos...',
     resetToDefault: 'Restaurar predeterminado',
-    
+
     // Auto save
     autoSaving: 'Guardando automáticamente...',
     autoSaved: 'Guardado automáticamente',

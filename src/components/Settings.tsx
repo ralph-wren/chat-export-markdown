@@ -375,12 +375,24 @@ const Settings: React.FC = () => {
         console.log('[Prompt Update] 微信提示词已更新到版本:', PROMPT_VERSIONS.WEIXIN);
       }
 
+      // 检查小红书提示词版本
+      if (settings.promptVersions?.xiaohongshu !== PROMPT_VERSIONS.XIAOHONGSHU) {
+        newSettings.xiaohongshu = {
+          ...newSettings.xiaohongshu,
+          cookie: newSettings.xiaohongshu?.cookie || '',
+          customPrompt: XIAOHONGSHU_DEFAULT_PROMPT
+        };
+        needsUpdate = true;
+        console.log('[Prompt Update] 小红书提示词已更新到版本:', PROMPT_VERSIONS.XIAOHONGSHU);
+      }
+
       if (needsUpdate) {
         // 更新版本号
         newSettings.promptVersions = {
           toutiao: PROMPT_VERSIONS.TOUTIAO,
           zhihu: PROMPT_VERSIONS.ZHIHU,
-          weixin: PROMPT_VERSIONS.WEIXIN
+          weixin: PROMPT_VERSIONS.WEIXIN,
+          xiaohongshu: PROMPT_VERSIONS.XIAOHONGSHU
         };
 
         // 阻止自动保存触发
