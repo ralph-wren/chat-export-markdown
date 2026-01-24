@@ -31,10 +31,10 @@ let cookieUpdateTimers: { [key: string]: NodeJS.Timeout } = {};
 chrome.cookies.onChanged.addListener(async (changeInfo) => {
   const { cookie } = changeInfo;
   const domain = cookie.domain;
-  
+
   // 判断是哪个平台的 cookie 变化
   let platform: 'toutiao' | 'zhihu' | 'weixin' | null = null;
-  
+
   if (domain.includes('toutiao.com')) {
     platform = 'toutiao';
   } else if (domain.includes('zhihu.com')) {
@@ -42,15 +42,15 @@ chrome.cookies.onChanged.addListener(async (changeInfo) => {
   } else if (domain.includes('qq.com')) {
     platform = 'weixin';
   }
-  
+
   if (!platform) return;
-  
+
   // 使用防抖，避免短时间内多次 cookie 变化导致频繁更新
   // 等待 2 秒后再更新，确保所有 cookie 都已设置完成
   if (cookieUpdateTimers[platform]) {
     clearTimeout(cookieUpdateTimers[platform]);
   }
-  
+
   cookieUpdateTimers[platform] = setTimeout(async () => {
     console.log(`[Cookie Monitor] Detected ${platform} cookie change, auto-updating...`);
     await updatePlatformCookie(platform!);
@@ -63,10 +63,10 @@ async function updatePlatformCookie(platform: 'toutiao' | 'zhihu' | 'weixin') {
   try {
     const settings = await getSettings();
     const now = Date.now() / 1000;
-    
+
     let url: string;
     let settingsKey: 'toutiao' | 'zhihu' | 'weixin';
-    
+
     switch (platform) {
       case 'toutiao':
         url = 'https://mp.toutiao.com/';
@@ -81,25 +81,25 @@ async function updatePlatformCookie(platform: 'toutiao' | 'zhihu' | 'weixin') {
         settingsKey = 'weixin';
         break;
     }
-    
+
     // 使用 URL 方式获取该平台所有有效的 cookie
     const cookies = await chrome.cookies.getAll({ url });
-    
+
     // 过滤：只保留未过期且有值的 cookie
     const validCookies = cookies.filter(c => {
       if (c.expirationDate && c.expirationDate < now) return false;
       if (!c.value || c.value.trim() === '') return false;
       return true;
     });
-    
+
     if (validCookies.length > 0) {
       const cookieStr = validCookies.map(c => `${c.name}=${c.value}`).join('; ');
-      
+
       // 检查 cookie 是否有变化，避免无意义的更新
       const currentCookie = settings[settingsKey]?.cookie || '';
       if (cookieStr !== currentCookie) {
         console.log(`[Cookie Monitor] Updating ${platform} cookie (${validCookies.length} cookies)`);
-        
+
         const newSettings = {
           ...settings,
           [settingsKey]: {
@@ -107,7 +107,7 @@ async function updatePlatformCookie(platform: 'toutiao' | 'zhihu' | 'weixin') {
             cookie: cookieStr
           }
         };
-        
+
         await saveSettings(newSettings);
         console.log(`[Cookie Monitor] ${platform} cookie updated successfully`);
       }
@@ -117,7 +117,7 @@ async function updatePlatformCookie(platform: 'toutiao' | 'zhihu' | 'weixin') {
       const currentCookie = settings[settingsKey]?.cookie || '';
       if (currentCookie) {
         console.log(`[Cookie Monitor] ${platform} cookies cleared (user logged out?)`);
-        
+
         const newSettings = {
           ...settings,
           [settingsKey]: {
@@ -125,7 +125,7 @@ async function updatePlatformCookie(platform: 'toutiao' | 'zhihu' | 'weixin') {
             cookie: ''
           }
         };
-        
+
         await saveSettings(newSettings);
       }
     }
@@ -140,7 +140,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     handleLogin(message.payload.provider)
       .then(() => sendResponse({ success: true }))
       .catch((e: any) => sendResponse({ success: false, error: e.message || String(e) }));
-    return true; 
+    return true;
   }
 
   if (message.type === 'START_SUMMARIZATION') {
@@ -154,7 +154,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ success: true });
     return true; // async response
   }
-  
+
   if (message.type === 'START_REFINEMENT') {
     const { messages, title } = message.payload;
     startRefinement(messages, title);
@@ -210,7 +210,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
-  
+
   if (message.type === 'CANCEL_SUMMARIZATION') {
     if (abortController) {
       abortController.abort();
@@ -223,13 +223,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
-  
+
   if (message.type === 'GET_STATUS') {
     // Return the memory state which should be in sync with storage
     sendResponse(currentTask);
     return true;
   }
-  
+
   if (message.type === 'CLEAR_STATUS') {
     currentTask = null;
     chrome.storage.local.remove('currentTask');
@@ -266,8 +266,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .then(({ blob, mimeType, filename }) => {
         // 将 Blob 转换为 ArrayBuffer 以便传输
         return blob.arrayBuffer().then(arrayBuffer => {
-          sendResponse({ 
-            success: true, 
+          sendResponse({
+            success: true,
             arrayBuffer: Array.from(new Uint8Array(arrayBuffer)),
             mimeType,
             filename,
@@ -326,7 +326,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 async function handleInitiateProcess(platform: 'toutiao' | 'zhihu' | 'weixin', tabId: number) {
   const platformName = platform === 'toutiao' ? '头条' : platform === 'zhihu' ? '知乎' : '公众号';
-  
+
   // 1. 设置初始状态，让用户立即看到反馈
   currentTask = {
     status: 'Processing...',
@@ -339,7 +339,7 @@ async function handleInitiateProcess(platform: 'toutiao' | 'zhihu' | 'weixin', t
 
   try {
     console.log(`[Background] 开始抓取内容 (Tab: ${tabId})...`);
-    
+
     // 2. 从 Background 发送消息给 Content Script
     // 注意：这里需要处理 Content Script 可能未加载或连接失败的情况
     let response;
@@ -379,7 +379,7 @@ async function handleInitiateProcess(platform: 'toutiao' | 'zhihu' | 'weixin', t
       progress: 0,
       error: error.message
     });
-    
+
     // 发送错误通知
     chrome.notifications.create({
       type: 'basic',
@@ -397,10 +397,10 @@ async function handleInitiateProcess(platform: 'toutiao' | 'zhihu' | 'weixin', t
  */
 async function fetchLinkContent(url: string, timeout: number = 5000): Promise<string> {
   console.log(`[Background] Fetching link content: ${url}`);
-  
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
+
   try {
     const response = await fetch(url, {
       signal: controller.signal,
@@ -410,20 +410,20 @@ async function fetchLinkContent(url: string, timeout: number = 5000): Promise<st
         'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
       }
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
-    
+
     const html = await response.text();
-    
+
     // 简单提取文本内容（移除HTML标签）
     // 创建一个临时的DOM解析器
     const textContent = extractTextFromHtml(html);
-    
+
     console.log(`[Background] Fetched ${textContent.length} chars from ${url}`);
     return textContent;
-    
+
   } catch (error: any) {
     if (error.name === 'AbortError') {
       throw new Error('Request timeout');
@@ -437,11 +437,11 @@ async function fetchLinkContent(url: string, timeout: number = 5000): Promise<st
 async function fetchImageAsDataUrl(url: string, referrer?: string): Promise<{ dataUrl: string; mimeType: string }> {
   const u = new URL(url);
   const host = u.hostname.toLowerCase();
-  
+
   // 策略 1: 尝试使用图片代理服务（绕过防盗链）
   if (host.endsWith('sinaimg.cn')) {
     console.log(`[fetchImageAsDataUrl] 检测到微博图片，尝试使用代理服务`);
-    
+
     // 尝试多个图片代理服务
     const proxyServices = [
       // 方案 1: 直接尝试（可能失败）
@@ -451,7 +451,7 @@ async function fetchImageAsDataUrl(url: string, referrer?: string): Promise<{ da
       // 方案 3: 使用 imageproxy.pimg.tw 代理
       { url: `https://imageproxy.pimg.tw/resize?url=${encodeURIComponent(url)}`, name: 'pimg.tw' },
     ];
-    
+
     for (const proxy of proxyServices) {
       try {
         console.log(`[fetchImageAsDataUrl] 尝试代理: ${proxy.name}`);
@@ -463,9 +463,9 @@ async function fetchImageAsDataUrl(url: string, referrer?: string): Promise<{ da
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           },
         });
-        
+
         console.log(`[fetchImageAsDataUrl] ${proxy.name} 响应: ${response.status}`);
-        
+
         if (response.ok) {
           const blob = await response.blob();
           if (blob.size >= 1024) {
@@ -488,7 +488,7 @@ async function fetchImageAsDataUrl(url: string, referrer?: string): Promise<{ da
       }
     }
   }
-  
+
   // 策略 2: 传统的 referrer 策略（作为后备）
   const fallbackReferrers = [
     referrer,
@@ -500,12 +500,12 @@ async function fetchImageAsDataUrl(url: string, referrer?: string): Promise<{ da
 
   let lastErr: unknown = null;
   const attempts = fallbackReferrers.length ? fallbackReferrers : [undefined];
-  
+
   for (let i = 0; i < attempts.length; i++) {
     const r = attempts[i];
     try {
       console.log(`[fetchImageAsDataUrl] 尝试 referrer ${i + 1}/${attempts.length}: ${r || 'none'}`);
-      
+
       const response = await fetch(url, {
         cache: 'no-store',
         credentials: 'omit',
@@ -517,33 +517,33 @@ async function fetchImageAsDataUrl(url: string, referrer?: string): Promise<{ da
           ...(r ? { 'Referer': r } as any : {}),
         },
       });
-      
+
       console.log(`[fetchImageAsDataUrl] 响应状态: ${response.status} ${response.statusText}`);
-      
+
       if (!response.ok) {
         lastErr = new Error(`HTTP ${response.status} ${response.statusText}`);
         console.log(`[fetchImageAsDataUrl] 请求失败: ${lastErr}`);
         continue;
       }
-      
+
       const ct = (response.headers.get('content-type') || '').toLowerCase();
       console.log(`[fetchImageAsDataUrl] Content-Type: ${ct}`);
-      
+
       if (ct && !ct.startsWith('image/')) {
         lastErr = new Error(`Unexpected content-type: ${ct}`);
         console.log(`[fetchImageAsDataUrl] 内容类型错误: ${lastErr}`);
         continue;
       }
-      
+
       const blob = await response.blob();
       console.log(`[fetchImageAsDataUrl] Blob 大小: ${blob.size} bytes, 类型: ${blob.type}`);
-      
+
       if (blob.size < 1024) {
         lastErr = new Error(`图片太小 (${blob.size} bytes)，可能是错误页面`);
         console.log(`[fetchImageAsDataUrl] ${lastErr}`);
         continue;
       }
-      
+
       const mimeType = (blob.type || response.headers.get('content-type') || 'image/jpeg').split(';')[0].trim() || 'image/jpeg';
       const arrayBuffer = await blob.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
@@ -554,7 +554,7 @@ async function fetchImageAsDataUrl(url: string, referrer?: string): Promise<{ da
       }
       const base64 = btoa(binary);
       const dataUrl = `data:${mimeType};base64,${base64}`;
-      
+
       console.log(`[fetchImageAsDataUrl] 成功获取图片，base64 长度: ${dataUrl.length}`);
       return { dataUrl, mimeType };
     } catch (e) {
@@ -562,7 +562,7 @@ async function fetchImageAsDataUrl(url: string, referrer?: string): Promise<{ da
       console.error(`[fetchImageAsDataUrl] 异常:`, e);
     }
   }
-  
+
   const msg = lastErr instanceof Error ? lastErr.message : String(lastErr || 'unknown');
   console.error(`[fetchImageAsDataUrl] 所有尝试均失败: ${msg}`);
   throw new Error(`Failed to fetch image: ${msg}`);
@@ -576,13 +576,13 @@ async function fetchImageAsDataUrl(url: string, referrer?: string): Promise<{ da
  */
 async function downloadImageViaR2(url: string, _referrer?: string): Promise<string> {
   console.log(`[downloadImageViaR2] 开始处理: ${url}`);
-  
+
   try {
     const settings = await getSettings();
     const backendUrl = settings.sync?.backendUrl || DEFAULT_SETTINGS.sync!.backendUrl;
-    
+
     console.log(`[downloadImageViaR2] 调用后端 API: ${backendUrl}/api/upload-from-url`);
-    
+
     const uploadResponse = await fetch(`${backendUrl}/api/upload-from-url`, {
       method: 'POST',
       headers: {
@@ -590,21 +590,21 @@ async function downloadImageViaR2(url: string, _referrer?: string): Promise<stri
       },
       body: JSON.stringify({ url }),
     });
-    
+
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text();
       throw new Error(`后端 API 失败: HTTP ${uploadResponse.status} - ${errorText}`);
     }
-    
+
     const result = await uploadResponse.json();
-    
+
     if (!result.success || !result.url) {
       throw new Error(`后端 API 失败: ${result.error || '未知错误'}`);
     }
-    
+
     console.log(`[downloadImageViaR2] ✅ 成功，R2 URL: ${result.url}`);
     return result.url;
-    
+
   } catch (error: any) {
     console.error(`[downloadImageViaR2] 失败:`, error);
     throw new Error(`通过 R2 中转失败: ${error.message || String(error)}`);
@@ -616,23 +616,23 @@ async function downloadImageViaR2(url: string, _referrer?: string): Promise<stri
  */
 async function downloadImageAsBlob(url: string, referrer?: string): Promise<{ blob: Blob; mimeType: string; filename: string }> {
   console.log(`[downloadImageAsBlob] 开始下载: ${url}`);
-  
+
   const u = new URL(url);
   const host = u.hostname.toLowerCase();
-  
+
   // 生成文件名
   const generateFilename = (mimeType: string): string => {
     const ext = mimeType.split('/')[1] || 'jpg';
     return `weibo-image-${Date.now()}.${ext}`;
   };
-  
+
   // 策略 1: 尝试使用图片代理服务
   if (host.endsWith('sinaimg.cn')) {
     console.log(`[downloadImageAsBlob] 检测到微博图片，尝试使用代理服务`);
-    
+
     // 尝试将 URL 转换为更通用的格式
     const cleanUrl = url.replace(/^https?:\/\//, '');
-    
+
     const proxyServices = [
       // 方案 1: 使用 wsrv.nl (weserv.nl 的短域名)
       { url: `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}`, name: 'wsrv.nl' },
@@ -643,17 +643,19 @@ async function downloadImageAsBlob(url: string, referrer?: string): Promise<{ bl
       // 方案 4: 使用 img.shields.io (可能不支持，但值得一试)
       { url: `https://img.shields.io/badge/dynamic/json?url=${encodeURIComponent(url)}`, name: 'shields.io' },
       // 方案 5: 直接访问（带完整 headers）
-      { url: url, name: '直接访问(完整headers)', headers: {
-        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://weibo.com/',
-        'Origin': 'https://weibo.com',
-        'Sec-Fetch-Dest': 'image',
-        'Sec-Fetch-Mode': 'no-cors',
-        'Sec-Fetch-Site': 'cross-site',
-      }},
+      {
+        url: url, name: '直接访问(完整headers)', headers: {
+          'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://weibo.com/',
+          'Origin': 'https://weibo.com',
+          'Sec-Fetch-Dest': 'image',
+          'Sec-Fetch-Mode': 'no-cors',
+          'Sec-Fetch-Site': 'cross-site',
+        }
+      },
     ];
-    
+
     for (const proxy of proxyServices) {
       try {
         console.log(`[downloadImageAsBlob] 尝试代理: ${proxy.name}`);
@@ -666,19 +668,19 @@ async function downloadImageAsBlob(url: string, referrer?: string): Promise<{ bl
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           },
         });
-        
+
         console.log(`[downloadImageAsBlob] ${proxy.name} 响应: ${response.status}`);
-        
+
         if (response.ok) {
           const blob = await response.blob();
           console.log(`[downloadImageAsBlob] ${proxy.name} Blob大小: ${blob.size} bytes, 类型: ${blob.type}`);
-          
+
           // 检查是否是有效的图片
           const mimeType = (blob.type || '').toLowerCase();
-          const isValidImage = mimeType.startsWith('image/') && 
-                              !mimeType.includes('svg') && 
-                              blob.size >= 10240; // 至少 10KB
-          
+          const isValidImage = mimeType.startsWith('image/') &&
+            !mimeType.includes('svg') &&
+            blob.size >= 10240; // 至少 10KB
+
           if (isValidImage) {
             const cleanMimeType = (blob.type || 'image/jpeg').split(';')[0].trim() || 'image/jpeg';
             const filename = generateFilename(cleanMimeType);
@@ -693,7 +695,7 @@ async function downloadImageAsBlob(url: string, referrer?: string): Promise<{ bl
       }
     }
   }
-  
+
   // 策略 2: 传统的 referrer 策略
   const fallbackReferrers = [
     referrer,
@@ -705,12 +707,12 @@ async function downloadImageAsBlob(url: string, referrer?: string): Promise<{ bl
 
   let lastErr: unknown = null;
   const attempts = fallbackReferrers.length ? fallbackReferrers : [undefined];
-  
+
   for (let i = 0; i < attempts.length; i++) {
     const r = attempts[i];
     try {
       console.log(`[downloadImageAsBlob] 尝试 referrer ${i + 1}/${attempts.length}: ${r || 'none'}`);
-      
+
       const response = await fetch(url, {
         cache: 'no-store',
         credentials: 'omit',
@@ -722,25 +724,25 @@ async function downloadImageAsBlob(url: string, referrer?: string): Promise<{ bl
           ...(r ? { 'Referer': r } as any : {}),
         },
       });
-      
+
       console.log(`[downloadImageAsBlob] 响应状态: ${response.status} ${response.statusText}`);
-      
+
       if (!response.ok) {
         lastErr = new Error(`HTTP ${response.status} ${response.statusText}`);
         continue;
       }
-      
+
       const blob = await response.blob();
       console.log(`[downloadImageAsBlob] Blob 大小: ${blob.size} bytes`);
-      
+
       if (blob.size < 1024) {
         lastErr = new Error(`图片太小 (${blob.size} bytes)`);
         continue;
       }
-      
+
       const mimeType = (blob.type || response.headers.get('content-type') || 'image/jpeg').split(';')[0].trim() || 'image/jpeg';
       const filename = generateFilename(mimeType);
-      
+
       console.log(`[downloadImageAsBlob] 成功下载图片: ${filename}, ${(blob.size / 1024).toFixed(1)} KB`);
       return { blob, mimeType, filename };
     } catch (e) {
@@ -748,7 +750,7 @@ async function downloadImageAsBlob(url: string, referrer?: string): Promise<{ bl
       console.error(`[downloadImageAsBlob] 异常:`, e);
     }
   }
-  
+
   const msg = lastErr instanceof Error ? lastErr.message : String(lastErr || 'unknown');
   console.error(`[downloadImageAsBlob] 所有尝试均失败: ${msg}`);
   throw new Error(`Failed to download image: ${msg}`);
@@ -783,13 +785,13 @@ function extractTextFromHtml(html: string): string {
   let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
   text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
   text = text.replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '');
-  
+
   // 移除HTML注释
   text = text.replace(/<!--[\s\S]*?-->/g, '');
-  
+
   // 移除所有HTML标签
   text = text.replace(/<[^>]+>/g, ' ');
-  
+
   // 解码HTML实体
   text = text.replace(/&nbsp;/g, ' ');
   text = text.replace(/&amp;/g, '&');
@@ -804,11 +806,11 @@ function extractTextFromHtml(html: string): string {
   text = text.replace(/&mdash;/g, '—');
   text = text.replace(/&ndash;/g, '–');
   text = text.replace(/&#\d+;/g, ''); // 移除其他数字实体
-  
+
   // 清理多余空白
   text = text.replace(/\s+/g, ' ');
   text = text.trim();
-  
+
   return text;
 }
 
@@ -816,7 +818,7 @@ async function handleAnalyzeScreenshot({ prompt, history }: { prompt: string, hi
   try {
     const settings = await getSettings();
     let effectiveApiKey = settings.apiKeys?.[settings.provider] || settings.apiKey;
-    
+
     if (!effectiveApiKey) {
       throw new Error(`API Key for ${settings.provider} is missing.`);
     }
@@ -833,21 +835,21 @@ async function handleAnalyzeScreenshot({ prompt, history }: { prompt: string, hi
 
     // 2. Call AI with Vision
     const messages = [
-        ...(history || []),
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            { 
-              type: "image_url", 
-              image_url: { 
-                url: dataUrl,
-                detail: "low" // Use low detail for speed and cost, usually enough for UI buttons
-              } 
+      ...(history || []),
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          {
+            type: "image_url",
+            image_url: {
+              url: dataUrl,
+              detail: "low" // Use low detail for speed and cost, usually enough for UI buttons
             }
-          ]
-        } as any // Cast to any to avoid type issues if installed SDK is slightly old
-      ];
+          }
+        ]
+      } as any // Cast to any to avoid type issues if installed SDK is slightly old
+    ];
 
     const response = await openai.chat.completions.create({
       model: settings.model,
@@ -875,16 +877,16 @@ let startTime: number = 0;
 function startTimer(baseMessage: string) {
   if (timerInterval) clearInterval(timerInterval);
   startTime = Date.now();
-  
+
   timerInterval = setInterval(() => {
     if (!currentTask) {
       if (timerInterval) clearInterval(timerInterval);
       return;
     }
-    
+
     const elapsed = Math.floor((Date.now() - startTime) / 1000);
     const message = `${baseMessage} (${elapsed}s)`;
-    
+
     // Update task state without broadcasting every second to avoid UI flicker overkill, 
     // but here we want to show it, so we update storage and broadcast.
     // To optimize, maybe only broadcast if popup is open? 
@@ -909,11 +911,11 @@ async function startRefinement(messages: ChatMessage[], title?: string) {
     // so we set currentTask to empty object first if we want a fresh start, 
     // OR we just rely on overwriting fields.
     // For refinement, we want to ensure we track the title.
-    
+
     // Explicitly set the initial state for refinement
     currentTask = {
-      status: 'Refining...', 
-      message: 'Initializing refinement...', 
+      status: 'Refining...',
+      message: 'Initializing refinement...',
       progress: 5,
       conversationHistory: messages,
       title: title
@@ -923,7 +925,7 @@ async function startRefinement(messages: ChatMessage[], title?: string) {
 
     const settings = await getSettings();
     let effectiveApiKey = settings.apiKeys?.[settings.provider] || settings.apiKey;
-    
+
     if (!effectiveApiKey) {
       throw new Error(`API Key for ${settings.provider} is missing. Please check settings.`);
     }
@@ -933,9 +935,9 @@ async function startRefinement(messages: ChatMessage[], title?: string) {
       baseURL: settings.baseUrl,
     });
 
-    updateTaskState({ 
-      status: 'Refining...', 
-      message: 'Sending instructions to AI...', 
+    updateTaskState({
+      status: 'Refining...',
+      message: 'Sending instructions to AI...',
       progress: 30,
       conversationHistory: messages
     });
@@ -944,9 +946,9 @@ async function startRefinement(messages: ChatMessage[], title?: string) {
     const stream = await openai.chat.completions.create({
       model: settings.model,
       messages: [
-        { 
-          role: 'system', 
-          content: 'You are an expert technical editor. The conversation history contains a markdown document generated by an assistant. The user will ask for changes, optimizations, or extensions to this specific document. You must REWRITE the entire document incorporating these changes based on the existing content. Return ONLY the updated markdown content. Do not generate a new document from scratch unless explicitly asked. Do not include conversational filler like "Here is the updated version".' 
+        {
+          role: 'system',
+          content: 'You are an expert technical editor. The conversation history contains a markdown document generated by an assistant. The user will ask for changes, optimizations, or extensions to this specific document. You must REWRITE the entire document incorporating these changes based on the existing content. Return ONLY the updated markdown content. Do not generate a new document from scratch unless explicitly asked. Do not include conversational filler like "Here is the updated version".'
         },
         ...messages.filter(m => m.role !== 'system'),
       ] as any,
@@ -958,11 +960,11 @@ async function startRefinement(messages: ChatMessage[], title?: string) {
 
     let refinedContent = '';
     let lastUpdate = Date.now();
-    
+
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content || '';
       refinedContent += content;
-      
+
       // Throttle updates to UI every 500ms
       const now = Date.now();
       if (now - lastUpdate > 500) {
@@ -978,16 +980,16 @@ async function startRefinement(messages: ChatMessage[], title?: string) {
         broadcastUpdate();
       }
     }
-    
+
     stopTimer();
 
-    updateTaskState({ 
-      status: 'Refining...', 
-      message: 'Processing response...', 
+    updateTaskState({
+      status: 'Refining...',
+      message: 'Processing response...',
       progress: 90,
       conversationHistory: messages
     });
-    
+
     // Update history with assistant response
     const updatedHistory: ChatMessage[] = [
       ...messages,
@@ -1014,10 +1016,10 @@ async function startRefinement(messages: ChatMessage[], title?: string) {
     };
     await addHistoryItem(newItem);
 
-    updateTaskState({ 
-      status: 'Refined!', 
+    updateTaskState({
+      status: 'Refined!',
       message: 'Refinement complete!',
-      progress: 100, 
+      progress: 100,
       result: refinedContent,
       conversationHistory: updatedHistory,
       title: newTitle
@@ -1030,10 +1032,10 @@ async function startRefinement(messages: ChatMessage[], title?: string) {
       return;
     }
     console.error('Refinement error:', error);
-    updateTaskState({ 
-      status: 'Error', 
+    updateTaskState({
+      status: 'Error',
       message: error.message || 'Refinement failed',
-      progress: 0, 
+      progress: 0,
       error: error.message,
       conversationHistory: messages // Keep history so user can retry
     });
@@ -1046,27 +1048,27 @@ async function startRefinement(messages: ChatMessage[], title?: string) {
 async function startSummarization(extraction: ExtractionResult) {
   try {
     abortController = new AbortController();
-    
+
     // Explicitly reset task for new summarization
-    currentTask = { 
-      status: 'Processing...', 
-      message: 'Initializing...', 
+    currentTask = {
+      status: 'Processing...',
+      message: 'Initializing...',
       progress: 5,
-      title: extraction.title 
+      title: extraction.title
     };
     chrome.storage.local.set({ currentTask });
     broadcastUpdate();
 
     const settings = await getSettings();
-    
+
     // Determine the effective API Key:
     // 1. Try to get provider-specific key from the new apiKeys map
     // 2. Fallback to the legacy single 'apiKey' if not found
     let effectiveApiKey = settings.apiKeys?.[settings.provider] || settings.apiKey;
-    
+
     // Special handling for 'custom' provider: might rely on the legacy field if not explicitly mapped,
     // but the UI now syncs custom key to apiKeys['custom'] too.
-    
+
     if (!effectiveApiKey) {
       throw new Error(`API Key for ${settings.provider} is missing. Please check settings.`);
     }
@@ -1079,15 +1081,15 @@ async function startSummarization(extraction: ExtractionResult) {
     updateTaskState({ status: 'Processing...', message: 'Sending request to AI...', progress: 30 });
 
     // Format messages for better model understanding (avoid JSON confusion)
-    const formattedContent = Array.isArray(extraction.messages) 
+    const formattedContent = Array.isArray(extraction.messages)
       ? extraction.messages.map((m: any) => `### ${m.role ? m.role.toUpperCase() : 'CONTENT'}:\n${m.content}`).join('\n\n')
       : String(extraction.messages);
 
     const initialMessages = [
       { role: 'system', content: settings.systemPrompt },
-      { 
-        role: 'user', 
-        content: `Please summarize the following content from ${extraction.url}.\n\nTitle: ${extraction.title}\n\nContent:\n${formattedContent}` 
+      {
+        role: 'user',
+        content: `Please summarize the following content from ${extraction.url}.\n\nTitle: ${extraction.title}\n\nContent:\n${formattedContent}`
       }
     ];
 
@@ -1095,12 +1097,12 @@ async function startSummarization(extraction: ExtractionResult) {
     // Note: For stream, we might want a "time to first byte" timeout instead, but 
     // keeping it simple for now: if the whole process takes > 3 mins, kill it.
     const timeoutId = setTimeout(() => {
-        if (abortController) {
-            abortController.abort();
-            // We can't easily reject the await stream loop from outside, 
-            // but aborting the controller will throw an AbortError in the loop.
-        }
-    }, 180000); 
+      if (abortController) {
+        abortController.abort();
+        // We can't easily reject the await stream loop from outside, 
+        // but aborting the controller will throw an AbortError in the loop.
+      }
+    }, 180000);
 
     const stream = await openai.chat.completions.create({
       model: settings.model,
@@ -1119,54 +1121,54 @@ async function startSummarization(extraction: ExtractionResult) {
     let hasReceivedContent = false;
 
     try {
-        for await (const chunk of stream) {
-            if (!hasReceivedContent) {
-                // First byte received! Clear strict timeout and maybe set a longer one?
-                // For now, we rely on the 3min global timeout or user cancel.
-                hasReceivedContent = true;
-            }
-
-            const content = chunk.choices[0]?.delta?.content || '';
-            summary += content;
-            
-            const now = Date.now();
-            if (now - lastUpdate > 500) {
-                lastUpdate = now;
-                // Update in-memory task state and broadcast
-                currentTask = {
-                    ...currentTask,
-                    status: 'Processing...',
-                    message: `${baseMessage} (${Math.floor(summary.length / 100)}k chars)`,
-                    result: summary, // Live preview
-                    progress: 50 + Math.min(40, Math.floor(summary.length / 100))
-                } as ActiveTask;
-                broadcastUpdate();
-            }
+      for await (const chunk of stream) {
+        if (!hasReceivedContent) {
+          // First byte received! Clear strict timeout and maybe set a longer one?
+          // For now, we rely on the 3min global timeout or user cancel.
+          hasReceivedContent = true;
         }
+
+        const content = chunk.choices[0]?.delta?.content || '';
+        summary += content;
+
+        const now = Date.now();
+        if (now - lastUpdate > 500) {
+          lastUpdate = now;
+          // Update in-memory task state and broadcast
+          currentTask = {
+            ...currentTask,
+            status: 'Processing...',
+            message: `${baseMessage} (${Math.floor(summary.length / 100)}k chars)`,
+            result: summary, // Live preview
+            progress: 50 + Math.min(40, Math.floor(summary.length / 100))
+          } as ActiveTask;
+          broadcastUpdate();
+        }
+      }
     } finally {
-        clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
     }
-    
+
     stopTimer();
 
     updateTaskState({ status: 'Processing...', message: 'Finalizing...', progress: 95 });
-    
+
     // Improved content extraction logic:
     // 1. Check if the ENTIRE content is wrapped in a markdown code block.
     // We only extract if the code block starts at the beginning and ends at the end.
     // This prevents extracting a small internal code block (e.g. a Java example) and losing the rest of the document.
     const outerCodeBlockRegex = /^```(?:markdown)?\s*([\s\S]*?)\s*```$/i;
     const outerMatch = summary.trim().match(outerCodeBlockRegex);
-    
+
     if (outerMatch && outerMatch[1]) {
-        // Only if the whole thing is a block, we unwrap it.
-        summary = outerMatch[1];
+      // Only if the whole thing is a block, we unwrap it.
+      summary = outerMatch[1];
     } else {
-        // Otherwise, just strip any accidental leading/trailing backticks if they look like wrappers
-        // but be careful not to touch internal code blocks.
-        // Actually, if it's not a full wrapper, we assume the content is raw markdown.
-        // We just do a safety trim.
-        summary = summary.trim();
+      // Otherwise, just strip any accidental leading/trailing backticks if they look like wrappers
+      // but be careful not to touch internal code blocks.
+      // Actually, if it's not a full wrapper, we assume the content is raw markdown.
+      // We just do a safety trim.
+      summary = summary.trim();
     }
 
     // 2. Clean Front Matter: Ensure it starts exactly with "---"
@@ -1176,7 +1178,7 @@ async function startSummarization(extraction: ExtractionResult) {
     // - followed by typical Front Matter keys like "title:", "date:", "layout:" to reduce false positives
     const frontMatterStartRegex = /---\s*\n(?:\s*title:|\s*date:|\s*layout:)/;
     const match = summary.match(frontMatterStartRegex);
-    
+
     if (match) {
       // If we found a valid Front Matter start, discard everything before it
       summary = summary.slice(match.index);
@@ -1185,7 +1187,7 @@ async function startSummarization(extraction: ExtractionResult) {
       // This helps if the model output format is slightly off but still has Front Matter
       const simpleMatch = summary.match(/---\s*\n/);
       if (simpleMatch && summary.indexOf('title:', simpleMatch.index!) > simpleMatch.index!) {
-         summary = summary.slice(simpleMatch.index);
+        summary = summary.slice(simpleMatch.index);
       }
     }
 
@@ -1195,38 +1197,38 @@ async function startSummarization(extraction: ExtractionResult) {
     const frontMatterEndMatch = summary.substring(3).match(frontMatterEndRegex); // Skip first '---'
 
     if (frontMatterEndMatch) {
-        // We found the closing '---'
-        let bodyStartIndex = 3 + frontMatterEndMatch.index! + frontMatterEndMatch[0].length;
-        let body = summary.substring(bodyStartIndex);
-        
-        // Remove stray code block fences immediately after Front Matter
-        // This handles cases where LLM wraps output in ```markdown ... ``` and we only stripped the opening
-        const strayFenceMatch = body.match(/^\s*```(?:markdown)?\s*\n?/);
-        if (strayFenceMatch) {
-            const matchLen = strayFenceMatch[0].length;
-            summary = summary.substring(0, bodyStartIndex) + summary.substring(bodyStartIndex + matchLen);
-            body = summary.substring(bodyStartIndex);
-        }
-        
-        // Check if body starts with H1 (ignoring whitespace)
-        if (!/^\s*#\s+/.test(body)) {
-            // Insert title
-            const titleToInsert = extraction.title || 'Untitled';
-            summary = summary.substring(0, bodyStartIndex) + `\n\n# ${titleToInsert}\n` + body;
-        }
+      // We found the closing '---'
+      let bodyStartIndex = 3 + frontMatterEndMatch.index! + frontMatterEndMatch[0].length;
+      let body = summary.substring(bodyStartIndex);
+
+      // Remove stray code block fences immediately after Front Matter
+      // This handles cases where LLM wraps output in ```markdown ... ``` and we only stripped the opening
+      const strayFenceMatch = body.match(/^\s*```(?:markdown)?\s*\n?/);
+      if (strayFenceMatch) {
+        const matchLen = strayFenceMatch[0].length;
+        summary = summary.substring(0, bodyStartIndex) + summary.substring(bodyStartIndex + matchLen);
+        body = summary.substring(bodyStartIndex);
+      }
+
+      // Check if body starts with H1 (ignoring whitespace)
+      if (!/^\s*#\s+/.test(body)) {
+        // Insert title
+        const titleToInsert = extraction.title || 'Untitled';
+        summary = summary.substring(0, bodyStartIndex) + `\n\n# ${titleToInsert}\n` + body;
+      }
     } else {
-        // No valid Front Matter structure found (or only opening '---')
-        // Check if the whole text starts with H1
-        if (!/^\s*#\s+/.test(summary)) {
-             const titleToInsert = extraction.title || 'Untitled';
-             summary = `# ${titleToInsert}\n\n` + summary;
-        }
+      // No valid Front Matter structure found (or only opening '---')
+      // Check if the whole text starts with H1
+      if (!/^\s*#\s+/.test(summary)) {
+        const titleToInsert = extraction.title || 'Untitled';
+        summary = `# ${titleToInsert}\n\n` + summary;
+      }
     }
 
     // 4. Final Cleanup: Remove trailing code block fences
     summary = summary.trim();
     if (summary.endsWith('```')) {
-        summary = summary.substring(0, summary.length - 3).trim();
+      summary = summary.substring(0, summary.length - 3).trim();
     }
 
     // Save to History
@@ -1237,14 +1239,14 @@ async function startSummarization(extraction: ExtractionResult) {
       content: summary,
       url: extraction.url
     };
-    
+
     await addHistoryItem(newItem);
 
-    updateTaskState({ 
-      status: 'Done!', 
+    updateTaskState({
+      status: 'Done!',
       message: 'Summary generated successfully!',
-      progress: 100, 
-      result: summary, 
+      progress: 100,
+      result: summary,
       conversationHistory: [
         ...initialMessages as ChatMessage[],
         { role: 'assistant', content: summary }
@@ -1277,11 +1279,11 @@ async function startSummarization(extraction: ExtractionResult) {
     }
 
     console.error('Summarization error:', error);
-    updateTaskState({ 
-      status: 'Error', 
+    updateTaskState({
+      status: 'Error',
       message: error.message || 'An error occurred',
-      progress: 0, 
-      error: error.message 
+      progress: 0,
+      error: error.message
     });
 
     // Send Error Notification
@@ -1316,10 +1318,10 @@ async function handlePublishToToutiao(payload: { title: string; content: string;
       for (const cookie of cookies) {
         const separatorIndex = cookie.indexOf('=');
         if (separatorIndex === -1) continue;
-        
+
         const name = cookie.substring(0, separatorIndex);
         const value = cookie.substring(separatorIndex + 1);
-        
+
         if (name && value) {
           try {
             await chrome.cookies.set({
@@ -1340,17 +1342,17 @@ async function handlePublishToToutiao(payload: { title: string; content: string;
 
     // Clean up content before publishing
     let cleanedContent = payload.content;
-    
+
     // 1. Remove "封面图建议" section (including variations)
     // Pattern: "封面图建议：..." or "### 封面图建议" or "## 封面图建议" followed by content until next heading or double newline
     cleanedContent = cleanedContent.replace(/^#{1,3}\s*封面图建议[：:].*/gm, ''); // Remove heading style
     cleanedContent = cleanedContent.replace(/^\*?\*?封面图建议\*?\*?[：:][^\n]*(\n(?![#\n])[^\n]*)*/gm, ''); // Remove paragraph style with continuation
     cleanedContent = cleanedContent.replace(/^封面图建议[：:][^\n]*\n?/gm, ''); // Simple single line
-    
+
     // 2. Remove "Cover Image Suggestion" (English version)
     cleanedContent = cleanedContent.replace(/^#{1,3}\s*Cover Image Suggestion[：:].*/gim, '');
     cleanedContent = cleanedContent.replace(/^Cover Image Suggestion[：:][^\n]*\n?/gim, '');
-    
+
     // 3. Remove "其他备选标题" / "备选标题" section (including all variations)
     // This removes the heading and all following lines until the next heading or double newline
     cleanedContent = cleanedContent.replace(/^#{1,3}\s*其他备选标题[：:]?.*(\n(?!#)[^\n]*)*/gm, '');
@@ -1359,15 +1361,15 @@ async function handlePublishToToutiao(payload: { title: string; content: string;
     cleanedContent = cleanedContent.replace(/^\*?\*?备选标题\*?\*?[：:]?[^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
     cleanedContent = cleanedContent.replace(/^其他备选标题[：:]?[^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
     cleanedContent = cleanedContent.replace(/^备选标题[：:]?[^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
-    
+
     // 4. Remove blockquote style alternative titles (> 开头的备选标题列表)
     cleanedContent = cleanedContent.replace(/^>\s*[\d\.\-\*]*\s*[^>\n]*标题[^\n]*\n?/gm, '');
     cleanedContent = cleanedContent.replace(/^>\s*[\d\.\-\*]+[^\n]+\n?/gm, ''); // Remove numbered list in blockquote after title
-    
+
     // 3. Clean up multiple consecutive blank lines
     cleanedContent = cleanedContent.replace(/\n{3,}/g, '\n\n');
     cleanedContent = cleanedContent.trim();
-    
+
     // 4. Extract the real title from the content (H1 heading)
     let articleTitle = payload.title;
     const h1Match = cleanedContent.match(/^#\s+(.+)$/m);
@@ -1385,7 +1387,7 @@ async function handlePublishToToutiao(payload: { title: string; content: string;
         articleTitle = extractedTitle;
       }
     }
-    
+
     // 5. Remove the H1 title from content (Toutiao has separate title field)
     cleanedContent = cleanedContent.replace(/^#\s+.+\n+/, '');
     cleanedContent = cleanedContent.trim();
@@ -1431,10 +1433,10 @@ async function handlePublishToZhihu(payload: { title: string; content: string; s
       for (const cookie of cookies) {
         const separatorIndex = cookie.indexOf('=');
         if (separatorIndex === -1) continue;
-        
+
         const name = cookie.substring(0, separatorIndex);
         const value = cookie.substring(separatorIndex + 1);
-        
+
         if (name && value) {
           try {
             await chrome.cookies.set({
@@ -1455,7 +1457,7 @@ async function handlePublishToZhihu(payload: { title: string; content: string; s
 
     // Clean up content before publishing
     let cleanedContent = payload.content;
-    
+
     // Remove metadata sections similar to Toutiao
     cleanedContent = cleanedContent.replace(/^#{1,3}\s*封面图建议[：:].*/gm, '');
     cleanedContent = cleanedContent.replace(/^\*?\*?封面图建议\*?\*?[：:][^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
@@ -1464,11 +1466,11 @@ async function handlePublishToZhihu(payload: { title: string; content: string; s
     cleanedContent = cleanedContent.replace(/^#{1,3}\s*备选标题[：:]?.*(\n(?!#)[^\n]*)*/gm, '');
     cleanedContent = cleanedContent.replace(/^\*?\*?其他备选标题\*?\*?[：:]?[^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
     cleanedContent = cleanedContent.replace(/^\*?\*?备选标题\*?\*?[：:]?[^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
-    
+
     // Clean up multiple consecutive blank lines
     cleanedContent = cleanedContent.replace(/\n{3,}/g, '\n\n');
     cleanedContent = cleanedContent.trim();
-    
+
     // Extract the real title from the content (H1 heading)
     let articleTitle = payload.title;
     const h1Match = cleanedContent.match(/^#\s+(.+)$/m);
@@ -1484,7 +1486,7 @@ async function handlePublishToZhihu(payload: { title: string; content: string; s
         articleTitle = extractedTitle;
       }
     }
-    
+
     // Remove the H1 title from content (Zhihu has separate title field)
     cleanedContent = cleanedContent.replace(/^#\s+.+\n+/, '');
     cleanedContent = cleanedContent.trim();
@@ -1530,10 +1532,10 @@ async function handlePublishToWeixin(payload: { title: string; content: string; 
       for (const cookie of cookies) {
         const separatorIndex = cookie.indexOf('=');
         if (separatorIndex === -1) continue;
-        
+
         const name = cookie.substring(0, separatorIndex);
         const value = cookie.substring(separatorIndex + 1);
-        
+
         if (name && value) {
           try {
             await chrome.cookies.set({
@@ -1554,7 +1556,7 @@ async function handlePublishToWeixin(payload: { title: string; content: string; 
 
     // Clean up content before publishing
     let cleanedContent = payload.content;
-    
+
     // Remove metadata sections
     cleanedContent = cleanedContent.replace(/^#{1,3}\s*封面图建议[：:].*/gm, '');
     cleanedContent = cleanedContent.replace(/^\*?\*?封面图建议\*?\*?[：:][^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
@@ -1563,11 +1565,11 @@ async function handlePublishToWeixin(payload: { title: string; content: string; 
     cleanedContent = cleanedContent.replace(/^#{1,3}\s*备选标题[：:]?.*(\n(?!#)[^\n]*)*/gm, '');
     cleanedContent = cleanedContent.replace(/^\*?\*?其他备选标题\*?\*?[：:]?[^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
     cleanedContent = cleanedContent.replace(/^\*?\*?备选标题\*?\*?[：:]?[^\n]*(\n(?![#\n])[^\n]*)*/gm, '');
-    
+
     // Clean up multiple consecutive blank lines
     cleanedContent = cleanedContent.replace(/\n{3,}/g, '\n\n');
     cleanedContent = cleanedContent.trim();
-    
+
     // Extract the real title from the content (H1 heading)
     let articleTitle = payload.title;
     const h1Match = cleanedContent.match(/^#\s+(.+)$/m);
@@ -1583,7 +1585,7 @@ async function handlePublishToWeixin(payload: { title: string; content: string; 
         articleTitle = extractedTitle;
       }
     }
-    
+
     // Remove the H1 title from content (Weixin has separate title field)
     cleanedContent = cleanedContent.replace(/^#\s+.+\n+/, '');
     cleanedContent = cleanedContent.trim();
@@ -1605,14 +1607,14 @@ async function handlePublishToWeixin(payload: { title: string; content: string; 
 
     // 打开或激活微信公众号页面
     const mpUrl = 'https://mp.weixin.qq.com/';
-    
+
     // 优先查找编辑器页面
     const editorTabs = await chrome.tabs.query({ url: '*://mp.weixin.qq.com/*appmsg_edit*' });
     // 其次查找所有微信页面
     const allTabs = await chrome.tabs.query({ url: '*://mp.weixin.qq.com/*' });
-    
+
     let tab: chrome.tabs.Tab;
-    
+
     if (editorTabs.length > 0) {
       // 找到编辑器页面，复用它
       tab = editorTabs[0];
@@ -1645,11 +1647,11 @@ async function handlePublishToWeixin(payload: { title: string; content: string; 
 async function startArticleGeneration(extraction: ExtractionResult) {
   try {
     abortController = new AbortController();
-    
+
     // Explicitly reset task for new generation
-    currentTask = { 
-      status: 'Processing...', 
-      message: 'Initializing Article Generation...', 
+    currentTask = {
+      status: 'Processing...',
+      message: 'Initializing Article Generation...',
       progress: 5,
       title: extraction.title,
       sourceUrl: extraction.url,
@@ -1659,9 +1661,9 @@ async function startArticleGeneration(extraction: ExtractionResult) {
     broadcastUpdate();
 
     const settings = await getSettings();
-    
+
     let effectiveApiKey = settings.apiKeys?.[settings.provider] || settings.apiKey;
-    
+
     if (!effectiveApiKey) {
       throw new Error(`API Key for ${settings.provider} is missing. Please check settings.`);
     }
@@ -1673,7 +1675,7 @@ async function startArticleGeneration(extraction: ExtractionResult) {
 
     updateTaskState({ status: 'Processing...', message: 'Sending request to AI...', progress: 30 });
 
-    const formattedContent = Array.isArray(extraction.messages) 
+    const formattedContent = Array.isArray(extraction.messages)
       ? extraction.messages.map((m: any) => `### ${m.role ? m.role.toUpperCase() : 'CONTENT'}:\n${m.content}`).join('\n\n')
       : String(extraction.messages);
 
@@ -1682,17 +1684,17 @@ async function startArticleGeneration(extraction: ExtractionResult) {
 
     const initialMessages = [
       { role: 'system', content: articlePrompt },
-      { 
-        role: 'user', 
-        content: `请根据以下内容生成一篇自媒体文章。\n\n来源：${extraction.url}\n\n原标题：${extraction.title}\n\n内容：\n${formattedContent}` 
+      {
+        role: 'user',
+        content: `请根据以下内容生成一篇自媒体文章。\n\n来源：${extraction.url}\n\n原标题：${extraction.title}\n\n内容：\n${formattedContent}`
       }
     ];
 
     const timeoutId = setTimeout(() => {
-        if (abortController) {
-            abortController.abort();
-        }
-    }, 180000); 
+      if (abortController) {
+        abortController.abort();
+      }
+    }, 180000);
 
     const stream = await openai.chat.completions.create({
       model: settings.model,
@@ -1710,70 +1712,70 @@ async function startArticleGeneration(extraction: ExtractionResult) {
     let hasReceivedContent = false;
 
     try {
-        for await (const chunk of stream) {
-            if (!hasReceivedContent) {
-                hasReceivedContent = true;
-            }
-
-            const content = chunk.choices[0]?.delta?.content || '';
-            summary += content;
-            
-            const now = Date.now();
-            if (now - lastUpdate > 500) {
-                lastUpdate = now;
-                currentTask = {
-                    ...currentTask,
-                    status: 'Processing...',
-                    message: `${baseMessage} (${Math.floor(summary.length / 100)}k chars)`,
-                    result: summary,
-                    progress: 50 + Math.min(40, Math.floor(summary.length / 100))
-                } as ActiveTask;
-                broadcastUpdate();
-            }
+      for await (const chunk of stream) {
+        if (!hasReceivedContent) {
+          hasReceivedContent = true;
         }
+
+        const content = chunk.choices[0]?.delta?.content || '';
+        summary += content;
+
+        const now = Date.now();
+        if (now - lastUpdate > 500) {
+          lastUpdate = now;
+          currentTask = {
+            ...currentTask,
+            status: 'Processing...',
+            message: `${baseMessage} (${Math.floor(summary.length / 100)}k chars)`,
+            result: summary,
+            progress: 50 + Math.min(40, Math.floor(summary.length / 100))
+          } as ActiveTask;
+          broadcastUpdate();
+        }
+      }
     } finally {
-        clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
     }
-    
+
     stopTimer();
 
     updateTaskState({ status: 'Processing...', message: 'Finalizing...', progress: 95 });
-    
+
     // Cleanup logic (similar to summarization)
     const outerCodeBlockRegex = /^```(?:markdown)?\s*([\s\S]*?)\s*```$/i;
     const outerMatch = summary.trim().match(outerCodeBlockRegex);
-    
+
     if (outerMatch && outerMatch[1]) {
-        summary = outerMatch[1];
+      summary = outerMatch[1];
     } else {
-        summary = summary.trim();
+      summary = summary.trim();
     }
 
     // Basic Title Check (Article prompt asks for H1)
     const hasH1 = /^\s*#\s+/.test(summary);
-    
-    if (!hasH1) {
-         const genericTitles = ['微博搜索', 'Weibo Search', '搜索', 'Search', '主页', 'Home'];
-         const isGeneric = genericTitles.some(t => extraction.title?.includes(t));
 
-         if (!isGeneric && extraction.title) {
-             summary = `# ${extraction.title}\n\n` + summary;
-         } else {
-             // Try to promote first line as title if it looks like one
-             const lines = summary.split('\n');
-             const firstLine = lines[0]?.trim();
-             if (firstLine && firstLine.length > 0 && firstLine.length < 100) {
-                 // Remove existing bolding/formatting if any
-                 const cleanTitle = firstLine.replace(/^\*\*|\*\*$/g, '').replace(/^#+\s*/, '');
-                 summary = `# ${cleanTitle}\n\n` + lines.slice(1).join('\n');
-             }
-         }
+    if (!hasH1) {
+      const genericTitles = ['微博搜索', 'Weibo Search', '搜索', 'Search', '主页', 'Home'];
+      const isGeneric = genericTitles.some(t => extraction.title?.includes(t));
+
+      if (!isGeneric && extraction.title) {
+        summary = `# ${extraction.title}\n\n` + summary;
+      } else {
+        // Try to promote first line as title if it looks like one
+        const lines = summary.split('\n');
+        const firstLine = lines[0]?.trim();
+        if (firstLine && firstLine.length > 0 && firstLine.length < 100) {
+          // Remove existing bolding/formatting if any
+          const cleanTitle = firstLine.replace(/^\*\*|\*\*$/g, '').replace(/^#+\s*/, '');
+          summary = `# ${cleanTitle}\n\n` + lines.slice(1).join('\n');
+        }
+      }
     }
 
     // Cleanup trailing fences
     summary = summary.trim();
     if (summary.endsWith('```')) {
-        summary = summary.substring(0, summary.length - 3).trim();
+      summary = summary.substring(0, summary.length - 3).trim();
     }
 
     // 从生成的文章中提取真正的标题（H1）
@@ -1795,14 +1797,14 @@ async function startArticleGeneration(extraction: ExtractionResult) {
       content: summary,
       url: extraction.url
     };
-    
+
     await addHistoryItem(newItem);
 
-    updateTaskState({ 
-      status: 'Done!', 
+    updateTaskState({
+      status: 'Done!',
       message: 'Article generated successfully!',
-      progress: 100, 
-      result: summary, 
+      progress: 100,
+      result: summary,
       title: finalTitle, // 同步更新任务状态中的标题
       sourceUrl: extraction.url,
       sourceImages: extraction.images,
@@ -1835,11 +1837,11 @@ async function startArticleGeneration(extraction: ExtractionResult) {
     }
 
     console.error('Article generation error:', error);
-    updateTaskState({ 
-      status: 'Error', 
+    updateTaskState({
+      status: 'Error',
       message: error.message || 'An error occurred',
-      progress: 0, 
-      error: error.message 
+      progress: 0,
+      error: error.message
     });
 
     const iconUrl = chrome.runtime.getURL('public/icon-128.png');
@@ -1860,13 +1862,13 @@ async function startArticleGeneration(extraction: ExtractionResult) {
 async function startArticleGenerationAndPublish(extraction: ExtractionResult, platform: 'toutiao' | 'zhihu' | 'weixin') {
   try {
     abortController = new AbortController();
-    
+
     const platformName = platform === 'toutiao' ? '头条' : platform === 'zhihu' ? '知乎' : '公众号';
-    
+
     // 初始化任务状态
-    currentTask = { 
-      status: 'Processing...', 
-      message: `正在生成文章并准备发布到${platformName}...`, 
+    currentTask = {
+      status: 'Processing...',
+      message: `正在生成文章并准备发布到${platformName}...`,
       progress: 5,
       title: extraction.title,
       sourceUrl: extraction.url,
@@ -1876,9 +1878,9 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
     broadcastUpdate();
 
     const settings = await getSettings();
-    
+
     let effectiveApiKey = settings.apiKeys?.[settings.provider] || settings.apiKey;
-    
+
     if (!effectiveApiKey) {
       throw new Error(`API Key for ${settings.provider} is missing. Please check settings.`);
     }
@@ -1890,13 +1892,13 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
 
     updateTaskState({ status: 'Processing...', message: '正在发送请求到 AI...', progress: 20 });
 
-    const formattedContent = Array.isArray(extraction.messages) 
+    const formattedContent = Array.isArray(extraction.messages)
       ? extraction.messages.map((m: any) => `### ${m.role ? m.role.toUpperCase() : 'CONTENT'}:\n${m.content}`).join('\n\n')
       : String(extraction.messages);
 
     // 根据用户设置的文章风格生成动态提示词（通用模板）
     const articlePrompt = generateArticlePrompt(settings.articleStyle);
-    
+
     // 根据目标平台获取专属提示词
     // 通用提示词 + 平台专属提示词 = 完整提示词
     let platformPrompt = '';
@@ -1910,9 +1912,30 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
       // 公众号：使用用户自定义提示词或默认公众号提示词
       platformPrompt = settings.weixin?.customPrompt || WEIXIN_DEFAULT_PROMPT;
     }
-    
-    // 组合完整提示词：通用模板 + 平台专属指南
-    const fullPrompt = `${articlePrompt}\n\n${platformPrompt}`;
+
+    // ========== 组合完整提示词 ==========
+    // 添加明确的分隔标记，让 AI 能清楚识别两部分提示词
+    const fullPrompt = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 【第一部分：通用文章生成规则】
+以下是所有平台共享的基础写作规则。
+如果与后续的平台专属规则有冲突，请优先遵循平台专属规则。
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${articlePrompt}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 【第二部分：${platformName}平台专属规则】
+以下是${platformName}平台的专属规则，优先级最高！
+当与上述通用规则冲突时，必须严格遵循本部分的规则。
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${platformPrompt}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ 【优先级提醒】
+如果通用规则和${platformName}专属规则有任何冲突，请无条件遵循${platformName}专属规则！
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
 
     // 根据平台添加特殊提醒
     let platformReminder = '';
@@ -1924,17 +1947,17 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
 
     const initialMessages = [
       { role: 'system', content: fullPrompt },
-      { 
-        role: 'user', 
-        content: `请根据以下内容生成一篇自媒体文章，目标平台是${platformName}。${platformReminder}\n\n来源：${extraction.url}\n\n原标题：${extraction.title}\n\n内容：\n${formattedContent}` 
+      {
+        role: 'user',
+        content: `请根据以下内容生成一篇自媒体文章，目标平台是${platformName}。${platformReminder}\n\n来源：${extraction.url}\n\n原标题：${extraction.title}\n\n内容：\n${formattedContent}`
       }
     ];
 
     const timeoutId = setTimeout(() => {
-        if (abortController) {
-            abortController.abort();
-        }
-    }, 180000); 
+      if (abortController) {
+        abortController.abort();
+      }
+    }, 180000);
 
     const stream = await openai.chat.completions.create({
       model: settings.model,
@@ -1951,32 +1974,32 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
     let lastUpdate = Date.now();
 
     try {
-        for await (const chunk of stream) {
-            // 检查是否已取消
-            if (!abortController || abortController.signal.aborted) {
-              break;
-            }
-            
-            const content = chunk.choices[0]?.delta?.content || '';
-            summary += content;
-            
-            const now = Date.now();
-            if (now - lastUpdate > 500) {
-                lastUpdate = now;
-                currentTask = {
-                    ...currentTask,
-                    status: 'Processing...',
-                    message: `${baseMessage} (${Math.floor(summary.length / 100)}k 字符)`,
-                    result: summary,
-                    progress: 30 + Math.min(50, Math.floor(summary.length / 80))
-                } as ActiveTask;
-                broadcastUpdate();
-            }
+      for await (const chunk of stream) {
+        // 检查是否已取消
+        if (!abortController || abortController.signal.aborted) {
+          break;
         }
+
+        const content = chunk.choices[0]?.delta?.content || '';
+        summary += content;
+
+        const now = Date.now();
+        if (now - lastUpdate > 500) {
+          lastUpdate = now;
+          currentTask = {
+            ...currentTask,
+            status: 'Processing...',
+            message: `${baseMessage} (${Math.floor(summary.length / 100)}k 字符)`,
+            result: summary,
+            progress: 30 + Math.min(50, Math.floor(summary.length / 80))
+          } as ActiveTask;
+          broadcastUpdate();
+        }
+      }
     } finally {
-        clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
     }
-    
+
     // 如果已取消，直接返回不继续处理
     if (!abortController || abortController.signal.aborted) {
       stopTimer();
@@ -1985,43 +2008,43 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
       broadcastUpdate();
       return;
     }
-    
+
     stopTimer();
 
     updateTaskState({ status: 'Processing...', message: '正在处理文章...', progress: 85 });
-    
+
     // 清理文章内容
     const outerCodeBlockRegex = /^```(?:markdown)?\s*([\s\S]*?)\s*```$/i;
     const outerMatch = summary.trim().match(outerCodeBlockRegex);
-    
+
     if (outerMatch && outerMatch[1]) {
-        summary = outerMatch[1];
+      summary = outerMatch[1];
     } else {
-        summary = summary.trim();
+      summary = summary.trim();
     }
 
     // 确保有标题
     const hasH1 = /^\s*#\s+/.test(summary);
-    
-    if (!hasH1) {
-         const genericTitles = ['微博搜索', 'Weibo Search', '搜索', 'Search', '主页', 'Home'];
-         const isGeneric = genericTitles.some(t => extraction.title?.includes(t));
 
-         if (!isGeneric && extraction.title) {
-             summary = `# ${extraction.title}\n\n` + summary;
-         } else {
-             const lines = summary.split('\n');
-             const firstLine = lines[0]?.trim();
-             if (firstLine && firstLine.length > 0 && firstLine.length < 100) {
-                 const cleanTitle = firstLine.replace(/^\*\*|\*\*$/g, '').replace(/^#+\s*/, '');
-                 summary = `# ${cleanTitle}\n\n` + lines.slice(1).join('\n');
-             }
-         }
+    if (!hasH1) {
+      const genericTitles = ['微博搜索', 'Weibo Search', '搜索', 'Search', '主页', 'Home'];
+      const isGeneric = genericTitles.some(t => extraction.title?.includes(t));
+
+      if (!isGeneric && extraction.title) {
+        summary = `# ${extraction.title}\n\n` + summary;
+      } else {
+        const lines = summary.split('\n');
+        const firstLine = lines[0]?.trim();
+        if (firstLine && firstLine.length > 0 && firstLine.length < 100) {
+          const cleanTitle = firstLine.replace(/^\*\*|\*\*$/g, '').replace(/^#+\s*/, '');
+          summary = `# ${cleanTitle}\n\n` + lines.slice(1).join('\n');
+        }
+      }
     }
 
     summary = summary.trim();
     if (summary.endsWith('```')) {
-        summary = summary.substring(0, summary.length - 3).trim();
+      summary = summary.substring(0, summary.length - 3).trim();
     }
 
     // 提取标题
@@ -2042,14 +2065,14 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
       content: summary,
       url: extraction.url
     };
-    
+
     await addHistoryItem(newItem);
 
-    updateTaskState({ 
-      status: 'Publishing...', 
+    updateTaskState({
+      status: 'Publishing...',
       message: `文章生成完成，正在跳转到${platformName}发布页面...`,
-      progress: 95, 
-      result: summary, 
+      progress: 95,
+      result: summary,
       title: finalTitle
     });
 
@@ -2084,7 +2107,7 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
 
   } catch (error: any) {
     stopTimer();
-    
+
     if (error.name === 'AbortError') {
       console.log('Article generation cancelled');
       // 取消时清理任务状态，不跳转到发布页面
@@ -2095,11 +2118,11 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
     }
 
     console.error('Article generation and publish error:', error);
-    updateTaskState({ 
-      status: 'Error', 
+    updateTaskState({
+      status: 'Error',
       message: error.message || '发生错误',
-      progress: 0, 
-      error: error.message 
+      progress: 0,
+      error: error.message
     });
 
     const iconUrl = chrome.runtime.getURL('public/icon-128.png');
@@ -2117,7 +2140,7 @@ async function startArticleGenerationAndPublish(extraction: ExtractionResult, pl
 async function handleLogin(provider: 'google' | 'github') {
   const settings = await getSettings();
   const backendUrl = settings.sync?.backendUrl || DEFAULT_SETTINGS.sync!.backendUrl;
-  const redirectUri = chrome.identity.getRedirectURL(); 
+  const redirectUri = chrome.identity.getRedirectURL();
 
   console.log('=== Login Debug Info ===');
   console.log('Provider:', provider);
@@ -2126,7 +2149,7 @@ async function handleLogin(provider: 'google' | 'github') {
 
   // 首先从后端获取 OAuth 配置
   let authConfig: { clientId: string; authUrl: string } | null = null;
-  
+
   try {
     console.log('Fetching OAuth config from backend...');
     const configResponse = await fetch(`${backendUrl}/auth/config/${provider}`);
@@ -2139,7 +2162,7 @@ async function handleLogin(provider: 'google' | 'github') {
   }
 
   let authUrl: string;
-  
+
   if (authConfig && authConfig.clientId) {
     // 直接构建 OAuth URL，跳过后端重定向
     if (provider === 'google') {
@@ -2167,7 +2190,7 @@ async function handleLogin(provider: 'google' | 'github') {
 
   return new Promise<void>((resolve, reject) => {
     console.log('Launching WebAuthFlow...');
-    
+
     chrome.identity.launchWebAuthFlow({
       url: authUrl,
       interactive: true
@@ -2175,18 +2198,18 @@ async function handleLogin(provider: 'google' | 'github') {
       console.log('WebAuthFlow callback received');
       console.log('Redirect URL:', redirectUrl);
       console.log('Last Error:', chrome.runtime.lastError);
-      
+
       if (chrome.runtime.lastError) {
         const errorMsg = chrome.runtime.lastError.message || 'Unknown error';
         console.error('Auth Flow Error:', errorMsg);
         reject(new Error(errorMsg));
         return;
       }
-      
+
       if (!redirectUrl) {
-         console.error('No redirect URL received');
-         reject(new Error('登录已取消或失败'));
-         return;
+        console.error('No redirect URL received');
+        reject(new Error('登录已取消或失败'));
+        return;
       }
 
       try {

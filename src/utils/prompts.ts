@@ -328,6 +328,9 @@ export const SYSTEM_PROMPTS: Record<string, string> = {
 
 export const ARTICLE_PROMPT_TEMPLATE = `# 自媒体文章生成提示词
 
+## ⚠️ 重要说明：提示词优先级
+**本提示词为通用模板，如果后续有平台专属提示词，且两者存在冲突时，必须优先遵循平台专属提示词的规则。**
+
 ## 一、你的角色
 你是一个**资深自媒体写手**，专门给头条、公众号、知乎这类平台写文章。
 
@@ -447,30 +450,32 @@ export const ARTICLE_PROMPT_TEMPLATE = `# 自媒体文章生成提示词
 ## 四、增强真实性（非常重要！）
 为了让文章更真实可信，避免AI味，你需要：
 
-### 4.1 添加具体细节
+### 4.1 观点表达原则（CRITICAL）
+- ❌ **严禁使用**"有网友提到/认为/说"、"网友爆料"、"知情人士透露"、"据某某说"等引用式表达
+- ❌ **严禁使用**"有人觉得"、"大家都说"、"很多人认为"等转述式表达
+- ✅ **必须直接输出观点**：把所有观点都当作你自己的思考和判断来表达
+- ✅ 例如：不要说"有网友提到一个形象的比喻"，直接说"我觉得这就像..."或"这让我想到..."
+- ✅ 例如：不要说"有人认为伊朗像袁绍"，直接说"伊朗的情况就像三国时期的袁绍"
+- ✅ 你要模拟一个真人创作者，所有分析、比喻、判断都是你自己想出来的，不要借用别人的口
+
+### 4.2 添加具体细节
 - **时间**：具体的日期、时间点（如"1月8日下午3点"、"上周三"、"去年双十一"）
 - **地点**：具体的城市、地区、场所（如"北京朝阳区"、"上海浦东机场"、"杭州西湖边"）
-- **人物**：真实的人名、职位、身份（如"张先生"、"某公司CEO李明"、"当事人小王"）
+- **人物**：真实的人名、职位、身份（如"张先生"、"某某公司CEO李明"、"当事人小王"）
 - **数据**：具体的数字、金额、比例（如"损失了3万多"、"涨了15%"、"排队2小时"）
-- ⚠️ 但注意：如果输入里没有这些信息，**不要硬编**具体人名/金额/精确日期；宁可用“有网友说”“大概”“差不多”这种更像真人的模糊表达
+- ⚠️ 但注意：如果输入里没有这些信息，**不要硬编**具体人名/金额/精确日期；宁可用"大概""差不多""最近"这种模糊表达
 
-### 4.2 引用多方观点
-- **当事人说法**：引用事件当事人的原话或态度
-- **网友评论**：引用有代表性的网友观点（可以从输入内容中提取，或合理编写）
-- **专家/媒体观点**：如果涉及专业领域，可以引用专家看法或媒体报道
-- **官方回应**：如果有官方声明，要提及
+### 4.3 引用评论时的特殊规则
+- ✅ **唯一允许的引用场景**：引用评论区的具体评论内容
+- ✅ 格式："评论区有人说：'...'"
+- ✅ 格式："看到一条评论说：'...'"
+- ❌ 但不要说"有网友提到一个观点/看法/分析"，评论必须是具体的话，用引号引出来
 
-### 4.3 信息来源
+### 4.4 信息来源
 - 如果输入内容中有具体的时间、地点、人物信息，**必须使用**
-- 如果输入内容缺少这些信息，可以根据上下文**做模糊补充**（例如“最近”“这两天”“某地”），不要捏造可被核查的细节
-- 可以使用"据了解"、"有网友爆料"、"知情人士透露"等表述
+- 如果输入内容缺少这些信息，可以根据上下文**做模糊补充**（例如"最近""这两天""某地"），不要捏造可被核查的细节
 - 如果你有联网搜索能力，可以搜索相关新闻补充背景信息
 
-### 4.4 评论区风格引用
-在文章中可以穿插一些"网友热评"风格的内容，比如：
-- "有网友调侃道：'这波操作我给满分'"
-- "评论区炸了，有人说：'...'"
-- "最高赞评论是这样说的：'...'"
 
 ## 五、格式要求
 - 必须用**简体中文**
@@ -487,7 +492,10 @@ export const ARTICLE_PROMPT_TEMPLATE = `# 自媒体文章生成提示词
 // ========== 头条平台专属提示词 ==========
 // 头条用户特点：年龄层广泛（25-50岁为主）、下沉市场用户多、喜欢热点新闻、社会话题、实用信息
 // 头条平台特点：没有AI生成图片功能，只能用关键词搜索图片；没有封面提示词；没有摘要功能
-export const TOUTIAO_DEFAULT_PROMPT = `## 头条号文章风格指南
+export const TOUTIAO_DEFAULT_PROMPT = `## 🔥 头条号平台专属规则（优先级最高）
+**重要：以下头条专属规则与通用提示词冲突时，必须优先遵循头条专属规则！**
+
+## 头条号文章风格指南
 
 ### 平台用户画像
 头条用户特点：
@@ -552,7 +560,10 @@ export const TOUTIAO_DEFAULT_PROMPT = `## 头条号文章风格指南
 // ========== 微信公众号平台专属提示词 ==========
 // 公众号用户特点：覆盖面广、注重内容质量、喜欢深度好文、分享意愿强
 // 公众号平台特点：有AI生成图片功能（需要详细描述）；有封面提示词；有摘要功能
-export const WEIXIN_DEFAULT_PROMPT = `## 微信公众号文章风格指南
+export const WEIXIN_DEFAULT_PROMPT = `## 🔥 微信公众号平台专属规则（优先级最高）
+**重要：以下公众号专属规则与通用提示词冲突时，必须优先遵循公众号专属规则！**
+
+## 微信公众号文章风格指南
 
 ### 平台用户画像
 公众号用户特点：
@@ -650,7 +661,10 @@ export const WEIXIN_DEFAULT_PROMPT = `## 微信公众号文章风格指南
 // ========== 知乎平台专属提示词 ==========
 // 知乎用户特点：高学历、一二线城市、追求深度内容、理性思考、专业性强
 // 知乎平台特点：没有AI生成图片功能，只能用关键词搜索图片；没有封面提示词；没有摘要功能
-export const ZHIHU_DEFAULT_PROMPT = `## 知乎文章风格指南
+export const ZHIHU_DEFAULT_PROMPT = `## 🔥 知乎平台专属规则（优先级最高）
+**重要：以下知乎专属规则与通用提示词冲突时，必须优先遵循知乎专属规则！**
+
+## 知乎文章风格指南
 
 ### 平台用户画像
 知乎用户特点：
@@ -739,19 +753,22 @@ export const generateArticlePrompt = (style?: {
 }): string => {
   // 根据风格设置生成风格描述
   // value: 0-100, 50为中立
+  // 优化阈值分布，让滑动条变化更明显
   const getStyleDescription = (value: number, leftDesc: string, rightDesc: string): string => {
-    if (value < 20) return `非常${leftDesc}`;
-    if (value < 40) return `比较${leftDesc}`;
-    if (value < 60) return ''; // 中立，不添加描述
-    if (value < 80) return `比较${rightDesc}`;
+    if (value < 15) return `非常${leftDesc}`;
+    if (value < 35) return `比较${leftDesc}`;
+    if (value < 45) return `略微${leftDesc}`;
+    if (value <= 55) return ''; // 中立，不添加描述（缩小到45-55这个小范围）
+    if (value < 65) return `略微${rightDesc}`;
+    if (value < 85) return `比较${rightDesc}`;
     return `非常${rightDesc}`;
   };
 
   // 如果没有风格设置，返回默认模板
   if (!style) return ARTICLE_PROMPT_TEMPLATE;
-  
+
   const styleDescriptions: string[] = [];
-  
+
   // 立场倾向：客观中立 ↔ 观点鲜明
   const objectivityDesc = getStyleDescription(
     style.objectivity ?? 50,
@@ -759,7 +776,7 @@ export const generateArticlePrompt = (style?: {
     '观点鲜明，大胆表达个人立场和看法'
   );
   if (objectivityDesc) styleDescriptions.push(objectivityDesc);
-  
+
   // 情感色彩：消极悲观 ↔ 积极乐观
   const sentimentDesc = getStyleDescription(
     style.sentiment ?? 50,
@@ -767,7 +784,7 @@ export const generateArticlePrompt = (style?: {
     '积极乐观，多看到好的一面和希望'
   );
   if (sentimentDesc) styleDescriptions.push(sentimentDesc);
-  
+
   // 评价态度：批评质疑 ↔ 赞美认可
   const toneDesc = getStyleDescription(
     style.tone ?? 50,
@@ -775,7 +792,7 @@ export const generateArticlePrompt = (style?: {
     '赞美认可，多给予肯定和鼓励'
   );
   if (toneDesc) styleDescriptions.push(toneDesc);
-  
+
   // 表达方式：犀利直接 ↔ 委婉礼貌
   const politenessDesc = getStyleDescription(
     style.politeness ?? 50,
@@ -783,7 +800,7 @@ export const generateArticlePrompt = (style?: {
     '委婉礼貌，表达温和有分寸'
   );
   if (politenessDesc) styleDescriptions.push(politenessDesc);
-  
+
   // 语言风格：口语随意 ↔ 正式书面
   const formalityDesc = getStyleDescription(
     style.formality ?? 50,
@@ -791,7 +808,7 @@ export const generateArticlePrompt = (style?: {
     '正式书面，用词规范有条理'
   );
   if (formalityDesc) styleDescriptions.push(formalityDesc);
-  
+
   // 趣味程度：严肃认真 ↔ 幽默搞笑
   const humorDesc = getStyleDescription(
     style.humor ?? 50,
@@ -799,10 +816,10 @@ export const generateArticlePrompt = (style?: {
     '幽默搞笑，加入段子和调侃'
   );
   if (humorDesc) styleDescriptions.push(humorDesc);
-  
+
   // 如果没有特殊风格要求，返回默认模板
   if (styleDescriptions.length === 0) return ARTICLE_PROMPT_TEMPLATE;
-  
+
   // 生成风格要求段落
   const styleSection = `
 ## 六、写作风格要求（重要！）
@@ -811,14 +828,14 @@ ${styleDescriptions.map(d => `- ${d}`).join('\n')}
 
 请严格按照上述风格要求来写作，让文章的语气和态度符合设定。
 `;
-  
+
   // 将风格要求插入到模板中
   return ARTICLE_PROMPT_TEMPLATE + styleSection;
 };
 
 // 提示词版本号 - 每次修改默认提示词时需要更新对应的版本号
 export const PROMPT_VERSIONS = {
-  TOUTIAO: '1.0.0',
-  ZHIHU: '1.0.0',
-  WEIXIN: '1.0.0'
+  TOUTIAO: '1.2.0',  // 修改观点表达规则 + 优化风格控制
+  ZHIHU: '1.2.0',    // 修改观点表达规则 + 优化风格控制
+  WEIXIN: '1.2.0'    // 修改观点表达规则 + 优化风格控制
 };
