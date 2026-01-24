@@ -1532,45 +1532,113 @@ const deleteTextInEditor = async (searchText: string): Promise<boolean> => {
 
   // 多次尝试删除，确保删除成功
   for (let attempt = 0; attempt < 3; attempt++) {
-    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
-    let node: Node | null;
     let found = false;
     
-    while ((node = walker.nextNode())) {
-      if (node.textContent && node.textContent.includes(searchText)) {
-        const range = document.createRange();
-        const startIndex = node.textContent.indexOf(searchText);
-        range.setStart(node, startIndex);
-        range.setEnd(node, startIndex + searchText.length);
-        const selection = window.getSelection();
-        selection?.removeAllRanges();
-        selection?.addRange(range);
+    // 方法1: TreeWalker (精确匹配)
+    try {
+      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
+      let node: Node | null;
+      
+      while ((node = walker.nextNode())) {
+        if (node.textContent && node.textContent.includes(searchText)) {
+          const range = document.createRange();
+          const startIndex = node.textContent.indexOf(searchText);
+          range.setStart(node, startIndex);
+          range.setEnd(node, startIndex + searchText.length);
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+          
+          document.execCommand('delete');
+          found = true;
+          await new Promise(r => setTimeout(r, 200));
+          break;
+        }
+      }
+    } catch (e) {
+      console.warn('TreeWalker delete failed', e);
+    }
+
+    // 方法2: 正则模糊匹配 (处理空格/特殊字符)
+    if (!found) {
+      try {
+        const escaped = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const patternStr = escaped.replace(/\\:|\\：/g, '[:：]').replace(/\\ /g, '\\s*');
+        const regex = new RegExp(patternStr);
         
-        // 删除选中的文本
-        document.execCommand('delete');
-        found = true;
-        await new Promise(r => setTimeout(r, 200));
-        break;
+        const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
+        let node: Node | null;
+        
+        while ((node = walker.nextNode())) {
+          const text = node.textContent || '';
+          const match = regex.exec(text);
+          if (match) {
+            const range = document.createRange();
+            range.setStart(node, match.index);
+            range.setEnd(node, match.index + match[0].length);
+            
+            const selection = window.getSelection();
+            selection?.removeAllRanges();
+            selection?.addRange(range);
+            
+            document.execCommand('delete');
+            found = true;
+            await new Promise(r => setTimeout(r, 200));
+            break;
+          }
+        }
+      } catch (e) {
+        console.warn('Regex delete failed', e);
+      }
+    }
+    
+    // 方法3: window.find (最后尝试)
+    if (!found) {
+      try {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) selection.collapseToStart();
+        
+        if ((window as any).find(searchText, false, false, true, false, false, false)) {
+          document.execCommand('delete');
+          found = true;
+          await new Promise(r => setTimeout(r, 200));
+        }
+      } catch (e) {
+        console.warn('window.find delete failed', e);
       }
     }
     
     if (!found) {
-      // 文本已经不存在了，删除成功
-      return true;
+      // 检查是否还存在 (使用正则检查)
+      const currentContent = editor.innerText || '';
+      const escaped = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const patternStr = escaped.replace(/\\:|\\：/g, '[:：]').replace(/\\ /g, '\\s*');
+      const regex = new RegExp(patternStr);
+      
+      if (!regex.test(currentContent)) {
+        return true; // 已经不存在了
+      }
+    } else {
+      // 删除成功后，再次检查是否还有残留
+      const currentContent = editor.innerText || '';
+      const escaped = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const patternStr = escaped.replace(/\\:|\\：/g, '[:：]').replace(/\\ /g, '\\s*');
+      const regex = new RegExp(patternStr);
+      
+      if (!regex.test(currentContent)) {
+        return true;
+      }
+      // 如果还有，继续循环删除
+      await new Promise(r => setTimeout(r, 300));
     }
-    
-    // 检查是否还存在
-    const currentContent = editor.innerText || '';
-    if (!currentContent.includes(searchText)) {
-      return true;
-    }
-    
-    await new Promise(r => setTimeout(r, 300));
   }
   
   // 最后检查
   const finalContent = editor.innerText || '';
-  return !finalContent.includes(searchText);
+  const escaped = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const patternStr = escaped.replace(/\\:|\\：/g, '[:：]').replace(/\\ /g, '\\s*');
+  const regex = new RegExp(patternStr);
+  return !regex.test(finalContent);
 };
 
 /**
@@ -1585,24 +1653,116 @@ const selectTextInEditor = async (searchText: string): Promise<boolean> => {
   editor.focus();
   await new Promise(r => setTimeout(r, 100));
 
-  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
-  let node: Node | null;
-  
-  while ((node = walker.nextNode())) {
-    if (node.textContent && node.textContent.includes(searchText)) {
-      const range = document.createRange();
-      const startIndex = node.textContent.indexOf(searchText);
-      range.setStart(node, startIndex);
-      range.setEnd(node, startIndex + searchText.length);
-      
-      const selection = window.getSelection();
-      selection?.removeAllRanges();
-      selection?.addRange(range);
-      
-      logger.log(`已选中文本: "${searchText}"`, 'info');
+  // 方法1: 使用 TreeWalker (精确匹配)
+  try {
+    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
+    let node: Node | null;
+    
+    while ((node = walker.nextNode())) {
+      if (node.textContent && node.textContent.includes(searchText)) {
+        const range = document.createRange();
+        const startIndex = node.textContent.indexOf(searchText);
+        range.setStart(node, startIndex);
+        range.setEnd(node, startIndex + searchText.length);
+        
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        
+        logger.log(`已选中文本 (TreeWalker): "${searchText}"`, 'info');
+        await new Promise(r => setTimeout(r, 200));
+        return true;
+      }
+    }
+  } catch (e) {
+    logger.log(`TreeWalker 查找出错: ${e}`, 'warn');
+  }
+
+  // 方法2: 使用 window.find (浏览器原生查找)
+  // 注意：window.find 会自动滚动并选中找到的文本
+  try {
+    // 先折叠选区到开头，避免从中间开始找
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      selection.collapseToStart();
+    }
+    
+    if ((window as any).find(searchText, false, false, true, false, false, false)) {
+      logger.log(`已选中文本 (window.find): "${searchText}"`, 'info');
       await new Promise(r => setTimeout(r, 200));
       return true;
     }
+  } catch (e) {
+    logger.log(`window.find 查找出错: ${e}`, 'warn');
+  }
+
+  // 方法3: 正则模糊匹配 (处理空格/特殊字符)
+  try {
+    // 构建灵活的正则: 转义特殊字符，并将空格替换为 \s*
+    // e.g. "[图片: foo]" -> "\[\s*图片\s*[:：]\s*foo\s*\]"
+    const escaped = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // 允许冒号是中文或英文，允许任意空白
+    const patternStr = escaped.replace(/\\:|\\：/g, '[:：]').replace(/\\ /g, '\\s*');
+    const regex = new RegExp(patternStr);
+    
+    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
+    let node: Node | null;
+    
+    while ((node = walker.nextNode())) {
+      const text = node.textContent || '';
+      const match = regex.exec(text);
+      if (match) {
+        const range = document.createRange();
+        range.setStart(node, match.index);
+        range.setEnd(node, match.index + match[0].length);
+        
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        
+        logger.log(`已选中文本 (正则匹配): "${match[0]}"`, 'info');
+        await new Promise(r => setTimeout(r, 200));
+        return true;
+      }
+    }
+  } catch (e) {
+    logger.log(`正则匹配查找出错: ${e}`, 'warn');
+  }
+
+  // 方法4: 降级模糊匹配 (忽略所有空白字符)
+  try {
+    const cleanSearchText = searchText.replace(/\s+/g, '');
+    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
+    let node: Node | null;
+    
+    while ((node = walker.nextNode())) {
+      const text = node.textContent || '';
+      const cleanText = text.replace(/\s+/g, '');
+      if (cleanText.includes(cleanSearchText)) {
+        // 这是一个近似匹配，我们需要找到原始文本中的位置
+        // 由于位置映射复杂，我们尝试构建一个针对此节点的宽松正则
+        const chars = cleanSearchText.split('');
+        const nodePattern = chars.map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*');
+        const nodeRegex = new RegExp(nodePattern);
+        
+        const match = nodeRegex.exec(text);
+        if (match) {
+          const range = document.createRange();
+          range.setStart(node, match.index);
+          range.setEnd(node, match.index + match[0].length);
+          
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+          
+          logger.log(`已选中文本 (降级模糊匹配): "${match[0]}"`, 'info');
+          await new Promise(r => setTimeout(r, 200));
+          return true;
+        }
+      }
+    }
+  } catch (e) {
+    logger.log(`降级模糊匹配查找出错: ${e}`, 'warn');
   }
   
   logger.log(`未找到文本: "${searchText}"`, 'warn');
@@ -1788,7 +1948,7 @@ const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
         logger.log(`\n📷 处理第 ${placeholders.length - i}/${placeholders.length} 个占位符: ${placeholder.keyword}`, 'info');
         
         // 步骤1: 选中占位符文本
-        const selected = await selectTextInEditor(placeholder.text);
+        let selected = await selectTextInEditor(placeholder.text);
         if (!selected) {
           logger.log(`无法选中占位符: ${placeholder.text}，尝试删除后在末尾插入`, 'warn');
           // 如果无法选中，尝试删除占位符并在末尾插入
@@ -1801,6 +1961,17 @@ const runSmartImageFlow = async (keyword?: string, autoPublish = false) => {
             range.collapse(false);
             sel?.removeAllRanges();
             sel?.addRange(range);
+            // 关键修正：手动设置光标到末尾后，必须标记为 selected=true，
+            // 这样 insertImageOnly 才会调用 openImageDialogPreserveSelection
+            // 从而保持我们刚刚设置的光标位置，而不是重新点击编辑器导致全选或光标重置
+            
+            // 额外安全检查：确保选区是折叠的（即光标状态，而不是选中状态）
+            if (!sel?.isCollapsed) {
+              logger.log('⚠️ 选区未折叠，强制折叠到末尾', 'warn');
+              sel?.collapseToEnd();
+            }
+            
+            selected = true;
           }
         }
         
@@ -2178,150 +2349,158 @@ const fillContent = async () => {
     }
     logger.log('⏳ 等待编辑器加载...', 'info');
 
+    let isFilling = false;
     let attempts = 0;
     const maxAttempts = 15;
     
     const tryFill = async (): Promise<boolean> => {
-      const titleEl = findElement(SELECTORS.titleInput);
-      const editorEl = findElement(SELECTORS.editor);
+      if (isFilling) return false;
+      isFilling = true;
+      
+      try {
+        const titleEl = findElement(SELECTORS.titleInput);
+        const editorEl = findElement(SELECTORS.editor);
 
-      if (titleEl && editorEl) {
-        // 填充标题
-        const existingTitle = titleEl instanceof HTMLInputElement || titleEl instanceof HTMLTextAreaElement
-          ? titleEl.value?.trim()
-          : titleEl.innerText?.trim();
-        
-        if (!existingTitle || existingTitle.length === 0) {
-          simulateInput(titleEl, payload.title);
-          logger.log('✅ 标题已填充', 'success');
-        } else {
-          logger.log('ℹ️ 标题已存在，跳过填充', 'info');
-        }
-
-        // 填充正文
-        editorEl.click();
-        editorEl.focus();
-        await new Promise(r => setTimeout(r, 300));
-        
-        const existingContent = editorEl.innerText?.trim();
-        const hasPlaceholderOnly = existingContent === '请输入正文' || existingContent === '';
-        
-        if (hasPlaceholderOnly) {
-          // 判断内容是否为 Markdown 格式
-          const isMarkdown = payload.content && (
-            payload.content.includes('##') ||
-            payload.content.includes('**') ||
-            payload.content.includes('- ') ||
-            payload.content.includes('1. ') ||
-            payload.content.includes('```') ||
-            payload.content.includes('> ')
-          );
+        if (titleEl && editorEl) {
+          // 填充标题
+          const existingTitle = titleEl instanceof HTMLInputElement || titleEl instanceof HTMLTextAreaElement
+            ? titleEl.value?.trim()
+            : titleEl.innerText?.trim();
           
-          if (isMarkdown) {
-            logger.log('📝 检测到 Markdown 格式内容', 'info');
-          }
-          
-          if (payload.htmlContent && !isMarkdown) {
-            document.execCommand('insertHTML', false, payload.htmlContent);
-            logger.log('✅ 内容已填充 (HTML)', 'success');
+          if (!existingTitle || existingTitle.length === 0) {
+            simulateInput(titleEl, payload.title);
+            logger.log('✅ 标题已填充', 'success');
           } else {
-            // 对于 Markdown 内容，尝试模拟真实的粘贴操作来触发知乎的 Markdown 检测
+            logger.log('ℹ️ 标题已存在，跳过填充', 'info');
+          }
+
+          // 填充正文
+          editorEl.click();
+          editorEl.focus();
+          await new Promise(r => setTimeout(r, 300));
+          
+          const existingContent = editorEl.innerText?.trim();
+          const hasPlaceholderOnly = existingContent === '请输入正文' || existingContent === '';
+          
+          if (hasPlaceholderOnly) {
+            // 判断内容是否为 Markdown 格式
+            const isMarkdown = payload.content && (
+              payload.content.includes('##') ||
+              payload.content.includes('**') ||
+              payload.content.includes('- ') ||
+              payload.content.includes('1. ') ||
+              payload.content.includes('```') ||
+              payload.content.includes('> ')
+            );
+            
             if (isMarkdown) {
-              logger.log('📋 使用粘贴方式填充 Markdown 内容...', 'info');
-              
-              // 方法1: 尝试使用 ClipboardEvent 模拟粘贴
-              try {
-                const clipboardData = new DataTransfer();
-                clipboardData.setData('text/plain', payload.content);
-                const pasteEvent = new ClipboardEvent('paste', {
-                  bubbles: true,
-                  cancelable: true,
-                  clipboardData: clipboardData
-                });
-                editorEl.dispatchEvent(pasteEvent);
-                logger.log('✅ 内容已通过粘贴事件填充', 'success');
-              } catch (e) {
-                // 如果粘贴事件失败，回退到 insertText
-                logger.log('粘贴事件失败，使用 insertText 方式', 'info');
+              logger.log('📝 检测到 Markdown 格式内容', 'info');
+            }
+            
+            if (payload.htmlContent && !isMarkdown) {
+              document.execCommand('insertHTML', false, payload.htmlContent);
+              logger.log('✅ 内容已填充 (HTML)', 'success');
+            } else {
+              // 对于 Markdown 内容，尝试模拟真实的粘贴操作来触发知乎的 Markdown 检测
+              if (isMarkdown) {
+                logger.log('📋 使用粘贴方式填充 Markdown 内容...', 'info');
+                
+                // 方法1: 尝试使用 ClipboardEvent 模拟粘贴
+                try {
+                  const clipboardData = new DataTransfer();
+                  clipboardData.setData('text/plain', payload.content);
+                  const pasteEvent = new ClipboardEvent('paste', {
+                    bubbles: true,
+                    cancelable: true,
+                    clipboardData: clipboardData
+                  });
+                  editorEl.dispatchEvent(pasteEvent);
+                  logger.log('✅ 内容已通过粘贴事件填充', 'success');
+                } catch (e) {
+                  // 如果粘贴事件失败，回退到 insertText
+                  logger.log('粘贴事件失败，使用 insertText 方式', 'info');
+                  document.execCommand('insertText', false, payload.content);
+                  logger.log('✅ 内容已填充 (文本)', 'success');
+                }
+              } else {
                 document.execCommand('insertText', false, payload.content);
                 logger.log('✅ 内容已填充 (文本)', 'success');
-              }
-            } else {
-              document.execCommand('insertText', false, payload.content);
-              logger.log('✅ 内容已填充 (文本)', 'success');
-            };
-            
-            // 如果是 Markdown 格式，立即检测并点击"确认并解析"按钮
-            // 注意：知乎会在粘贴后显示一个 Notification 提示，几秒后会自动消失
-            // 所以需要立即检测并点击，不能等待！
-            if (isMarkdown) {
-              logger.log('⏳ 立即检测 Markdown 解析提示...', 'info');
-              // 不等待，立即开始检测
-              // 使用一个快速循环来检测按钮
-              let found = false;
-              for (let i = 0; i < 20 && !found; i++) {
-                // 每 200ms 检测一次，共 4 秒
-                if (i > 0) {
-                  await new Promise(r => setTimeout(r, 200));
-                }
-                
-                // 查找 Notification 中的"确认并解析"按钮
-                const notifications = document.querySelectorAll('[class*="Notification"]');
-                for (const notification of notifications) {
-                  if (!isElementVisible(notification as HTMLElement)) continue;
-                  const btns = notification.querySelectorAll('button');
-                  for (const btn of btns) {
-                    const text = (btn as HTMLElement).innerText?.trim();
-                    if (text === '确认并解析') {
-                      logger.log('🎯 找到"确认并解析"按钮，立即点击！', 'action');
-                      simulateClick(btn as HTMLElement);
-                      await new Promise(r => setTimeout(r, 1000));
-                      logger.log('✅ Markdown 格式已解析', 'success');
-                      found = true;
-                      break;
-                    }
-                  }
-                  if (found) break;
-                }
-                
-                // 也查找 Button--link 类型的按钮
-                if (!found) {
-                  const linkButtons = document.querySelectorAll('button[class*="Button--link"]');
-                  for (const btn of linkButtons) {
-                    const text = (btn as HTMLElement).innerText?.trim();
-                    if (text === '确认并解析' && isElementVisible(btn as HTMLElement)) {
-                      logger.log('🎯 找到"确认并解析"按钮，立即点击！', 'action');
-                      simulateClick(btn as HTMLElement);
-                      await new Promise(r => setTimeout(r, 1000));
-                      logger.log('✅ Markdown 格式已解析', 'success');
-                      found = true;
-                      break;
-                    }
-                  }
-                }
-                
-                if (!found && i < 19) {
-                  logger.log(`检测中... (${i + 1}/20)`, 'info');
-                }
-              }
+              };
               
-              if (!found) {
-                logger.log('⚠️ 未找到"确认并解析"按钮，尝试全选触发...', 'warn');
-                await selectAllAndTriggerMarkdownParse(editorEl);
-                await new Promise(r => setTimeout(r, 500));
-                // 再次快速检测
-                await handleMarkdownParse();
+              // 如果是 Markdown 格式，立即检测并点击"确认并解析"按钮
+              // 注意：知乎会在粘贴后显示一个 Notification 提示，几秒后会自动消失
+              // 所以需要立即检测并点击，不能等待！
+              if (isMarkdown) {
+                logger.log('⏳ 立即检测 Markdown 解析提示...', 'info');
+                // 不等待，立即开始检测
+                // 使用一个快速循环来检测按钮
+                let found = false;
+                for (let i = 0; i < 20 && !found; i++) {
+                  // 每 200ms 检测一次，共 4 秒
+                  if (i > 0) {
+                    await new Promise(r => setTimeout(r, 200));
+                  }
+                  
+                  // 查找 Notification 中的"确认并解析"按钮
+                  const notifications = document.querySelectorAll('[class*="Notification"]');
+                  for (const notification of notifications) {
+                    if (!isElementVisible(notification as HTMLElement)) continue;
+                    const btns = notification.querySelectorAll('button');
+                    for (const btn of btns) {
+                      const text = (btn as HTMLElement).innerText?.trim();
+                      if (text === '确认并解析') {
+                        logger.log('🎯 找到"确认并解析"按钮，立即点击！', 'action');
+                        simulateClick(btn as HTMLElement);
+                        await new Promise(r => setTimeout(r, 1000));
+                        logger.log('✅ Markdown 格式已解析', 'success');
+                        found = true;
+                        break;
+                      }
+                    }
+                    if (found) break;
+                  }
+                  
+                  // 也查找 Button--link 类型的按钮
+                  if (!found) {
+                    const linkButtons = document.querySelectorAll('button[class*="Button--link"]');
+                    for (const btn of linkButtons) {
+                      const text = (btn as HTMLElement).innerText?.trim();
+                      if (text === '确认并解析' && isElementVisible(btn as HTMLElement)) {
+                        logger.log('🎯 找到"确认并解析"按钮，立即点击！', 'action');
+                        simulateClick(btn as HTMLElement);
+                        await new Promise(r => setTimeout(r, 1000));
+                        logger.log('✅ Markdown 格式已解析', 'success');
+                        found = true;
+                        break;
+                      }
+                    }
+                  }
+                  
+                  if (!found && i < 19) {
+                    logger.log(`检测中... (${i + 1}/20)`, 'info');
+                  }
+                }
+                
+                if (!found) {
+                  logger.log('⚠️ 未找到"确认并解析"按钮，尝试全选触发...', 'warn');
+                  await selectAllAndTriggerMarkdownParse(editorEl);
+                  await new Promise(r => setTimeout(r, 500));
+                  // 再次快速检测
+                  await handleMarkdownParse();
+                }
               }
             }
+          } else {
+            logger.log('ℹ️ 编辑器已有内容，跳过填充', 'info');
           }
-        } else {
-          logger.log('ℹ️ 编辑器已有内容，跳过填充', 'info');
+          
+          chrome.storage.local.remove('pending_zhihu_publish');
+          return true;
         }
-        
-        chrome.storage.local.remove('pending_zhihu_publish');
-        return true;
+        return false;
+      } finally {
+        isFilling = false;
       }
-      return false;
     };
 
     const interval = setInterval(async () => {
