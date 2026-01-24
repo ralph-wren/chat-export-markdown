@@ -44,6 +44,11 @@ export default defineManifest({
       matches: ['*://mp.weixin.qq.com/*'],
       js: ['src/content/weixin.ts'],
     },
+    {
+      // 小红书创作者平台发布页面
+      matches: ['*://creator.xiaohongshu.com/*'],
+      js: ['src/content/xiaohongshu.ts'],
+    },
   ],
   background: {
     service_worker: 'src/background/index.ts',

@@ -1940,9 +1940,13 @@ ${platformPrompt}
     // 根据平台添加特殊提醒
     let platformReminder = '';
     if (platform === 'toutiao' || platform === 'zhihu') {
-      platformReminder = `\n\n⚠️ 重要提醒：${platformName}平台的图片提示词必须是2-5个字的简短关键词（如"卫星"、"星空"），严禁使用长句子描述！`;
+      platformReminder = `\n\n⚠️ 重要提醒：${platformName}平台的图片提示词必须是2-5个字的简短关键词（如\"卫星\"、\"星空\"），严禁使用长句子描述！`;
     } else if (platform === 'weixin') {
-      platformReminder = `\n\n⚠️ 重要提醒：公众号平台的图片提示词需要15-50字的详细场景描述，用于AI生成配图。文章最后必须包含[封面: xxx]和[摘要: xxx]。`;
+      // 只有公众号需要封面和摘要
+      platformReminder = `\n\n⚠️ 重要提醒：${platformName}平台的图片提示词需要15-50字的详细场景描述，用于AI生成配图。文章最后必须包含[封面: xxx]和[摘要: xxx]。`;
+    } else if (platform === 'xiaohongshu') {
+      // 小红书不需要封面和摘要，但需要Emoji和话题
+      platformReminder = `\n\n⚠️ 重要提醒：小红书平台必须大量使用Emoji，分段要短，结尾必须包含至少5个话题标签（格式：#标签名）。不需要生成图片占位符。`;
     }
 
     const initialMessages = [

@@ -26,7 +26,7 @@ const MermaidChart = ({ code }: { code: string }) => {
         // Simple heuristic to check if code looks somewhat complete before rendering
         // Mermaid often throws hard errors on partial syntax
         if (!code || code.trim().length < 10) {
-           throw new Error('Code too short');
+          throw new Error('Code too short');
         }
 
         // Validate syntax before rendering to avoid the "Bomb" error icon
@@ -42,7 +42,7 @@ const MermaidChart = ({ code }: { code: string }) => {
       }
     };
     if (code) {
-        renderChart();
+      renderChart();
     }
   }, [code]);
 
@@ -70,7 +70,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
   const [currentSourceImages, setCurrentSourceImages] = useState<string[]>([]); // Track source images
   const [isPreview, setIsPreview] = useState(true);
   const [t, setT] = useState<Translation>(getTranslation('zh-CN')); // 翻译
-  
+
   const [userClosedResult, setUserClosedResult] = useState(false);
   const userClosedResultRef = React.useRef(userClosedResult);
   const viewRef = React.useRef(view);
@@ -91,10 +91,10 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     };
     loadLanguage();
   }, []);
-  
+
   // History State
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
-  
+
   // Refinement Chat State
   const [refinementInput, setRefinementInput] = useState('');
   const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>([]);
@@ -139,7 +139,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       }
     };
     chrome.runtime.onMessage.addListener(listener);
-    
+
     // 监听标签页更新事件，当页面导航时清除错误状态
     const tabUpdateListener = (_tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
       if (changeInfo.status === 'loading') {
@@ -148,7 +148,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       }
     };
     chrome.tabs.onUpdated.addListener(tabUpdateListener);
-    
+
     return () => {
       chrome.runtime.onMessage.removeListener(listener);
       chrome.tabs.onUpdated.removeListener(tabUpdateListener);
@@ -164,7 +164,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       }
       return;
     }
-    
+
     setStatus(t.publishingToToutiao);
     try {
       // Send to background
@@ -177,7 +177,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
           sourceImages: currentSourceImages
         }
       });
-      
+
       if (response && response.success) {
         setStatus(t.publishSuccess);
       } else {
@@ -199,7 +199,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       }
       return;
     }
-    
+
     setStatus(t.publishingToZhihu);
     try {
       // Send to background
@@ -212,7 +212,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
           sourceImages: currentSourceImages
         }
       });
-      
+
       if (response && response.success) {
         setStatus(t.publishSuccess);
       } else {
@@ -234,7 +234,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       }
       return;
     }
-    
+
     setStatus(t.publishingToWeixin || '正在发布到公众号...');
     try {
       // Send to background
@@ -245,7 +245,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
           content: result
         }
       });
-      
+
       if (response && response.success) {
         setStatus(t.publishSuccess);
       } else {
@@ -282,14 +282,14 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       if (!tab.id) throw new Error('No active tab');
 
       // 将抓取和生成逻辑移至 background，避免关闭 popup 中断任务
-      const response = await chrome.runtime.sendMessage({ 
-        type: 'INITIATE_GENERATE_AND_PUBLISH', 
+      const response = await chrome.runtime.sendMessage({
+        type: 'INITIATE_GENERATE_AND_PUBLISH',
         payload: {
           platform: 'toutiao',
           tabId: tab.id
         }
       });
-      
+
       if (!response?.success) {
         throw new Error(response?.error || '无法启动后台任务');
       }
@@ -300,7 +300,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     } catch (error: any) {
       console.error(error);
       let errorMsg = error.message;
-      
+
       if (
         errorMsg.includes('Could not establish connection') ||
         errorMsg.includes('Receiving end does not exist') ||
@@ -310,7 +310,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
         setErrorMessage(
           <div className="flex flex-col gap-2">
             <span>{t.connectionFailed}</span>
-            <button 
+            <button
               onClick={async () => {
                 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
                 if (tab?.id) {
@@ -327,7 +327,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       } else {
         setErrorMessage(errorMsg);
       }
-      
+
       setStatus('Error');
       setLoading(false);
     }
@@ -357,14 +357,14 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       if (!tab.id) throw new Error('No active tab');
 
       // 将抓取和生成逻辑移至 background，避免关闭 popup 中断任务
-      const response = await chrome.runtime.sendMessage({ 
-        type: 'INITIATE_GENERATE_AND_PUBLISH', 
+      const response = await chrome.runtime.sendMessage({
+        type: 'INITIATE_GENERATE_AND_PUBLISH',
         payload: {
           platform: 'zhihu',
           tabId: tab.id
         }
       });
-      
+
       if (!response?.success) {
         throw new Error(response?.error || '无法启动后台任务');
       }
@@ -372,7 +372,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     } catch (error: any) {
       console.error(error);
       let errorMsg = error.message;
-      
+
       if (
         errorMsg.includes('Could not establish connection') ||
         errorMsg.includes('Receiving end does not exist') ||
@@ -382,7 +382,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
         setErrorMessage(
           <div className="flex flex-col gap-2">
             <span>{t.connectionFailed}</span>
-            <button 
+            <button
               onClick={async () => {
                 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
                 if (tab?.id) {
@@ -399,7 +399,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       } else {
         setErrorMessage(errorMsg);
       }
-      
+
       setStatus('Error');
       setLoading(false);
     }
@@ -429,14 +429,14 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       if (!tab.id) throw new Error('No active tab');
 
       // 将抓取和生成逻辑移至 background，避免关闭 popup 中断任务
-      const response = await chrome.runtime.sendMessage({ 
-        type: 'INITIATE_GENERATE_AND_PUBLISH', 
+      const response = await chrome.runtime.sendMessage({
+        type: 'INITIATE_GENERATE_AND_PUBLISH',
         payload: {
           platform: 'weixin',
           tabId: tab.id
         }
       });
-      
+
       if (!response?.success) {
         throw new Error(response?.error || '无法启动后台任务');
       }
@@ -444,7 +444,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     } catch (error: any) {
       console.error(error);
       let errorMsg = error.message;
-      
+
       if (
         errorMsg.includes('Could not establish connection') ||
         errorMsg.includes('Receiving end does not exist') ||
@@ -454,7 +454,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
         setErrorMessage(
           <div className="flex flex-col gap-2">
             <span>{t.connectionFailed}</span>
-            <button 
+            <button
               onClick={async () => {
                 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
                 if (tab?.id) {
@@ -471,7 +471,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       } else {
         setErrorMessage(errorMsg);
       }
-      
+
       setStatus('Error');
       setLoading(false);
     }
@@ -486,7 +486,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       setErrorMessage(null);
       setIsRefining(false);
       setLogMessage('');
-      
+
       await chrome.runtime.sendMessage({ type: 'CANCEL_SUMMARIZATION' });
     } catch (error) {
       console.error('Cancel error:', error);
@@ -503,21 +503,21 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       }
       return;
     }
-    
+
     if (task.error) {
       // 过滤掉 bfcache 相关的错误，这些是页面导航时的正常行为，不需要显示给用户
       const errorStr = String(task.error).toLowerCase();
-      const isBfcacheError = errorStr.includes('back/forward cache') || 
-                            errorStr.includes('bfcache') ||
-                            errorStr.includes('message channel is closed') ||
-                            errorStr.includes('extension port is moved');
-      
+      const isBfcacheError = errorStr.includes('back/forward cache') ||
+        errorStr.includes('bfcache') ||
+        errorStr.includes('message channel is closed') ||
+        errorStr.includes('extension port is moved');
+
       if (isBfcacheError) {
         // 静默忽略 bfcache 错误，只在控制台记录
         console.log('[Memoraid] Ignoring bfcache-related error:', task.error);
         return;
       }
-      
+
       setLoading(false);
       setStatus(`Error`);
       setErrorMessage(task.error);
@@ -536,7 +536,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
 
     // Determine if it's a main summarization task or refinement
     const isRefinementTask = statusText.startsWith('Refin') || statusText === 'Refined!';
-    
+
     if (isRefinementTask) {
       setIsRefining(statusText !== 'Refined!');
       // Restore conversation history if available
@@ -554,26 +554,26 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     setErrorMessage(null);
     setProgress(task.progress);
     setLogMessage(task.message || statusText);
-    
+
     if (task.result) {
-        setResult(task.result);
-        if (task.title) {
-          setCurrentTitle(task.title);
-        }
-        if (task.sourceUrl) {
-          setCurrentSourceUrl(task.sourceUrl);
-        }
-        if (task.sourceImages) {
-          setCurrentSourceImages(task.sourceImages);
-        }
-        // Only switch view if we are not already in result view (to avoid jumping if user is refining)
-        // AND if the user hasn't explicitly closed the result view for this session
-        // Use refs to check current state to avoid stale closure in event listener
-        if (viewRef.current !== 'result' && allowAutoSwitch && !userClosedResultRef.current) {
-          setView('result');
-        }
+      setResult(task.result);
+      if (task.title) {
+        setCurrentTitle(task.title);
       }
-    
+      if (task.sourceUrl) {
+        setCurrentSourceUrl(task.sourceUrl);
+      }
+      if (task.sourceImages) {
+        setCurrentSourceImages(task.sourceImages);
+      }
+      // Only switch view if we are not already in result view (to avoid jumping if user is refining)
+      // AND if the user hasn't explicitly closed the result view for this session
+      // Use refs to check current state to avoid stale closure in event listener
+      if (viewRef.current !== 'result' && allowAutoSwitch && !userClosedResultRef.current) {
+        setView('result');
+      }
+    }
+
     // Always sync conversation history if present in task, to ensure we have the full context
     if (task.conversationHistory) {
       setConversationHistory(task.conversationHistory);
@@ -596,7 +596,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     setLogMessage(t.extractingContent);
     setResult(null);
     setErrorMessage(null);
-    setConversationHistory([]); 
+    setConversationHistory([]);
     setUserClosedResult(false); // Reset this flag for new task 
 
     try {
@@ -604,11 +604,11 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       if (!tab.id) throw new Error('No active tab');
 
       const response = await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_CONTENT' });
-      
+
       if (!response) {
         throw new Error('No response from content script. Refresh the page?');
       }
-      
+
       if (response.type === 'ERROR') {
         throw new Error(response.payload);
       }
@@ -617,44 +617,44 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
 
       const extraction: ExtractionResult = response.payload;
       console.log('Extracted:', extraction);
-      
+
       if (extraction.title) {
         setCurrentTitle(extraction.title);
       }
 
       // Delegate to Background Script
-      chrome.runtime.sendMessage({ 
-        type: 'START_SUMMARIZATION', 
-        payload: extraction 
+      chrome.runtime.sendMessage({
+        type: 'START_SUMMARIZATION',
+        payload: extraction
       });
 
     } catch (error: any) {
       console.error(error);
       let errorMsg = error.message;
-      
+
       // Handle "Could not establish connection" error specifically
       if (errorMsg.includes('Could not establish connection') || errorMsg.includes('Receiving end does not exist')) {
-          setErrorMessage(
-            <div className="flex flex-col gap-2">
-               <span>{t.connectionFailed}</span>
-               <button 
-                 onClick={async () => {
-                   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-                   if (tab?.id) {
-                     chrome.tabs.reload(tab.id);
-                     window.close(); // Close popup to force user to reopen after refresh
-                   }
-                 }}
-                 className="text-xs bg-red-100 hover:bg-red-200 text-red-800 py-1 px-2 rounded font-medium transition w-fit"
-               >
-                 {t.refreshPage}
-               </button>
-            </div> as any
-          );
+        setErrorMessage(
+          <div className="flex flex-col gap-2">
+            <span>{t.connectionFailed}</span>
+            <button
+              onClick={async () => {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (tab?.id) {
+                  chrome.tabs.reload(tab.id);
+                  window.close(); // Close popup to force user to reopen after refresh
+                }
+              }}
+              className="text-xs bg-red-100 hover:bg-red-200 text-red-800 py-1 px-2 rounded font-medium transition w-fit"
+            >
+              {t.refreshPage}
+            </button>
+          </div> as any
+        );
       } else {
-          setErrorMessage(errorMsg);
+        setErrorMessage(errorMsg);
       }
-      
+
       setStatus('Error');
       setLoading(false);
     }
@@ -662,12 +662,12 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
 
   const handleRefine = async () => {
     if (!refinementInput.trim() || isRefining) return;
-    
+
     setIsRefining(true);
     setStatus('Refining...');
     setErrorMessage(null);
     setProgress(5); // Initial progress
-    
+
     try {
       const newHistory: ChatMessage[] = [
         ...conversationHistory,
@@ -679,8 +679,8 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       setRefinementInput('');
 
       // Delegate to Background Script
-      await chrome.runtime.sendMessage({ 
-        type: 'START_REFINEMENT', 
+      await chrome.runtime.sendMessage({
+        type: 'START_REFINEMENT',
         payload: { messages: newHistory, title: currentTitle }
       });
 
@@ -704,7 +704,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     // Pre-fill
     let safeTitle = (currentTitle || 'Untitled').replace(/[\\/:*?"<>|]/g, '-').trim();
     if (!safeTitle.endsWith('.md')) safeTitle += '.md';
-    
+
     // Load last used directory
     let defaultDir = '/';
     try {
@@ -718,12 +718,12 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
 
     setSaveConfig({
       fileName: safeTitle,
-      directory: defaultDir, 
+      directory: defaultDir,
       message: `Add ${safeTitle}`
     });
     setPushResultUrl(null);
     setIsSaveModalOpen(true);
-    
+
     // Fetch directories
     setIsLoadingDirs(true);
     try {
@@ -742,18 +742,18 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     try {
       const settings = await getSettings();
       if (!settings.github) throw new Error('No settings');
-      
+
       const dir = saveConfig.directory === '/' ? '' : saveConfig.directory;
       // Ensure no double slashes
       const fullPath = dir ? `${dir}/${saveConfig.fileName}` : saveConfig.fileName;
-      
+
       const pushResponse = await pushToGitHub(
         settings.github,
         fullPath,
         result || '',
         saveConfig.message
       );
-      
+
       // Save last used directory
       chrome.storage.local.set({ lastGithubDir: saveConfig.directory });
 
@@ -780,19 +780,19 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    
+
     // Sanitize title for filename
     let safeTitle = (currentTitle || 'summary').replace(/[\\/:*?"<>|]/g, '-').trim();
     if (!safeTitle) safeTitle = 'summary';
     if (!safeTitle.toLowerCase().endsWith('.md')) safeTitle += '.md';
-    
+
     a.download = safeTitle;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
-  
+
   const handleDeleteItem = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     await deleteHistoryItem(id);
@@ -827,7 +827,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
         {view === 'home' && (
           <div className="w-full flex-1 flex flex-col min-h-0">
             <div className="text-center space-y-4 w-full flex flex-col items-center mb-8 shrink-0">
-              
+
               {errorMessage && (
                 <div className="w-full px-4 mb-2">
                   <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm flex items-start gap-2 text-left">
@@ -840,7 +840,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
               <p className="text-gray-600 text-sm px-4">
                 {t.homeDescription}
               </p>
-              
+
               {!loading ? (
                 <div className="flex flex-col gap-3 w-full items-center">
                   {/* 四个主要功能按钮放在一起 - 公众号放最前，写文档放最后 */}
@@ -881,109 +881,109 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                 </div>
               ) : (
                 <div className="w-64 mx-auto space-y-3">
-                   <div className="bg-gray-100 rounded-lg p-3 border flex flex-col gap-2">
-                     <div className="flex justify-between items-center text-xs text-gray-500 font-medium">
-                       <span className="flex items-center gap-2">
-                         <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
-                         {t.processing}
-                       </span>
-                       <span>{progress}%</span>
-                     </div>
-                     
-                     <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                        <div 
-                          className="bg-blue-600 h-1.5 rounded-full transition-all duration-300 ease-in-out" 
-                          style={{ width: `${progress}%` }}
-                        ></div>
-                     </div>
-                     
-                     {/* Detailed Log Message */}
-                     <p className="text-[10px] text-gray-400 text-center truncate px-1 h-4">
-                       {logMessage}
-                     </p>
+                  <div className="bg-gray-100 rounded-lg p-3 border flex flex-col gap-2">
+                    <div className="flex justify-between items-center text-xs text-gray-500 font-medium">
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
+                        {t.processing}
+                      </span>
+                      <span>{progress}%</span>
+                    </div>
 
-                     {result && (
-                       <button 
-                         onClick={() => {
-                           setView('result');
-                           setUserClosedResult(false);
-                         }}
-                         className="text-xs bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 py-1.5 rounded transition flex items-center justify-center gap-1.5 w-full mt-1 font-medium"
-                       >
-                         <Eye className="w-3 h-3" /> {t.viewLiveResult}
-                       </button>
-                     )}
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-300 ease-in-out"
+                        style={{ width: `${progress}%` }}
+                      ></div>
+                    </div>
 
-                     <button 
-                       onClick={handleCancel}
-                       className="text-xs border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 py-1.5 rounded transition flex items-center justify-center gap-1.5 w-full mt-1 font-medium"
-                     >
-                       <Square className="w-3 h-3 fill-current" /> {t.stopGenerating}
-                     </button>
-                   </div>
+                    {/* Detailed Log Message */}
+                    <p className="text-[10px] text-gray-400 text-center truncate px-1 h-4">
+                      {logMessage}
+                    </p>
+
+                    {result && (
+                      <button
+                        onClick={() => {
+                          setView('result');
+                          setUserClosedResult(false);
+                        }}
+                        className="text-xs bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 py-1.5 rounded transition flex items-center justify-center gap-1.5 w-full mt-1 font-medium"
+                      >
+                        <Eye className="w-3 h-3" /> {t.viewLiveResult}
+                      </button>
+                    )}
+
+                    <button
+                      onClick={handleCancel}
+                      className="text-xs border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 py-1.5 rounded transition flex items-center justify-center gap-1.5 w-full mt-1 font-medium"
+                    >
+                      <Square className="w-3 h-3 fill-current" /> {t.stopGenerating}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
 
             <div className="flex-1 flex flex-col min-h-0 w-full border-t pt-4">
-               <div className="flex justify-between items-center mb-3 px-1 shrink-0">
-                 <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-1">
-                   <History className="w-4 h-4" />
-                   {t.recentDocuments}
-                 </h2>
-                 {historyItems.length > 0 && (
-                   <button onClick={handleClearHistory} className="text-[10px] text-gray-400 hover:text-red-500 uppercase tracking-wider font-bold">
-                     {t.clearAll}
-                   </button>
-                 )}
-               </div>
-               
-               <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
-                 {historyItems.length === 0 ? (
-                   <div className="h-32 flex flex-col items-center justify-center text-gray-400">
-                     <History className="w-8 h-8 mb-2 opacity-20" />
-                     <p className="text-xs italic">{t.noHistoryYet}</p>
-                   </div>
-                 ) : (
-                   historyItems.map(item => (
-                     <div 
-                       key={item.id}
+              <div className="flex justify-between items-center mb-3 px-1 shrink-0">
+                <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                  <History className="w-4 h-4" />
+                  {t.recentDocuments}
+                </h2>
+                {historyItems.length > 0 && (
+                  <button onClick={handleClearHistory} className="text-[10px] text-gray-400 hover:text-red-500 uppercase tracking-wider font-bold">
+                    {t.clearAll}
+                  </button>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
+                {historyItems.length === 0 ? (
+                  <div className="h-32 flex flex-col items-center justify-center text-gray-400">
+                    <History className="w-8 h-8 mb-2 opacity-20" />
+                    <p className="text-xs italic">{t.noHistoryYet}</p>
+                  </div>
+                ) : (
+                  historyItems.map(item => (
+                    <div
+                      key={item.id}
                       onClick={() => {
                         setResult(item.content);
                         setCurrentTitle(item.title);
                         setView('result');
                       }}
-                       className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer group flex justify-between items-start transition bg-white"
-                     >
-                       <div className="flex-1 min-w-0">
-                         <h3 className="font-medium text-sm truncate" title={item.title}>{item.title}</h3>
-                         <p className="text-[10px] text-gray-400 mt-0.5">
-                           {new Date(item.date).toLocaleDateString()} {new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                         </p>
-                       </div>
-                       <button 
-                         onClick={(e) => handleDeleteItem(e, item.id)}
-                         className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"
-                       >
-                         <Trash2 className="w-3.5 h-3.5" />
-                       </button>
-                     </div>
-                   ))
-                 )}
-               </div>
+                      className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer group flex justify-between items-start transition bg-white"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm truncate" title={item.title}>{item.title}</h3>
+                        <p className="text-[10px] text-gray-400 mt-0.5">
+                          {new Date(item.date).toLocaleDateString()} {new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      <button
+                        onClick={(e) => handleDeleteItem(e, item.id)}
+                        className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         )}
 
         {view === 'history' && (
-           <div className="w-full h-full flex flex-col">
-             {/* This view is deprecated but kept for safety if state gets stuck */}
-             <div className="flex justify-between items-center mb-4">
-               <button onClick={() => setView('home')} className="flex items-center gap-1 text-sm text-gray-600 hover:text-black">
-                 <ArrowLeft className="w-4 h-4" /> Back
-               </button>
-             </div>
-           </div>
+          <div className="w-full h-full flex flex-col">
+            {/* This view is deprecated but kept for safety if state gets stuck */}
+            <div className="flex justify-between items-center mb-4">
+              <button onClick={() => setView('home')} className="flex items-center gap-1 text-sm text-gray-600 hover:text-black">
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+            </div>
+          </div>
         )}
 
         {view === 'result' && result && (
@@ -991,7 +991,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
             <div className="flex justify-between items-center px-1 mb-2">
               <span className="text-xs font-semibold text-gray-500">{t.result}</span>
               <div className="flex gap-2">
-                 <button
+                <button
                   onClick={() => setIsPreview(!isPreview)}
                   className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded transition shadow-sm font-medium"
                 >
@@ -999,34 +999,34 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                   {isPreview ? t.showCode : t.preview}
                 </button>
                 <button
-                 onClick={() => {
-                   setView('home');
-                   setUserClosedResult(true); // Mark as explicitly closed
-                   loadHistory(); // Reload history when returning to home
-                 }}
-                 className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 hover:bg-red-50 hover:text-red-600 text-gray-700 px-3 py-1.5 rounded transition shadow-sm font-medium"
-              >
-                <X className="w-3.5 h-3.5" />
-                {t.close}
-              </button>
+                  onClick={() => {
+                    setView('home');
+                    setUserClosedResult(true); // Mark as explicitly closed
+                    loadHistory(); // Reload history when returning to home
+                  }}
+                  className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 hover:bg-red-50 hover:text-red-600 text-gray-700 px-3 py-1.5 rounded transition shadow-sm font-medium"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  {t.close}
+                </button>
               </div>
             </div>
 
             <div className="bg-gray-50 p-4 rounded-lg border flex-1 overflow-y-auto min-h-0">
               {isPreview ? (
                 <div className="prose prose-sm prose-slate max-w-none">
-                  <ReactMarkdown 
+                  <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkFrontmatter]}
                     rehypePlugins={[rehypeSlug, rehypeRaw]}
                     components={{
-                      code({node, inline, className, children, ...props}: any) {
+                      code({ node, inline, className, children, ...props }: any) {
                         const match = /language-(\w+)/.exec(className || '');
                         const isMermaid = match && match[1] === 'mermaid';
-                        
+
                         if (!inline && isMermaid) {
                           return <MermaidChart code={String(children).replace(/\n$/, '')} />;
                         }
-                        
+
                         return !inline && match ? (
                           <pre className={className} {...props}>
                             <code>{children}</code>
@@ -1038,15 +1038,15 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                         );
                       },
                       // Hide frontmatter content in preview
-                      p: ({children}: any) => {
-                         if (typeof children === 'string' && children.startsWith('---') && children.endsWith('---')) {
-                           return null;
-                         }
-                         return <p>{children}</p>;
+                      p: ({ children }: any) => {
+                        if (typeof children === 'string' && children.startsWith('---') && children.endsWith('---')) {
+                          return null;
+                        }
+                        return <p>{children}</p>;
                       }
                     }}
                   >
-                    {result.replace(/^---[\s\S]+?---/, '')} 
+                    {result.replace(/^---[\s\S]+?---/, '')}
                   </ReactMarkdown>
                 </div>
               ) : (
@@ -1055,9 +1055,9 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                 </pre>
               )}
             </div>
-            
+
             <div className="flex gap-2 shrink-0">
-               <button
+              <button
                 onClick={handleCopy}
                 className="flex-1 bg-blue-600 text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-blue-700 transition"
                 title={t.copy}
@@ -1065,7 +1065,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                 <Copy className="w-4 h-4" />
                 <span className="text-xs">{t.copy}</span>
               </button>
-               <button
+              <button
                 onClick={handleDownload}
                 className="flex-1 bg-green-600 text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-green-700 transition"
                 title={t.downloadMarkdown}
@@ -1084,7 +1084,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
             </div>
 
             <div className="flex gap-2 shrink-0 mt-2">
-               <button
+              <button
                 onClick={handlePublishToWeixin}
                 className="flex-1 bg-green-500 text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-green-600 transition"
                 title={t.weixin || '公众号'}
@@ -1092,7 +1092,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                 <MessageCircle className="w-4 h-4" />
                 <span className="text-xs">{t.weixin || '公众号'}</span>
               </button>
-               <button
+              <button
                 onClick={handlePublishToToutiao}
                 className="flex-1 bg-red-600 text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-red-700 transition"
                 title={t.toutiao}
@@ -1100,7 +1100,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                 <Newspaper className="w-4 h-4" />
                 <span className="text-xs">{t.toutiao}</span>
               </button>
-               <button
+              <button
                 onClick={handlePublishToZhihu}
                 className="flex-1 bg-blue-500 text-white py-2 rounded flex items-center justify-center gap-2 hover:bg-blue-600 transition"
                 title={t.zhihu}
@@ -1109,20 +1109,19 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                 <span className="text-xs">{t.zhihu}</span>
               </button>
             </div>
-            
+
             <div className="pt-2 border-t mt-2 shrink-0 flex flex-col gap-2">
               {/* Refinement Chat History */}
               {conversationHistory.length > 0 && (
                 <div className="max-h-32 overflow-y-auto space-y-2 p-2 bg-gray-50 rounded border text-xs mb-1">
                   {conversationHistory.filter(msg => msg.role !== 'system' && !(msg.role === 'user' && msg.content.includes('Please summarize'))).map((msg, idx) => (
                     <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] p-2 rounded-lg ${
-                        msg.role === 'user' 
-                          ? 'bg-blue-100 text-blue-900 rounded-br-none' 
+                      <div className={`max-w-[85%] p-2 rounded-lg ${msg.role === 'user'
+                          ? 'bg-blue-100 text-blue-900 rounded-br-none'
                           : 'bg-white border text-gray-800 rounded-bl-none shadow-sm'
-                      }`}>
-                         {msg.role === 'assistant' ? 'AI: ' : 'You: '}
-                         {msg.content.length > 60 && msg.role === 'assistant' ? msg.content.substring(0, 60) + '...' : msg.content}
+                        }`}>
+                        {msg.role === 'assistant' ? 'AI: ' : 'You: '}
+                        {msg.content.length > 60 && msg.role === 'assistant' ? msg.content.substring(0, 60) + '...' : msg.content}
                       </div>
                     </div>
                   ))}
@@ -1130,23 +1129,23 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
               )}
 
               {isRefining && (
-                 <div className="mb-1 px-1">
-                     <div className="flex justify-between items-center text-[10px] text-gray-500 font-medium mb-1">
-                       <span className="flex items-center gap-1 truncate max-w-[200px]">
-                         <Loader2 className="w-3 h-3 animate-spin text-purple-600" />
-                         {logMessage || 'Refining...'}
-                       </span>
-                       <span>{progress}%</span>
-                     </div>
-                     <div className="w-full bg-gray-100 rounded-full h-1 overflow-hidden">
-                        <div 
-                          className="bg-purple-600 h-1 rounded-full transition-all duration-300 ease-in-out" 
-                          style={{ width: `${progress}%` }}
-                        ></div>
-                     </div>
-                 </div>
+                <div className="mb-1 px-1">
+                  <div className="flex justify-between items-center text-[10px] text-gray-500 font-medium mb-1">
+                    <span className="flex items-center gap-1 truncate max-w-[200px]">
+                      <Loader2 className="w-3 h-3 animate-spin text-purple-600" />
+                      {logMessage || 'Refining...'}
+                    </span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-1 overflow-hidden">
+                    <div
+                      className="bg-purple-600 h-1 rounded-full transition-all duration-300 ease-in-out"
+                      style={{ width: `${progress}%` }}
+                    ></div>
+                  </div>
+                </div>
               )}
-              
+
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -1156,7 +1155,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                   disabled={isRefining}
                   className="flex-1 p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                
+
                 {isRefining ? (
                   <button
                     onClick={handleCancel}
@@ -1197,7 +1196,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            
+
             <div className="p-4 space-y-4 overflow-y-auto">
               {pushResultUrl ? (
                 <div className="text-center py-4 space-y-3">
@@ -1205,15 +1204,15 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                     <Check className="w-6 h-6" />
                   </div>
                   <p className="text-green-600 font-medium">{t.successfullyPushed}</p>
-                  <a 
-                    href={pushResultUrl} 
-                    target="_blank" 
+                  <a
+                    href={pushResultUrl}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline text-sm break-all block"
                   >
                     {t.viewOnGithub}
                   </a>
-                  <button 
+                  <button
                     onClick={() => setIsSaveModalOpen(false)}
                     className="w-full bg-gray-100 text-gray-700 py-2 rounded hover:bg-gray-200"
                   >
@@ -1224,14 +1223,14 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                 <>
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-gray-600">{t.fileName}</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={saveConfig.fileName}
-                      onChange={e => setSaveConfig({...saveConfig, fileName: e.target.value})}
+                      onChange={e => setSaveConfig({ ...saveConfig, fileName: e.target.value })}
                       className="w-full p-2 border rounded text-sm"
                     />
                   </div>
-                  
+
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-gray-600">{t.directory}</label>
                     {isLoadingDirs ? (
@@ -1242,7 +1241,7 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                       <div className="relative">
                         <select
                           value={saveConfig.directory}
-                          onChange={e => setSaveConfig({...saveConfig, directory: e.target.value})}
+                          onChange={e => setSaveConfig({ ...saveConfig, directory: e.target.value })}
                           className="w-full p-2 border rounded text-sm appearance-none"
                         >
                           <option value="/">/ (Root)</option>
@@ -1254,18 +1253,18 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-gray-600">{t.commitMessage}</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={saveConfig.message}
-                      onChange={e => setSaveConfig({...saveConfig, message: e.target.value})}
+                      onChange={e => setSaveConfig({ ...saveConfig, message: e.target.value })}
                       className="w-full p-2 border rounded text-sm"
                       placeholder={t.commitMessage}
                     />
                   </div>
-                  
+
                   <button
                     onClick={handlePush}
                     disabled={isPushing || !saveConfig.fileName}

@@ -10,14 +10,20 @@ export class DOMHelper {
   static findElement(selectors: string[]): HTMLElement | null {
     for (const selector of selectors) {
       try {
-        // 处理 :contains() 伪选择器（jQuery 风格）
-        if (selector.includes(':contains(')) {
-          const match = selector.match(/(.+):contains\("([^"]+)"\)/);
+        // 处理 :contains() 或 :has-text() 伪选择器
+        if (selector.includes(':contains(') || selector.includes(':has-text(')) {
+          const isHasText = selector.includes(':has-text(');
+          const pattern = isHasText 
+            ? /(.*?):has-text\("([^"]+)"\)/ 
+            : /(.*?):contains\("([^"]+)"\)/;
+          
+          const match = selector.match(pattern);
           if (match) {
-            const [, baseSelector, text] = match;
+            const baseSelector = match[1] || '*';
+            const text = match[2];
             const elements = document.querySelectorAll(baseSelector);
             for (const el of elements) {
-              if (el.textContent?.includes(text)) {
+              if (el.textContent?.includes(text) && this.isElementVisible(el as HTMLElement)) {
                 return el as HTMLElement;
               }
             }
@@ -45,13 +51,19 @@ export class DOMHelper {
     
     for (const selector of selectors) {
       try {
-        if (selector.includes(':contains(')) {
-          const match = selector.match(/(.+):contains\("([^"]+)"\)/);
+        if (selector.includes(':contains(') || selector.includes(':has-text(')) {
+          const isHasText = selector.includes(':has-text(');
+          const pattern = isHasText 
+            ? /(.*?):has-text\("([^"]+)"\)/ 
+            : /(.*?):contains\("([^"]+)"\)/;
+          
+          const match = selector.match(pattern);
           if (match) {
-            const [, baseSelector, text] = match;
+            const baseSelector = match[1] || '*';
+            const text = match[2];
             const elements = document.querySelectorAll(baseSelector);
             for (const el of elements) {
-              if (el.textContent?.includes(text) && !seen.has(el as HTMLElement)) {
+              if (el.textContent?.includes(text) && !seen.has(el as HTMLElement) && this.isElementVisible(el as HTMLElement)) {
                 seen.add(el as HTMLElement);
                 results.push(el as HTMLElement);
               }

@@ -44,6 +44,11 @@ export interface AppSettings {
     autoPublish?: boolean; // 是否自动发布
     customPrompt?: string; // 自定义提示词
   };
+  xiaohongshu?: {
+    cookie: string;
+    autoPublish?: boolean; // 生成文章后是否自动发布到小红书
+    customPrompt?: string; // 自定义提示词
+  };
   sync?: {
     enabled: boolean;
     backendUrl: string; // e.g. https://my-worker.workers.dev
@@ -58,6 +63,7 @@ export interface AppSettings {
     toutiao?: string;
     zhihu?: string;
     weixin?: string;
+    xiaohongshu?: string;
   };
 }
 
@@ -88,6 +94,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   weixin: {
     cookie: '',
     authorName: '',
+    autoPublish: true,
+    customPrompt: ''
+  },
+  xiaohongshu: {
+    cookie: '',
     autoPublish: true,
     customPrompt: ''
   },

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { AppSettings, DEFAULT_SETTINGS, getSettings, saveSettings, syncSettings, restoreSettings, ArticleStyleSettings } from '../utils/storage';
-import { SYSTEM_PROMPTS, TOUTIAO_DEFAULT_PROMPT, ZHIHU_DEFAULT_PROMPT, WEIXIN_DEFAULT_PROMPT, PROMPT_VERSIONS } from '../utils/prompts';
+import { SYSTEM_PROMPTS, TOUTIAO_DEFAULT_PROMPT, ZHIHU_DEFAULT_PROMPT, WEIXIN_DEFAULT_PROMPT, XIAOHONGSHU_DEFAULT_PROMPT, PROMPT_VERSIONS } from '../utils/prompts';
 import { getTranslation } from '../utils/i18n';
-import { Eye, EyeOff, Loader2, CheckCircle, XCircle, Newspaper, RefreshCw, Cloud, Lock, Key, Palette, Send, BookOpen, RotateCcw, FileText, MessageCircle, BarChart3, Github } from 'lucide-react';
+import { Eye, EyeOff, Loader2, CheckCircle, XCircle, Newspaper, RefreshCw, Cloud, Lock, Key, Palette, Send, BookOpen, RotateCcw, FileText, MessageCircle, BarChart3, Github, Heart } from 'lucide-react';
 import { validateGitHubConnection } from '../utils/github';
 import { generateRandomString } from '../utils/crypto';
 
@@ -202,9 +202,11 @@ const Settings: React.FC = () => {
   const [showToutiaoCookie, setShowToutiaoCookie] = useState(false);
   const [showZhihuCookie, setShowZhihuCookie] = useState(false);
   const [showWeixinCookie, setShowWeixinCookie] = useState(false);
+  const [showXiaohongshuCookie, setShowXiaohongshuCookie] = useState(false);
   const [fetchingToutiao, setFetchingToutiao] = useState(false);
   const [fetchingZhihu, setFetchingZhihu] = useState(false);
   const [fetchingWeixin, setFetchingWeixin] = useState(false);
+  const [fetchingXiaohongshu, setFetchingXiaohongshu] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verifyingApi, setVerifyingApi] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -533,6 +535,18 @@ const Settings: React.FC = () => {
     }));
   };
 
+  // 处理小红书配置变化
+  const handleXiaohongshuChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setSettings(prev => ({
+      ...prev,
+      xiaohongshu: {
+        ...prev.xiaohongshu || { cookie: '' },
+        [name]: value
+      }
+    }));
+  };
+
   // 处理文章风格滑动条变化
   const handleStyleChange = (key: keyof ArticleStyleSettings, value: number) => {
     setSettings(prev => ({
@@ -799,6 +813,46 @@ const Settings: React.FC = () => {
       alert('Failed to fetch cookies. Please try manually.');
     } finally {
       setFetchingWeixin(false);
+    }
+  };
+
+  // 自动获取小红书 Cookie
+  const handleAutoFetchXiaohongshuCookie = async () => {
+    if (typeof chrome === 'undefined' || !chrome.cookies) {
+      alert('This feature requires the Chrome Extension environment.');
+      return;
+    }
+
+    setFetchingXiaohongshu(true);
+    try {
+      const cookies = await chrome.cookies.getAll({ url: 'https://creator.xiaohongshu.com/' });
+      const now = Date.now() / 1000;
+      const relevantCookies = cookies.filter(c => {
+        if (c.expirationDate && c.expirationDate < now) return false;
+        if (!c.value || c.value.trim() === '') return false;
+        return true;
+      });
+
+      if (relevantCookies.length > 0) {
+        const cookieStr = relevantCookies.map(c => `${c.name}=${c.value}`).join('; ');
+        setSettings(prev => ({
+          ...prev,
+          xiaohongshu: {
+            ...prev.xiaohongshu || { cookie: '' },
+            cookie: cookieStr
+          }
+        }));
+      } else {
+        const confirmLogin = confirm('未找到小红书 Cookie，是否前往创作者平台登录？');
+        if (confirmLogin) {
+          chrome.tabs.create({ url: 'https://creator.xiaohongshu.com/publish/publish?from=tab_switch&target=article' });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch Xiaohongshu cookies:", error);
+      alert('获取 Cookie 失败，请手动输入。');
+    } finally {
+      setFetchingXiaohongshu(false);
     }
   };
 
@@ -1375,6 +1429,81 @@ const Settings: React.FC = () => {
             </p>
           </div>
 
+        </div>
+      </div>
+
+      {/* ========== 小红书配置 ========== */}
+      <div className="border-t pt-4">
+        <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
+          <Heart className="w-4 h-4 text-[#ff2442] fill-current" />
+          小红书配置
+        </h3>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <div className="flex justify-between items-center">
+              <label className="block text-xs font-medium text-gray-600">{t.cookieLabel}</label>
+              <button
+                type="button"
+                onClick={handleAutoFetchXiaohongshuCookie}
+                disabled={fetchingXiaohongshu}
+                className="text-[#ff2442] hover:text-[#e61e3c] flex items-center gap-1 text-xs font-medium"
+              >
+                {fetchingXiaohongshu ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                {t.autoFetch}
+              </button>
+            </div>
+            <div className="relative">
+              <input
+                type={showXiaohongshuCookie ? "text" : "password"}
+                name="cookie"
+                value={settings.xiaohongshu?.cookie || ''}
+                onChange={handleXiaohongshuChange}
+                className="w-full p-2 border rounded pr-10 text-sm focus:border-[#ff2442] focus:ring-1 focus:ring-[#ff2442] outline-none"
+                placeholder="Paste your Xiaohongshu cookie here..."
+              />
+              <button
+                type="button"
+                onClick={() => setShowXiaohongshuCookie(!showXiaohongshuCookie)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"
+              >
+                {showXiaohongshuCookie ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400">
+              {t.cookieHint}
+            </p>
+          </div>
+
+          {/* 小红书自定义提示词 */}
+          <div className="space-y-1">
+            <div className="flex justify-between items-center">
+              <label className="block text-xs font-medium text-gray-600">{t.customPromptLabel}</label>
+              <button
+                type="button"
+                onClick={() => setSettings(prev => ({
+                  ...prev,
+                  xiaohongshu: {
+                    ...prev.xiaohongshu || { cookie: '' },
+                    customPrompt: XIAOHONGSHU_DEFAULT_PROMPT
+                  }
+                }))}
+                className="text-[#ff2442] hover:text-[#e61e3c] flex items-center gap-1 text-xs font-medium"
+              >
+                <RotateCcw className="w-3 h-3" />
+                {t.resetToDefault}
+              </button>
+            </div>
+            <textarea
+              name="customPrompt"
+              value={settings.xiaohongshu?.customPrompt || XIAOHONGSHU_DEFAULT_PROMPT}
+              onChange={handleXiaohongshuChange}
+              className="w-full p-2 border rounded h-32 text-sm font-mono focus:border-[#ff2442] focus:ring-1 focus:ring-[#ff2442] outline-none"
+              placeholder={t.customPromptPlaceholder}
+            />
+            <p className="text-[10px] text-gray-400">
+              {t.customPromptHint}
+            </p>
+          </div>
         </div>
       </div>
 
