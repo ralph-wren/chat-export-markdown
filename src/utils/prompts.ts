@@ -681,6 +681,8 @@ export const ZHIHU_DEFAULT_PROMPT = `## 知乎文章风格指南
 - ❌ **严禁使用 Markdown 加粗**（不要用 **text**）
 - ❌ **严禁使用 Markdown/HTML 下划线**（不要用 <u>text</u>）
 - ❌ **严禁使用 Markdown 标题语法**（不要用 #, ##, ### 等）
+- ❌ **严禁输出英文标题**，必须直接输出中文标题
+- ❌ **严禁重复用户输入的原始问题**
 - ✅ **仅使用纯文本**，通过自然段落和空行来组织内容
 
 ### 高赞元素
@@ -812,4 +814,11 @@ ${styleDescriptions.map(d => `- ${d}`).join('\n')}
   
   // 将风格要求插入到模板中
   return ARTICLE_PROMPT_TEMPLATE + styleSection;
+};
+
+// 提示词版本号 - 每次修改默认提示词时需要更新对应的版本号
+export const PROMPT_VERSIONS = {
+  TOUTIAO: '1.0.0',
+  ZHIHU: '1.0.0',
+  WEIXIN: '1.0.0'
 };

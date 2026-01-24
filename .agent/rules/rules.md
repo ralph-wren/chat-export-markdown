@@ -1,3 +1,6 @@
+---
+trigger: always_on
+---
 
 1. 始终使用中文对话
 2. 生成的代码按功能拆分，能复用的功能方法进行复用，不要重复实现相同功能
@@ -19,3 +22,4 @@
 18. 通过 bash -lc "CI=1 npx wrangler r2 object put pothos-images/memoraid/feature-extract.png --file ../store-assets/feature-extract.png --content-type image/png --remote" 的方式可以上传图片到
 19. 生成的说明文档统一放到docs目录,文件名称格式{日期如20260124}-{功能，几个字}-{具体解决的问题}.md
 20. 测试文件、临时文件统一放到test目录
+21. 每次更新提示词后，都要在src\utils\prompts.ts更新PROMPT_VERSIONS对应平台的版本，方便部署后自动更新提示词内容

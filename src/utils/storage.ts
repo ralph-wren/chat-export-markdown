@@ -54,6 +54,11 @@ export interface AppSettings {
   };
   debugMode?: boolean;
   articleStyle?: ArticleStyleSettings; // 文章风格设置
+  promptVersions?: { // 提示词版本号，用于自动更新检测
+    toutiao?: string;
+    zhihu?: string;
+    weixin?: string;
+  };
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -169,18 +174,18 @@ export const syncSettings = async (settings: AppSettings): Promise<AppSettings> 
   if (!settings.sync?.enabled || !settings.sync.token || !settings.sync.backendUrl) {
     throw new Error('Sync not configured');
   }
-  
+
   // Use provided encryption key or generate one if missing (though UI should enforce it)
   const passphrase = settings.sync.encryptionKey || generateRandomString();
-  
+
   // Prepare data to encrypt (exclude sync config itself to avoid loop/issues)
   const dataToEncrypt = JSON.stringify({
     ...settings,
     sync: undefined // Don't sync the sync config itself
   });
-  
+
   const { encrypted, salt, iv } = await encryptData(dataToEncrypt, passphrase);
-  
+
   const response = await fetch(`${settings.sync.backendUrl}/settings`, {
     method: 'POST',
     headers: {
@@ -193,13 +198,13 @@ export const syncSettings = async (settings: AppSettings): Promise<AppSettings> 
       iv
     })
   });
-  
+
   if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Sync failed:', response.status, response.statusText, errorText);
-      throw new Error(`Failed to upload settings: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-  
+    const errorText = await response.text();
+    console.error('Sync failed:', response.status, response.statusText, errorText);
+    throw new Error(`Failed to upload settings: ${response.status} ${response.statusText} - ${errorText}`);
+  }
+
   return {
     ...settings,
     sync: {
@@ -223,22 +228,22 @@ export const restoreSettings = async (currentSettings: AppSettings): Promise<App
   });
 
   if (!response.ok) {
-     if (response.status === 404) {
-       throw new Error('No remote settings found');
-     }
-     throw new Error('Failed to fetch settings');
+    if (response.status === 404) {
+      throw new Error('No remote settings found');
+    }
+    throw new Error('Failed to fetch settings');
   }
 
   const { encrypted_data, salt, iv } = await response.json();
-  
+
   if (!currentSettings.sync.encryptionKey) {
-     throw new Error('Missing encryption key');
+    throw new Error('Missing encryption key');
   }
 
   try {
     const decryptedJson = await decryptData(encrypted_data, currentSettings.sync.encryptionKey, salt, iv);
     const remoteSettings = JSON.parse(decryptedJson);
-    
+
     // Merge remote settings with local sync config
     return {
       ...remoteSettings,
