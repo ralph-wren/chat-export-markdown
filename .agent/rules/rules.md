@@ -1,25 +1,52 @@
 ---
 trigger: always_on
 ---
+## 项目概览
+- **代码仓库**: https://github.com/ralph-wren/memoraid
+- **类型**: Chrome 扩展 (React/Vite) + Cloudflare Worker 后端。
+- **核心技术**: TypeScript, TailwindCSS, Cloudflare D1 (SQL), R2 (对象存储)。
 
-1. 始终使用中文对话
-2. 生成的代码按功能拆分，能复用的功能方法进行复用，不要重复实现相同功能
-3. 我把一些关键信息保存在本地环境变量，你可以去查看，需要的时候获取使用，简单的方法是echo 某个变量获取到
-4. 使用npx wrangler deploy命令部署后端服务，不会覆盖远程变量，不需要重新配置变量
-5. 我让你记住的一些东西，或者经常需要使用的信息，你可以保存在规则文件里，并且进行加密
-6. 涉及浏览器页面交互的操作，可以自动调用mcp工具，比如playwright，chrome devtools访问浏览器，查看相关页面了解页面信息
-7. 更改完代码一定要执行npm run build确认不报错
-8. 我是初学者，代码尽量加注释，尤其每次改动要加注释说明下
-9. 代码仓库地址 https://github.com/ralph-wren/memoraid
-10. 所有内容部署到cloudflare page
-11. 本地已经安装和cloudflare的d1，r1数据库的交互命令
-12. 任务完成后检查下是否符合要求
-13. 使用 npx playwright codegen --channel=chrome --user-data-dir="C:\Users\ralph\AppData\Local\Chrome-Automation" https://mp.weixin.qq.com/ 这种命令打开浏览器查看相关页面操作
-14. 需要时参考docs\REMOTE_DEBUG.md的调试步骤进行远程调试，需要我在浏览器生成验证码发给你进行调试
-15. 生成所有临时文件、测试文件都统一放在跟目录的test目录下，用完删除
-16. 每次执行npm run release前，更新一下版本信息
-17. 需要遵守.cursor目录下的规则
-18. 通过 bash -lc "CI=1 npx wrangler r2 object put pothos-images/memoraid/feature-extract.png --file ../store-assets/feature-extract.png --content-type image/png --remote" 的方式可以上传图片到
-19. 生成的说明文档统一放到docs目录,文件名称格式{日期如20260124}-{功能，几个字}-{具体解决的问题}.md
-20. 测试文件、临时文件统一放到test目录
-21. 每次更新提示词后，都要在src\utils\prompts.ts更新PROMPT_VERSIONS对应平台的版本，方便部署后自动更新提示词内容
+## ⚠️ 关键规则
+1.  **语言**: 始终使用 **中文** 与用户进行对话。
+2.  **验证**: 修改 *任何* 代码后，**必须** 执行 `npm run build` 以确保没有错误。
+3.  **代码风格**:
+    - 功能模块化（复用方法，避免重复）。
+    - **添加注释**: 所有代码必须加注释，特别是解释修改原因（用户是初学者）。
+4.  **提示词**: 更新提示词时，**必须** 同步更新 `src\utils\prompts.ts` 中的 `PROMPT_VERSIONS` 版本号。
+5.  **文档**:
+    - 统一存放在 `docs/` 目录。
+    - 命名格式: `{日期如20260124}-{功能}-{具体解决的问题}.md`。
+    - 每次回答完一个问题都要更新文档，记录下解决的问题和方法。
+6.  **临时文件**: 所有测试/临时文件必须放在 `test/` 目录。用完即删。
+7.  **发布**: 在运行 `npm run release` 之前，先更新版本信息。
+
+## 常用命令
+
+### 构建与开发
+- **构建 (验证)**: `npm run build` (执行 TypeScript 检查和 Vite 构建)
+- **启动开发服务器**: `npm run dev`
+- **打包发布**: `npm run release`
+
+### 后端 (Cloudflare)
+- **部署**: `npx wrangler deploy` (在 `backend/` 目录下执行)。*注意：这不会覆盖远程环境变量。*
+- **数据库迁移**: `npx wrangler d1 execute memoraid-db --file=./schema.sql` (在 `backend/` 目录下执行)
+- **上传图片到 R2**:
+  ```bash
+  bash -lc "CI=1 npx wrangler r2 object put pothos-images/memoraid/<文件名> --file <本地路径> --content-type image/png --remote"
+  ```
+
+### 调试与自动化
+- **Playwright Codegen** (打开浏览器/查看页面信息):
+  ```bash
+  npx playwright codegen --channel=chrome --user-data-dir="C:\Users\ralph\AppData\Local\Chrome-Automation" https://mp.weixin.qq.com/
+  ```
+- **远程调试**: 按照 `docs/REMOTE_DEBUG.md` 中的步骤操作。
+
+## 架构说明
+- **扩展前端**:
+  - `src/popup`: 用户界面 (React)。
+  - `src/content`: 页面交互脚本 (今日头条, 微信公众号, 知乎，以及未来的其他)。
+  - `src/background`: 后台服务 Worker。
+  - `src/utils`: 通用逻辑 (提示词, 存储, API)。
+- **后端**: `backend/` (Cloudflare Worker)。
+- **环境**: 关键信息保存在本地环境变量中（如果需要查看，可以使用 `echo` 命令）。

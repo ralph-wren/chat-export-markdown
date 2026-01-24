@@ -281,29 +281,21 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab.id) throw new Error('No active tab');
 
-      const response = await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_CONTENT' });
-      
-      if (!response) {
-        throw new Error('No response from content script. Refresh the page?');
-      }
-      
-      if (response.type === 'ERROR') {
-        throw new Error(response.payload);
-      }
-
-      setLogMessage(t.contentExtracted);
-
-      const extraction: ExtractionResult = response.payload;
-      
-      if (extraction.title) {
-        setCurrentTitle(extraction.title);
-      }
-
-      // 发送生成并发布到头条的请求
-      chrome.runtime.sendMessage({ 
-        type: 'GENERATE_AND_PUBLISH_TOUTIAO', 
-        payload: extraction 
+      // 将抓取和生成逻辑移至 background，避免关闭 popup 中断任务
+      const response = await chrome.runtime.sendMessage({ 
+        type: 'INITIATE_GENERATE_AND_PUBLISH', 
+        payload: {
+          platform: 'toutiao',
+          tabId: tab.id
+        }
       });
+      
+      if (!response?.success) {
+        throw new Error(response?.error || '无法启动后台任务');
+      }
+
+      // 不需要在这里处理 extraction 结果，background 会通过 storage 更新状态
+      // 这里的 loading 状态会由 updateFromTask 维持
 
     } catch (error: any) {
       console.error(error);
@@ -364,29 +356,18 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab.id) throw new Error('No active tab');
 
-      const response = await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_CONTENT' });
-      
-      if (!response) {
-        throw new Error('No response from content script. Refresh the page?');
-      }
-      
-      if (response.type === 'ERROR') {
-        throw new Error(response.payload);
-      }
-
-      setLogMessage(t.contentExtracted);
-
-      const extraction: ExtractionResult = response.payload;
-      
-      if (extraction.title) {
-        setCurrentTitle(extraction.title);
-      }
-
-      // 发送生成并发布到知乎的请求
-      chrome.runtime.sendMessage({ 
-        type: 'GENERATE_AND_PUBLISH_ZHIHU', 
-        payload: extraction 
+      // 将抓取和生成逻辑移至 background，避免关闭 popup 中断任务
+      const response = await chrome.runtime.sendMessage({ 
+        type: 'INITIATE_GENERATE_AND_PUBLISH', 
+        payload: {
+          platform: 'zhihu',
+          tabId: tab.id
+        }
       });
+      
+      if (!response?.success) {
+        throw new Error(response?.error || '无法启动后台任务');
+      }
 
     } catch (error: any) {
       console.error(error);
@@ -447,29 +428,18 @@ const Home: React.FC<HomeProps> = ({ onOpenSettings }) => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab.id) throw new Error('No active tab');
 
-      const response = await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_CONTENT' });
-      
-      if (!response) {
-        throw new Error('No response from content script. Refresh the page?');
-      }
-      
-      if (response.type === 'ERROR') {
-        throw new Error(response.payload);
-      }
-
-      setLogMessage(t.contentExtracted);
-
-      const extraction: ExtractionResult = response.payload;
-      
-      if (extraction.title) {
-        setCurrentTitle(extraction.title);
-      }
-
-      // 发送生成并发布到微信公众号的请求
-      chrome.runtime.sendMessage({ 
-        type: 'GENERATE_AND_PUBLISH_WEIXIN', 
-        payload: extraction 
+      // 将抓取和生成逻辑移至 background，避免关闭 popup 中断任务
+      const response = await chrome.runtime.sendMessage({ 
+        type: 'INITIATE_GENERATE_AND_PUBLISH', 
+        payload: {
+          platform: 'weixin',
+          tabId: tab.id
+        }
       });
+      
+      if (!response?.success) {
+        throw new Error(response?.error || '无法启动后台任务');
+      }
 
     } catch (error: any) {
       console.error(error);

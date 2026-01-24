@@ -200,6 +200,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+
+  // 新增：初始化完整生成流程（抓取+生成+发布）
+  // 这将抓取逻辑从 Popup 移至 Background，解决 Popup 关闭导致任务中断的问题
+  if (message.type === 'INITIATE_GENERATE_AND_PUBLISH') {
+    const { platform, tabId } = message.payload;
+    // 异步执行，不等待结果直接返回成功
+    handleInitiateProcess(platform, tabId);
+    sendResponse({ success: true });
+    return true;
+  }
   
   if (message.type === 'CANCEL_SUMMARIZATION') {
     if (abortController) {
@@ -313,6 +323,72 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 // 已移除 handleAiMediaEnhance 和 handleOcrImage 函数
+
+async function handleInitiateProcess(platform: 'toutiao' | 'zhihu' | 'weixin', tabId: number) {
+  const platformName = platform === 'toutiao' ? '头条' : platform === 'zhihu' ? '知乎' : '公众号';
+  
+  // 1. 设置初始状态，让用户立即看到反馈
+  currentTask = {
+    status: 'Processing...',
+    message: `正在从页面抓取内容...`,
+    progress: 5,
+    title: '正在抓取...'
+  };
+  chrome.storage.local.set({ currentTask });
+  broadcastUpdate();
+
+  try {
+    console.log(`[Background] 开始抓取内容 (Tab: ${tabId})...`);
+    
+    // 2. 从 Background 发送消息给 Content Script
+    // 注意：这里需要处理 Content Script 可能未加载或连接失败的情况
+    let response;
+    try {
+      response = await chrome.tabs.sendMessage(tabId, { type: 'EXTRACT_CONTENT' });
+    } catch (e: any) {
+      console.error('抓取通信失败:', e);
+      throw new Error('无法连接到页面，请刷新页面后重试');
+    }
+
+    if (!response) {
+      throw new Error('页面无响应，请刷新后重试');
+    }
+
+    if (response.type === 'ERROR') {
+      throw new Error(response.payload || '内容抓取失败');
+    }
+
+    const extraction = response.payload;
+    console.log(`[Background] 抓取成功: ${extraction.title}`);
+
+    // 更新状态
+    updateTaskState({
+      message: '抓取完成，准备生成文章...',
+      progress: 20,
+      title: extraction.title
+    });
+
+    // 3. 开始生成和发布流程
+    await startArticleGenerationAndPublish(extraction, platform);
+
+  } catch (error: any) {
+    console.error('流程失败:', error);
+    updateTaskState({
+      status: 'Error',
+      message: error.message || '处理过程中发生错误',
+      progress: 0,
+      error: error.message
+    });
+    
+    // 发送错误通知
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('public/icon-128.png'),
+      title: '任务失败',
+      message: error.message || `发布到${platformName}失败`
+    });
+  }
+}
 
 /**
  * 获取链接页面的文本内容
