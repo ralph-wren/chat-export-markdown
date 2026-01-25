@@ -358,10 +358,26 @@ async function handleInitiateProcess(platform: 'toutiao' | 'zhihu' | 'weixin' | 
     // 2. 从 Background 发送消息给 Content Script
     // 注意：这里需要处理 Content Script 可能未加载或连接失败的情况
     let response;
-    try {
-      response = await chrome.tabs.sendMessage(tabId, { type: 'EXTRACT_CONTENT' });
-    } catch (e: any) {
-      console.error('抓取通信失败:', e);
+    let retryCount = 0;
+    const maxRetries = 10; // 增加重试次数，应对微博等慢加载页面
+
+    while (retryCount < maxRetries) {
+      try {
+        // 每次重试前检查 Tab 是否还存在且 url 没变（这就太复杂了，先只发消息）
+        response = await chrome.tabs.sendMessage(tabId, { type: 'EXTRACT_CONTENT' });
+        if (response) break;
+      } catch (e) {
+        console.log(`[Background] 抓取通信尝试 ${retryCount + 1}/${maxRetries} 失败，等待重试...`);
+      }
+
+      retryCount++;
+      if (retryCount < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 800)); // 每次等待 800ms
+      }
+    }
+
+    if (!response) {
+      console.error('抓取通信最终失败');
       throw new Error('无法连接到页面，请刷新页面后重试');
     }
 
@@ -1737,7 +1753,8 @@ async function handlePublishToXiaohongshu(payload: { title: string, content: str
     console.log('[Background] Xiaohongshu publish data saved:', publishData);
 
     // 4. 打开或激活小红书发布页面
-    const publishUrl = 'https://creator.xiaohongshu.com/publish/publish';
+    // 添加 from=tab_switch 参数确保页面显示"新的创作"按钮
+    const publishUrl = 'https://creator.xiaohongshu.com/publish/publish?from=tab_switch&target=article';
 
     // 查找已有的小红书页面
     const existingTabs = await chrome.tabs.query({ url: '*://creator.xiaohongshu.com/*' });

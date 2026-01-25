@@ -103,7 +103,12 @@ const SELECTORS = {
     ],
 
     // 原创声明入口 - Playwright: getByText('去声明')
+    // 根据实际页面结构: .media-settings > ... > .wrapper.red > span.btn-text.red
     originalityEntry: [
+        '.media-settings .wrapper.red span.btn-text.red',  // 最精确的选择器
+        '.media-settings span.btn-text.red',  // 稍微宽松一点
+        '.wrapper.red span.btn-text',  // 红色按钮文本
+        'span.btn-text.red',  // 红色按钮文本（更宽松）
         'span:has-text("去声明")',
         'div:has-text("去声明")',
         ':has-text("去声明")',
@@ -113,7 +118,11 @@ const SELECTORS = {
     ],
 
     // 原创声明勾选框 - Playwright: locator('.d-checkbox-indicator')
+    // 根据实际页面结构: div.originalContainer > div.footer > ... > span.d-checkbox-simulator
     originalityCheckbox: [
+        '.originalContainer .footer span.d-checkbox-simulator',  // 最精确的选择器
+        '.originalContainer span.d-checkbox-simulator',  // 稍微宽松
+        'span.d-checkbox-simulator',  // 复选框模拟器
         '.d-checkbox-indicator',
         '.d-checkbox-input',
         '.checkbox-indicator',
@@ -121,7 +130,10 @@ const SELECTORS = {
     ],
 
     // 确认原创按钮 - Playwright: getByRole('button', { name: '声明原创' })
+    // 根据实际页面结构: div.originalContainer > div.footer > button
     declareOriginalButton: [
+        '.originalContainer .footer button',  // 最精确的选择器
+        '.originalContainer button',  // 稍微宽松
         'button:has-text("声明原创")',
         'button:contains("声明原创")',
         '.d-modal-footer button.red',
@@ -626,14 +638,32 @@ const setOriginalityDeclaration = async (): Promise<boolean> => {
         logger.log(`页面上共找到 ${allCheckboxes.length} 个复选框元素`, 'info');
 
         if (allCheckboxes.length > 0) {
-            const visibleCheckbox = allCheckboxes.find(el => isElementVisible(el as HTMLElement));
-            if (visibleCheckbox) {
-                checkbox = visibleCheckbox as HTMLElement;
-                logger.log('使用备用复选框元素', 'info');
+            // 优先查找与"原创"相关的复选框（通过父元素或兄弟元素的文本内容判断）
+            const originalCheckbox = allCheckboxes.find(el => {
+                const parent = el.parentElement;
+                const grandParent = parent?.parentElement;
+                const text = (parent?.textContent || '') + (grandParent?.textContent || '');
+                return text.includes('原创') && isElementVisible(el as HTMLElement);
+            });
+
+            if (originalCheckbox) {
+                checkbox = originalCheckbox as HTMLElement;
+                logger.log('找到与"原创"相关的复选框', 'info');
+            } else {
+                // 如果没找到与"原创"相关的，查找第一个可见的复选框
+                const visibleCheckbox = allCheckboxes.find(el => isElementVisible(el as HTMLElement));
+                if (visibleCheckbox) {
+                    checkbox = visibleCheckbox as HTMLElement;
+                    logger.log('使用第一个可见的复选框', 'info');
+                    // 输出该复选框的信息以便调试
+                    const parent = visibleCheckbox.parentElement;
+                    logger.log(`复选框父元素文本: ${parent?.textContent?.substring(0, 50)}`, 'info');
+                }
             }
         }
 
         if (!checkbox) {
+            logger.log('⚠️ 无法找到任何可用的复选框，跳过原创声明设置', 'warn');
             return false;
         }
     }
