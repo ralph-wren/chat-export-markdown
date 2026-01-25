@@ -571,6 +571,67 @@ const selectTemplateCover = async (): Promise<boolean> => {
 };
 
 /**
+ * 随机选择一个图文模板
+ */
+const selectRandomTemplate = async (): Promise<boolean> => {
+    logger.log('查找并随机选择图文模板...', 'info');
+
+    // 1. 优先使用精确的 CSS 类名选择器 (基于用户提供的 HTML)
+    let targets = Array.from(document.querySelectorAll('.template-list .template-card'));
+    let visibleTargets = targets.filter(el => isElementVisible(el as HTMLElement)) as HTMLElement[];
+
+    // 2. 如果没找到，尝试模糊匹配类名
+    if (visibleTargets.length === 0) {
+        logger.log('精确选择器未找到，尝试模糊匹配...', 'info');
+        const candidates = Array.from(document.querySelectorAll('div[class*="template-card"], div[class*="template-item"]'));
+        visibleTargets = candidates.filter(el => isElementVisible(el as HTMLElement)) as HTMLElement[];
+    }
+
+    // 3. 如果还是没找到，尝试之前的启发式搜索（通过"模板"文字定位）
+    if (visibleTargets.length === 0) {
+        logger.log('类名匹配未找到，尝试通过文本定位...', 'info');
+        const templateHeaders = Array.from(document.querySelectorAll('div, span, h3, h4')).filter(el => 
+            el.textContent?.includes('模板') && isElementVisible(el as HTMLElement)
+        );
+
+        for (const header of templateHeaders) {
+            let parent = header.parentElement;
+            for(let i=0; i<3 && parent; i++) {
+                const grids = parent.querySelectorAll('div[class*="grid"], ul, div[class*="list"]');
+                for (const grid of Array.from(grids)) {
+                    const children = Array.from(grid.children).filter(c => isElementVisible(c as HTMLElement));
+                    if (children.length > 3) {
+                        visibleTargets = children as HTMLElement[];
+                        break;
+                    }
+                }
+                if (visibleTargets.length > 0) break;
+                parent = parent.parentElement;
+            }
+            if (visibleTargets.length > 0) break;
+        }
+    }
+
+    if (visibleTargets.length === 0) {
+        logger.log('❌ 未找到图文模板列表', 'warn');
+        return false;
+    }
+
+    const randomIndex = Math.floor(Math.random() * visibleTargets.length);
+    const target = visibleTargets[randomIndex];
+    
+    // 获取模板名称用于日志
+    const templateName = target.querySelector('.template-title')?.textContent || `第 ${randomIndex + 1} 个模板`;
+    logger.log(`找到 ${visibleTargets.length} 个模板，随机选择: ${templateName}`, 'action');
+    
+    simulateClick(target);
+    await new Promise(r => setTimeout(r, 1000));
+    
+    logger.log('✅ 已随机选择模板', 'success');
+    return true;
+};
+
+/**
  * 点击"下一步"按钮
  */
 const clickNextStep = async (): Promise<boolean> => {
@@ -1104,6 +1165,7 @@ installPublishReporting();
 (window as any).memoraidXiaohongshuFillContent = fillContent;
 (window as any).memoraidXiaohongshuAutoFormat = clickAutoFormat;
 (window as any).memoraidXiaohongshuSelectCover = selectTemplateCover;
+(window as any).memoraidXiaohongshuSelectTemplate = selectRandomTemplate;
 (window as any).memoraidXiaohongshuNextStep = clickNextStep;
 (window as any).memoraidXiaohongshuAddTopics = addTopics;
 (window as any).memoraidXiaohongshuSetDeclaration = setContentTypeDeclaration;
@@ -1144,6 +1206,7 @@ console.log(`
   memoraidXiaohongshuFillContent("内容")    - 填充正文
   memoraidXiaohongshuAutoFormat()           - 一键排版
   memoraidXiaohongshuSelectCover()          - 选择模板封面
+  memoraidXiaohongshuSelectTemplate()       - 随机选择图文模板
   memoraidXiaohongshuNextStep()             - 进入发布设置
   memoraidXiaohongshuAddTopics(["#话题1"])  - 添加话题
   memoraidXiaohongshuPublish()              - 发布文章
