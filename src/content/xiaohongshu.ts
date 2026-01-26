@@ -41,8 +41,12 @@ const SELECTORS = {
         '[placeholder*="请输入标题"]'
     ],
 
-    // 正文编辑器 - 小红书核心使用的是 rich-editor 下的 slate
+    // 正文编辑器
+    // 说明：小红书文章发布页目前使用 tiptap/ProseMirror（contenteditable），不是 Slate。
+    // 这里优先匹配 ProseMirror，其次再兜底 Slate/Quill。
     editor: [
+        '.tiptap.ProseMirror[contenteditable="true"]',
+        '.ProseMirror[contenteditable="true"]',
         '.rich-editor-content [data-slate-editor="true"]',
         '[data-slate-editor="true"]',
         '.rich-editor-content',
@@ -57,9 +61,25 @@ const SELECTORS = {
         '.rich-editor-toolbar button:has-text("排版")'
     ],
 
-    // 模板封面图片 - Playwright: locator('div:nth-child(19) > .template-cover-container > .images-grid > img').first()
-    // 注意：这里使用第一个可见的模板图片
+    // 「模板与封面」面板按钮
+    templateAndCoverButton: [
+        'button:has-text("模板与封面")',
+        'button:contains("模板与封面")',
+        '[role="button"]:has-text("模板与封面")'
+    ],
+
+    // 面板内 Tab：选择模板
+    templateTab: [
+        ':has-text("选择模板")',
+        ':contains("选择模板")'
+    ],
+
+    // 模板封面图片（右侧“选择模板/封面设置”面板里的缩略图）
+    // 说明：当前页面这些 img 常带 alt="模板封面"
     templateCoverImage: [
+        'img[alt="模板封面"]',
+        'img[alt*="模板封面"]',
+        'img[alt*="模板"]',
         '.template-cover-container img',
         '.images-grid img',
         '[class*="template"] img'
@@ -400,20 +420,69 @@ const fillContent = async (content: string): Promise<boolean> => {
 
     logger.log(`填充正文内容 (${content.length} 字)...`, 'action');
 
-    // 强制先滚动到编辑器并点击
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+    // 强制滚动到编辑器并点击获取焦点
     editor.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    await new Promise(r => setTimeout(r, 500));
-
-    // 模拟点击并获取焦点
+    await sleep(400);
     simulateClick(editor);
     editor.focus();
+    await sleep(200);
 
-    // 模拟点击并获取焦点
-    simulateClick(editor);
-    editor.focus();
-    await new Promise(r => setTimeout(r, 200));
+    // 防止误操作标题：若焦点仍在标题栏则强制转移
+    const titleInput = findElement(SELECTORS.titleInput);
+    if (titleInput && (titleInput === document.activeElement || titleInput.contains(document.activeElement))) {
+        logger.log('⚠️ 焦点仍在标题栏，强制转移焦点到正文编辑器', 'warn');
+        simulateClick(editor);
+        editor.focus();
+        await sleep(300);
+    }
 
-    // 关键改进：尝试点击编辑器内部的段落，这是基于 Playwright 录制发现的必要步骤
+    // =====================================================
+    // 分支1：ProseMirror/tiptap（小红书文章页）
+    // =====================================================
+    const isProseMirror = editor.classList.contains('ProseMirror') || editor.classList.contains('tiptap');
+    if (isProseMirror) {
+        logger.log('检测到 ProseMirror 编辑器，使用快捷键式写入策略', 'info');
+
+        // 1) 清空：Ctrl+A + Delete（比 Range 选中更符合 ProseMirror 预期）
+        editor.focus();
+        document.execCommand('selectAll', false);
+        document.execCommand('delete', false);
+        await sleep(150);
+
+        // 2) 写入：逐行 insertText + insertParagraph，确保换行保留
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            // 允许空行：空行就直接换段
+            if (lines[i].length > 0) {
+                document.execCommand('insertText', false, lines[i]);
+            }
+            if (i < lines.length - 1) {
+                document.execCommand('insertParagraph', false);
+            }
+        }
+
+        // 3) 触发 input 通知框架更新
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+        await sleep(300);
+
+        const ok = editor.innerText.trim().length > 0;
+        if (!ok) {
+            logger.log('❌ 正文填充失败：ProseMirror 编辑器内容仍为空', 'error');
+            return false;
+        }
+
+        logger.log('✅ ✅ 正文已填充（ProseMirror）', 'success');
+        await sleep(400);
+        return true;
+    }
+
+    // =====================================================
+    // 分支2：Slate/其他（旧版/不同页面）
+    // =====================================================
+
+    // 关键改进：尝试点击编辑器内部段落以激活输入状态
     const innerParagraph = editor.querySelector('p, [data-slate-node="element"], .rich-editor-content p');
     const targetElement = (innerParagraph as HTMLElement) || editor;
 
@@ -421,28 +490,10 @@ const fillContent = async (content: string): Promise<boolean> => {
         logger.log('点击编辑器内层段落以激活输入状态', 'info');
         simulateClick(targetElement);
         targetElement.focus();
-        await new Promise(r => setTimeout(r, 200));
+        await sleep(200);
     }
 
-    // 验证当前焦点是否在编辑器内，防止误删标题
-    // 注意：小红书编辑器有时候 document.activeElement 可能指向 body，所以这里放宽检查
-    // 如果焦点在标题输入框，则必须移开
-    const titleInput = findElement(SELECTORS.titleInput);
-    if (titleInput && (titleInput === document.activeElement || titleInput.contains(document.activeElement))) {
-        logger.log('⚠️ 焦点仍在标题栏，强制转移焦点到编辑器', 'warn');
-        targetElement.focus();
-        // 尝试模拟点击一下编辑器
-        simulateClick(targetElement);
-        await new Promise(r => setTimeout(r, 500));
-    }
-
-    // 清空编辑器内容 - 使用更安全的 Range 操作替代 selectAll，防止选中整个页面或标题
-    // 再次检查焦点
-    if (!editor.contains(document.activeElement)) {
-        targetElement.focus();
-    }
-
-    // 新的清空逻辑：选中编辑器内容进行删除
+    // 清空：使用 Range 只选中编辑器内容，避免误选页面
     try {
         const selection = window.getSelection();
         if (selection) {
@@ -450,24 +501,18 @@ const fillContent = async (content: string): Promise<boolean> => {
             const range = document.createRange();
             range.selectNodeContents(targetElement);
             selection.addRange(range);
-            // 确保焦点在 targetElement
             targetElement.focus();
             document.execCommand('delete', false);
             selection.removeAllRanges();
         }
     } catch (e) {
-        logger.log('Range 清空失败，尝试针对性删除', 'warn');
+        logger.log('Range 清空失败，尝试直接清空', 'warn');
         targetElement.innerHTML = '';
     }
 
-    await new Promise(r => setTimeout(r, 500));
+    await sleep(300);
 
-    // 再次验证焦点，防止在清空过程中丢失
-    if (!editor.contains(document.activeElement)) {
-        targetElement.focus();
-    }
-
-    // 使用模拟粘贴 (Paste Event) 填充，这是处理 Slate.js 多行内容最稳定的方法
+    // 模拟粘贴：部分编辑器会忽略合成 ClipboardEvent，因此作为“尝试”而不是依赖
     let pasteSuccess = false;
     try {
         const dataTransfer = new DataTransfer();
@@ -477,29 +522,23 @@ const fillContent = async (content: string): Promise<boolean> => {
             bubbles: true,
             cancelable: true
         });
-
-        // 尝试向目标元素分发粘贴事件
         targetElement.dispatchEvent(pasteEvent);
-
-        // 检查是否粘贴成功（有些编辑器可能需要一点时间更新 DOM）
-        await new Promise(r => setTimeout(r, 200));
-
+        await sleep(200);
         if (editor.innerText.trim().length > 0) {
             pasteSuccess = true;
             logger.log('✅ 正文已通过模拟粘贴填充', 'success');
         } else {
-            logger.log('模拟粘贴似乎没有效果，尝试回退', 'warn');
+            logger.log('⚠️ 模拟粘贴似乎没有效果，尝试回退', 'warn');
         }
     } catch (e) {
-        logger.log('模拟粘贴执行出错，尝试回退', 'warn');
+        logger.log('⚠️ 模拟粘贴执行出错，尝试回退', 'warn');
     }
 
-    // 如果粘贴失败，或者编辑器依然为空，尝试回退逻辑
     if (!pasteSuccess || editor.innerText.trim().length === 0) {
         logger.log('正在使用回退模式（逐行插入）...', 'info');
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
-            if (lines[i].trim()) {
+            if (lines[i].length > 0) {
                 document.execCommand('insertText', false, lines[i]);
             }
             if (i < lines.length - 1) {
@@ -508,13 +547,17 @@ const fillContent = async (content: string): Promise<boolean> => {
         }
     }
 
-    // 再次触发 input 事件通知 React/Slate 更新
     editor.dispatchEvent(new Event('input', { bubbles: true }));
+    await sleep(300);
 
-    // 额外触发一个 keyup 事件
-    editor.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Enter' }));
+    const ok = editor.innerText.trim().length > 0;
+    if (!ok) {
+        logger.log('❌ 正文填充失败：编辑器内容仍为空', 'error');
+        return false;
+    }
 
-    await new Promise(r => setTimeout(r, 1000));
+    logger.log('✅ ✅ 正文已填充', 'success');
+    await sleep(400);
     return true;
 };
 
@@ -547,24 +590,64 @@ const clickAutoFormat = async (): Promise<boolean> => {
  * 选择模板封面
  */
 const selectTemplateCover = async (): Promise<boolean> => {
-    logger.log('查找模板封面图片...', 'info');
+    logger.log('查找模板封面（模板缩略图）...', 'info');
 
-    // 查找所有模板封面图片
-    const images = Array.from(document.querySelectorAll('.template-cover-container img, .images-grid img'));
-    const visibleImages = images.filter(img => isElementVisible(img as HTMLElement));
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+    // 0) 先确保右侧“模板与封面”面板已打开
+    const openBtn = findElement(SELECTORS.templateAndCoverButton);
+    if (openBtn && isElementVisible(openBtn)) {
+        logger.log('打开“模板与封面”面板', 'info');
+        simulateClick(openBtn);
+        await sleep(600);
+    }
+
+    // 1) 等待缩略图加载出来（点击面板后通常需要异步渲染/懒加载）
+    const waitForCoverThumbs = async (timeoutMs = 8000): Promise<HTMLElement[]> => {
+        const start = Date.now();
+        while (Date.now() - start < timeoutMs) {
+            const images = Array.from(document.querySelectorAll(SELECTORS.templateCoverImage.join(',')));
+            const visibleImages = images.filter(img => isElementVisible(img as HTMLElement)) as HTMLElement[];
+            if (visibleImages.length > 0) return visibleImages;
+            await sleep(300);
+        }
+        return [];
+    };
+
+    // 先确保在“选择模板”tab（有些时候默认在“封面设置”）
+    const tab = findElement(SELECTORS.templateTab);
+    if (tab && isElementVisible(tab) && !(tab.textContent || '').includes('封面设置')) {
+        // 仅当它可点击且页面没在模板列表时，点一下
+        //（这里不做强判断，点一下不影响）
+        simulateClick(tab);
+        await sleep(300);
+    }
+
+    const visibleImages = await waitForCoverThumbs(10000);
     if (visibleImages.length === 0) {
-        logger.log('未找到模板封面图片，跳过', 'warn');
+        logger.log('⚠️ 未找到模板封面缩略图：可能需要更长加载时间/面板未真正展开', 'warn');
         return false;
     }
 
-    // 随机选择一个可见的图片
-    const randomIndex = Math.floor(Math.random() * visibleImages.length);
-    logger.log(`找到 ${visibleImages.length} 个模板封面，随机选择第 ${randomIndex + 1} 个`, 'info');
-    const selectedImage = visibleImages[randomIndex] as HTMLElement;
+    // 2) 过滤掉明显不是模板缩略图的小图标（根据尺寸）
+    const thumbImages = visibleImages.filter(el => {
+        const r = el.getBoundingClientRect();
+        return r.width >= 60 && r.height >= 80;
+    });
+    const candidates = thumbImages.length > 0 ? thumbImages : visibleImages;
 
-    simulateClick(selectedImage);
-    await new Promise(r => setTimeout(r, 800));
+    // 3) 随机选择一个
+    const randomIndex = Math.floor(Math.random() * candidates.length);
+    logger.log(`找到 ${candidates.length} 个模板封面，随机选择第 ${randomIndex + 1} 个`, 'info');
+    const selected = candidates[randomIndex];
+
+    try {
+        selected.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch {}
+    await sleep(200);
+
+    simulateClick(selected);
+    await sleep(800);
 
     logger.log('✅ 已选择模板封面', 'success');
     return true;
@@ -626,37 +709,24 @@ const selectRandomTemplate = async (): Promise<boolean> => {
     candidateScopes.push(document.body);
 
     const collectCards = (scope: HTMLElement): HTMLElement[] => {
-        // 常见类名/结构兜底：卡片容器、可点击 div、含缩略图的块
-        const selectors = [
-            '.template-list .template-card',
-            'div[class*="template"][class*="card"]',
-            'div[class*="template"][class*="item"]',
-            // 一些版本没有 card/item 类名：直接用缩略图 img 找可点击祖先
-            'img'
-        ];
+        // ✅ 以“模板缩略图 img”为主：更稳定，也更接近真实点击目标
+        // 该页面的模板缩略图通常是竖图（约 92x160），而图标/开关很小。
+        const imgs = Array.from(scope.querySelectorAll('img'))
+            .filter(img => isElementVisible(img as HTMLElement))
+            .filter(img => {
+                const r = (img as HTMLElement).getBoundingClientRect();
+                // 过滤：小图标 / 颜色块等
+                return r.width >= 70 && r.height >= 120;
+            }) as HTMLImageElement[];
 
-        const raw: HTMLElement[] = [];
-        for (const sel of selectors) {
-            const nodes = Array.from(scope.querySelectorAll(sel));
-            for (const n of nodes) {
-                if (sel === 'img') {
-                    const clickable = findClickableAncestor(n);
-                    if (clickable) raw.push(clickable);
-                } else {
-                    raw.push(n as HTMLElement);
-                }
-            }
-        }
+        // 尝试点击 img 本身；如果被遮罩拦截，再回退到可点击祖先
+        const cards: HTMLElement[] = imgs.map(img => {
+            const clickable = findClickableAncestor(img);
+            return (clickable && clickable !== scope) ? clickable : (img as unknown as HTMLElement);
+        });
 
         // 去重 + 过滤可见
-        const uniq = Array.from(new Set(raw)).filter(el => isElementVisible(el));
-
-        // 再过滤：模板卡片一般包含图片缩略图或较多文本
-        return uniq.filter(el => {
-            const hasImg = el.querySelectorAll('img').length > 0;
-            const text = (el.textContent || '').trim();
-            return hasImg || text.length > 10;
-        });
+        return Array.from(new Set(cards)).filter(el => isElementVisible(el));
     };
 
     // 收集候选卡片
@@ -1129,11 +1199,11 @@ const autoFillContent = async (): Promise<void> => {
         if (isFlowCancelled) return;
 
         // 步骤5: 随机选择图文模板（可选）
-        // 说明：在“预览/选择模板”页面右侧会出现模板列表。
-        // 如果页面没有模板面板，此步骤会自动跳过。
-        await selectRandomTemplate();
+        // ⚠️ 默认不自动执行：避免影响你手动选模板/排查问题。
+        // 如需启用，请在控制台手动调用：memoraidXiaohongshuSelectTemplate()
+        // await selectRandomTemplate();
 
-        if (isFlowCancelled) return;
+        // if (isFlowCancelled) return;
 
         // 步骤6: 选择模板封面（可选）
         await selectTemplateCover();
