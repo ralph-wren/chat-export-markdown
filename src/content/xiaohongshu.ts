@@ -572,61 +572,130 @@ const selectTemplateCover = async (): Promise<boolean> => {
 
 /**
  * 随机选择一个图文模板
+ *
+ * 说明：小红书的“预览/选择模板”区域经常做 A/B 实验，类名不稳定。
+ * 这里采用“先定位右侧模板面板（包含‘选择模板’文本）→再找可点击卡片”的策略。
  */
 const selectRandomTemplate = async (): Promise<boolean> => {
     logger.log('查找并随机选择图文模板...', 'info');
 
-    // 1. 优先使用精确的 CSS 类名选择器 (基于用户提供的 HTML)
-    let targets = Array.from(document.querySelectorAll('.template-list .template-card'));
-    let visibleTargets = targets.filter(el => isElementVisible(el as HTMLElement)) as HTMLElement[];
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-    // 2. 如果没找到，尝试模糊匹配类名
-    if (visibleTargets.length === 0) {
-        logger.log('精确选择器未找到，尝试模糊匹配...', 'info');
-        const candidates = Array.from(document.querySelectorAll('div[class*="template-card"], div[class*="template-item"]'));
-        visibleTargets = candidates.filter(el => isElementVisible(el as HTMLElement)) as HTMLElement[];
-    }
+    // 从一个元素向上找“可点击祖先”
+    const findClickableAncestor = (el: Element | null): HTMLElement | null => {
+        let cur: Element | null = el;
+        for (let i = 0; i < 6 && cur; i++) {
+            const h = cur as HTMLElement;
+            const role = h.getAttribute?.('role') || '';
+            const tag = (h.tagName || '').toLowerCase();
+            const isClickable =
+                tag === 'button' ||
+                tag === 'a' ||
+                role === 'button' ||
+                typeof (h as any).onclick === 'function' ||
+                h.style?.cursor === 'pointer' ||
+                h.getAttribute?.('tabindex') !== null;
+            if (isClickable && isElementVisible(h)) return h;
+            cur = cur.parentElement;
+        }
+        return null;
+    };
 
-    // 3. 如果还是没找到，尝试之前的启发式搜索（通过"模板"文字定位）
-    if (visibleTargets.length === 0) {
-        logger.log('类名匹配未找到，尝试通过文本定位...', 'info');
-        const templateHeaders = Array.from(document.querySelectorAll('div, span, h3, h4')).filter(el => 
-            el.textContent?.includes('模板') && isElementVisible(el as HTMLElement)
-        );
+    // 1) 优先定位“选择模板”面板
+    const allTextNodes = Array.from(document.querySelectorAll('div, span, h1, h2, h3, h4')) as HTMLElement[];
+    const templateHeader = allTextNodes.find(el => isElementVisible(el) && (el.textContent || '').trim() === '选择模板');
 
-        for (const header of templateHeaders) {
-            let parent = header.parentElement;
-            for(let i=0; i<3 && parent; i++) {
-                const grids = parent.querySelectorAll('div[class*="grid"], ul, div[class*="list"]');
-                for (const grid of Array.from(grids)) {
-                    const children = Array.from(grid.children).filter(c => isElementVisible(c as HTMLElement));
-                    if (children.length > 3) {
-                        visibleTargets = children as HTMLElement[];
-                        break;
-                    }
-                }
-                if (visibleTargets.length > 0) break;
-                parent = parent.parentElement;
+    let panel: HTMLElement | null = null;
+    if (templateHeader) {
+        // 向上找一个“看起来像侧边栏/面板”的容器
+        let p: HTMLElement | null = templateHeader;
+        for (let i = 0; i < 8 && p; i++) {
+            // 经验：面板里通常会有很多 img 缩略图
+            const imgs = p.querySelectorAll('img');
+            if (imgs.length >= 3) {
+                panel = p;
+                break;
             }
-            if (visibleTargets.length > 0) break;
+            p = p.parentElement;
         }
     }
 
-    if (visibleTargets.length === 0) {
-        logger.log('❌ 未找到图文模板列表', 'warn');
+    // 2) 如果定位失败，回退到全局找“模板卡片”
+    const candidateScopes: HTMLElement[] = [];
+    if (panel) candidateScopes.push(panel);
+    candidateScopes.push(document.body);
+
+    const collectCards = (scope: HTMLElement): HTMLElement[] => {
+        // 常见类名/结构兜底：卡片容器、可点击 div、含缩略图的块
+        const selectors = [
+            '.template-list .template-card',
+            'div[class*="template"][class*="card"]',
+            'div[class*="template"][class*="item"]',
+            // 一些版本没有 card/item 类名：直接用缩略图 img 找可点击祖先
+            'img'
+        ];
+
+        const raw: HTMLElement[] = [];
+        for (const sel of selectors) {
+            const nodes = Array.from(scope.querySelectorAll(sel));
+            for (const n of nodes) {
+                if (sel === 'img') {
+                    const clickable = findClickableAncestor(n);
+                    if (clickable) raw.push(clickable);
+                } else {
+                    raw.push(n as HTMLElement);
+                }
+            }
+        }
+
+        // 去重 + 过滤可见
+        const uniq = Array.from(new Set(raw)).filter(el => isElementVisible(el));
+
+        // 再过滤：模板卡片一般包含图片缩略图或较多文本
+        return uniq.filter(el => {
+            const hasImg = el.querySelectorAll('img').length > 0;
+            const text = (el.textContent || '').trim();
+            return hasImg || text.length > 10;
+        });
+    };
+
+    // 收集候选卡片
+    let cards: HTMLElement[] = [];
+    for (const scope of candidateScopes) {
+        cards = collectCards(scope);
+        if (cards.length >= 3) break;
+    }
+
+    if (cards.length === 0) {
+        logger.log('❌ 未找到图文模板列表（可能不在模板预览页/或页面结构变化）', 'warn');
         return false;
     }
 
-    const randomIndex = Math.floor(Math.random() * visibleTargets.length);
-    const target = visibleTargets[randomIndex];
-    
-    // 获取模板名称用于日志
-    const templateName = target.querySelector('.template-title')?.textContent || `第 ${randomIndex + 1} 个模板`;
-    logger.log(`找到 ${visibleTargets.length} 个模板，随机选择: ${templateName}`, 'action');
-    
+    // 尽量只选右侧面板的卡片（避免误点正文区图片）
+    if (panel) {
+        const panelCards = cards.filter(c => panel!.contains(c));
+        if (panelCards.length >= 3) cards = panelCards;
+    }
+
+    // 随机选择一个
+    const randomIndex = Math.floor(Math.random() * cards.length);
+    const target = cards[randomIndex];
+
+    // 尝试提取模板名（如果有）
+    const nameEl = target.querySelector('[class*="title"], [class*="name"], h4, h3, span');
+    const templateName = (nameEl?.textContent || '').trim() || `第 ${randomIndex + 1} 个模板`;
+
+    logger.log(`找到 ${cards.length} 个模板，随机选择: ${templateName}`, 'action');
+
+    // 点击前确保在视口内
+    try {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch {}
+    await sleep(250);
+
     simulateClick(target);
-    await new Promise(r => setTimeout(r, 1000));
-    
+    await sleep(1200);
+
     logger.log('✅ 已随机选择模板', 'success');
     return true;
 };
@@ -1059,7 +1128,14 @@ const autoFillContent = async (): Promise<void> => {
 
         if (isFlowCancelled) return;
 
-        // 步骤5: 选择模板封面（可选）
+        // 步骤5: 随机选择图文模板（可选）
+        // 说明：在“预览/选择模板”页面右侧会出现模板列表。
+        // 如果页面没有模板面板，此步骤会自动跳过。
+        await selectRandomTemplate();
+
+        if (isFlowCancelled) return;
+
+        // 步骤6: 选择模板封面（可选）
         await selectTemplateCover();
 
         if (isFlowCancelled) return;
